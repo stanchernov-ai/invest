@@ -84,7 +84,13 @@ class StateMachineOrchestrator:
         
         if member_info["model"] == FAST_MODEL: 
             config_params["max_output_tokens"] = FLASH_TOKEN_LIMIT
-        
+
+        # Elevated native reasoning for decision-critical agents (internal thinking
+        # tokens only; does not enter the response text / downstream context).
+        thinking_budget = member_info.get("thinking_budget")
+        if thinking_budget is not None:
+            config_params["thinking_config"] = types.ThinkingConfig(thinking_budget=thinking_budget)
+
         if schema:
             config_params["response_mime_type"] = "application/json"
             config_params["response_schema"] = schema

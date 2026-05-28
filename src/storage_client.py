@@ -15,6 +15,46 @@ dash = chr(45)
 INPUT_CONTAINER = f"boardroom{dash}inputs"
 STATE_CONTAINER = f"boardroom{dash}state"
 REPORT_CONTAINER = f"boardroom{dash}reports"
+RUN_STATUS_BLOB = "run_status.json"
+
+
+def save_run_status(payload: dict) -> None:
+    """Publish latest pipeline run status to state blob (completion signal for monitors)."""
+    client = get_blob_service_client()
+    json_str = json.dumps(payload, indent=2)
+
+    filepath = os.path.join(DATA_DIR, RUN_STATUS_BLOB)
+    os.makedirs(os.path.dirname(filepath) or DATA_DIR, exist_ok=True)
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(json_str)
+
+    if client:
+        try:
+            blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=RUN_STATUS_BLOB)
+            blob_client.upload_blob(json_str, overwrite=True)
+        except Exception:
+            logger.error("Failed to publish run_status.json to Azure.")
+
+
+def load_run_status() -> dict | None:
+    """Load run_status.json from Azure state container, falling back to local copy."""
+    client = get_blob_service_client()
+    if client:
+        try:
+            blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=RUN_STATUS_BLOB)
+            if blob_client.exists():
+                return json.loads(blob_client.download_blob().readall())
+        except Exception:
+            logger.warning("Could not load run_status.json from Azure.")
+
+    filepath = os.path.join(DATA_DIR, RUN_STATUS_BLOB)
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
 
 def get_blob_service_client():
     if not AZURE_CONN_STR:

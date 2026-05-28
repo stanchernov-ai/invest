@@ -131,10 +131,10 @@ def generate_dynamic_mandate(current_portfolio_value: float, weighted_cagr: floa
     future_value = current_portfolio_value * ((1 + r)**years_left) + annual_injection * (((1 + r)**years_left - 1) / r)
     
     mandate = (
-        f"THE NEW MANDATE: Stan is {age} years old with {years_left} years to retirement. "
-        f"The absolute target is no longer a fixed dollar amount. The objective is to aggressively outperform the NASDAQ by at least 5 percent annually. "
-        f"Stan's current portfolio value is ${current_portfolio_value:,.2f} with an estimated weighted historical CAGR of {r*100:.2f} percent. "
-        f"If this rate of return is maintained, the mathematically projected retirement balance at age 65 is ${future_value:,.2f}. "
-        f"Demand excellence, alpha, and aggressive outperformance to push this projection even higher."
+        f"Stan is {age} years old with {years_left} years to retirement. "
+        f"The objective is to aggressively outperform the NASDAQ by at least 5 percent annually. "
+        f"Current portfolio value is ${current_portfolio_value:,.2f} with an estimated weighted historical CAGR of {r*100:.2f} percent. "
+        f"If this rate of return is maintained, the projected balance at age 65 is ${future_value:,.2f}. "
+        f"Demand excellence, alpha, and aggressive outperformance to push this projection higher."
     )
     return mandate

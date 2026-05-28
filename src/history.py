@@ -196,10 +196,11 @@ async def build_account_returns(data_dir=None, api_key=None, session=None, windo
         date_objs = [datetime.datetime.strptime(d, "%Y-%m-%d").date() for d in global_dates]
         ytd_start = datetime.date(today.year, 1, 1)
         twelve_mo_start = today - datetime.timedelta(days=365)
+        three_mo_start = today - datetime.timedelta(days=90)
 
         # Cumulative TWR growth factors per account + total, for each window.
         accounts = ACCOUNT_ORDER + ["Total"]
-        factor = {acct: {"ytd": 1.0, "12m": 1.0} for acct in accounts}
+        factor = {acct: {"ytd": 1.0, "12m": 1.0, "3m": 1.0} for acct in accounts}
         daily_total = {}
 
         for i in range(len(global_dates)):
@@ -237,18 +238,37 @@ async def build_account_returns(data_dir=None, api_key=None, session=None, windo
                         factor[acct]["ytd"] *= (1 + r)
                     if cur_date >= twelve_mo_start:
                         factor[acct]["12m"] *= (1 + r)
+                    if cur_date >= three_mo_start:
+                        factor[acct]["3m"] *= (1 + r)
             if total_vprev > 1.0:
                 r_tot = total_gain / total_vprev
                 if cur_date >= ytd_start:
                     factor["Total"]["ytd"] *= (1 + r_tot)
                 if cur_date >= twelve_mo_start:
                     factor["Total"]["12m"] *= (1 + r_tot)
+                if cur_date >= three_mo_start:
+                    factor["Total"]["3m"] *= (1 + r_tot)
 
         returns = {}
         for acct in accounts:
             returns[acct] = {
                 "ytd": round((factor[acct]["ytd"] - 1) * 100, 2),
                 "12m": round((factor[acct]["12m"] - 1) * 100, 2),
+                "3m": round((factor[acct]["3m"] - 1) * 100, 2),
+            }
+
+        spy_series, qqq_series = await asyncio.gather(
+            fetch_price_series("SPY", api_key, session, start_str, end_str),
+            fetch_price_series("QQQ", api_key, session, start_str, end_str),
+        )
+        spy_aligned = _forward_fill_prices(spy_series, global_dates)
+        qqq_aligned = _forward_fill_prices(qqq_series, global_dates)
+        benchmark_history = {}
+        for i, date_str in enumerate(global_dates):
+            benchmark_history[date_str.replace("-", "")] = {
+                "portfolio": daily_total.get(date_str, 0.0),
+                "spy": round(spy_aligned[i], 2),
+                "qqq": round(qqq_aligned[i], 2),
             }
 
         return {
@@ -257,6 +277,7 @@ async def build_account_returns(data_dir=None, api_key=None, session=None, windo
             "basis": "securities_only",
             "returns": returns,
             "daily_total": daily_total,
+            "benchmark_history": benchmark_history,
         }
     except Exception as e:
         logger.error(f"History engine failed (non-fatal): {e}")

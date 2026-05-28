@@ -92,6 +92,16 @@ This document tracks identified bugs, architectural improvements, and long-term 
   * Create a `.cursor/rules/architecture_validator.mdc` file defining how the agent should review PRs or structural changes against the `technical_solution.md`.
   * Define prompts for weekly performance analysis (e.g., comparing `portfolio_history.json` trends against the debate logs).
 
+### 3.3 Run Completion Signal (No More Blind Polling) — DONE
+* **Description:** Replace agent `sleep` + blob-list guessing with a deterministic completion contract so deploy/run monitoring is efficient and reliable.
+* **Problem:** Azure cannot push notifications into Cursor. Prior workflow used fixed waits and listed blobs hoping new files appeared — racey and slow.
+* **Resolution (2026-05-28):**
+  * Pipeline writes `boardroom-state/run_status.json` at run start (`running`) and in `finally` (`success` / `failed` / `aborted`) with `run_id`, timestamps, duration, artifact names, and error detail.
+  * Added `scripts/wait_for_run.py` — polls with exponential backoff (15s → 60s), exits 0/1/2/3. Documented in `engineering_playbook.md`.
+  * **Deploy monitoring:** use `gh run watch --exit-status` (no sleep).
+  * **Run monitoring:** capture `--run-id` at trigger time, then `wait_for_run.py --run-id …`.
+* **Deferred:** optional GitHub Actions post-deploy smoke job that triggers + waits automatically; failure email alert (cross-ref 2.2).
+
 ---
 
 ## Phase 4: Reporting & Visual Formatting
@@ -216,6 +226,24 @@ A team of focused reviewers, each producing a short scored report + prioritized 
   * Brand/polish: header, section dividers, mobile/responsive behavior.
 * **Output:** A prioritized list of concrete visual improvements (with before/after notes) and, where low-risk, proposed template diffs to `reporting.py`. Could run after each design change or weekly.
 * **Implementation notes:** Cursor subagent that reads `reporting.py` + a rendered sample briefing (pulled from Azure via Phase 3.1) and critiques against a design rubric. Pairs naturally with the Phase 4 reporting work just completed.
+
+---
+
+## Phase 6: Agent Reasoning & Behavior Quality
+
+### 6.1 Native "Thinking" Budgets for Decision-Critical Agents — DONE (in progress to validate)
+* **Description:** Improve output quality by deliberately investing more Gemini 2.5 **native thinking** (internal reasoning) on the agents whose reasoning drives decisions, while protecting the context window and the 10-minute Azure ceiling.
+* **Key insight:** Native thinking tokens are *internal* — they do **not** enter the response text, so they raise quality **without** bloating the debate history passed to downstream agents. This is the safe lever.
+* **Resolution (2026-05-28):**
+  * Added tunable budgets in `agents.py` (`THINK_PANELIST=4096`, `THINK_CHAIRMAN=8192`) and a `thinking_budget` key on the 5 board members + Chairman.
+  * `engine._run_agent` now attaches `types.ThinkingConfig(thinking_budget=...)` when present. Verified the SDK config shape locally.
+  * **Red Teamer left at default** — its output isn't consumed by any agent for decisions (read-only narrative), so elevated thinking is low ROI (see 5.2 opportunity note below).
+* **Validate next run:** benchmark total runtime vs the ~5-6 min baseline (and the 10-min hard ceiling) and the Gemini token/cost delta; dial budgets down if runtime creeps up.
+* **Deferred sub-items:**
+  * **6.2 Thought-summary capture** — `include_thoughts=True` to log Chairman/Buffett reasoning to telemetry for drift detection (e.g., the live `STRONG BUY : MNDY` Buffett-drift case). Needs a parsing refactor in `_run_agent` (separate thought parts from the JSON answer) so it doesn't break structured-output parsing — do carefully.
+  * **6.3 Red Teamer utilization** — its bear case is rendered but never fed back into the debate/decisions. Either wire it into the Chairman's final gut-check / Compliance, or accept it as reader-only. (Cross-ref Opportunity Audit 5.2.)
+
+> **Note:** The agent-behavior/prompt-drift fixes triaged from Stan's Gemini list (Buffett value anchor, Livermore Stand-Aside, Chairman deterministic tie-break, synthesis contradiction, compliance de-hardcoding) are the natural rest of Phase 6 once the backlog write-up is confirmed.
 
 ---
 

@@ -1,11 +1,38 @@
 import os
 import tempfile
 import logging
+from datetime import datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from dotenv import load_dotenv
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
+
+# Display timezone for all human-facing timestamps (logs, report filenames,
+# email dates). Azure's Linux host runs in UTC, so naive datetime.now() renders
+# UTC; we convert to a configurable local zone instead. Override with the
+# BOARDROOM_TIMEZONE env var (IANA name, e.g. "America/Phoenix").
+TIMEZONE = os.getenv("BOARDROOM_TIMEZONE", "America/Los_Angeles")
+try:
+    LOCAL_TZ = ZoneInfo(TIMEZONE)
+except (ZoneInfoNotFoundError, ValueError):
+    logger.warning(f"Unknown timezone '{TIMEZONE}'; falling back to UTC.")
+    LOCAL_TZ = ZoneInfo("UTC")
+
+
+def now_local() -> datetime:
+    """Timezone-aware 'now' in the configured local zone."""
+    return datetime.now(LOCAL_TZ)
+
+
+# Render all logging timestamps (%(asctime)s) in the local zone too. staticmethod
+# avoids the bound-method gotcha when overriding the class-level converter.
+def _local_log_time(timestamp):
+    return datetime.fromtimestamp(timestamp, LOCAL_TZ).timetuple()
+
+
+logging.Formatter.converter = staticmethod(_local_log_time)
 
 # Centralized filesystem paths.
 # Production (Azure Functions Linux) keeps the original /tmp layout, while

@@ -3,7 +3,8 @@ import smtplib
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime
+
+from src.config.settings import now_local
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ def send_executive_briefing(html_content: str):
         logger.error("FATAL: Missing email credentials in environment variables. Cannot send briefing.")
         return False
 
-    date_str = datetime.now().strftime("%B %d, %Y")
+    date_str = now_local().strftime("%B %d, %Y")
     subject = f"SC Invest: Executive Boardroom Briefing - {date_str}"
 
     msg = MIMEMultipart('alternative')

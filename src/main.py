@@ -4,7 +4,6 @@ import logging
 import sys
 import json
 import aiohttp
-from datetime import datetime
 from google.genai import types
 
 from src import pipeline
@@ -18,7 +17,7 @@ from src.output import notifier
 from src.core.schemas import generate_dynamic_mandate
 from src.core.engine import app
 from src.data.fmp_client import get_fmp_advanced_metrics, get_fmp_macro
-from src.config.settings import settings, DATA_DIR
+from src.config.settings import settings, DATA_DIR, now_local
 from src.core.agents import call_gemini_async, agent_config, FAST_MODEL, FLASH_TOKEN_LIMIT
 
 logger = logging.getLogger()
@@ -86,11 +85,29 @@ async def run_post_flight_qa(raw_log: str, chairman_json: str):
 
 async def main_batch():
     logger.info("Initializing high performance quantitative pipeline engine.")
+    file_timestamp = now_local().strftime('%Y%m%d_%H%M%S')
+    api_telemetry = {}
+    run_started = now_local()
+    run_status = {
+        "run_id": file_timestamp,
+        "status": "running",
+        "started_at": run_started.isoformat(),
+        "finished_at": None,
+        "duration_seconds": None,
+        "briefing_blob": None,
+        "qa_blob": None,
+        "error": None,
+    }
+    run_outcome = "failed"
+    run_error = None
+
     if not settings.validate():
         logger.error("FATAL ABORT: Required environment variables missing. Halting pipeline.")
+        run_status.update({"status": "aborted", "error": "missing environment variables"})
+        storage_client.save_run_status(run_status)
         return
-    file_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    api_telemetry = {}
+
+    storage_client.save_run_status(run_status)
 
     try:
         storage_client.sync_inputs_from_cloud()
@@ -163,17 +180,29 @@ async def main_batch():
                 d["price"] = adv["current_price"]
 
         history_path = os.path.join(DATA_DIR, "portfolio_history.json")
-        history_data = {}
-        if os.path.exists(history_path):
-            try:
-                with open(history_path, "r") as f: history_data = json.load(f)
-            except Exception: pass
-
-        today_str = datetime.now().strftime('%Y%m%d')
-        if spy_price > 0 and total_portfolio_value > 0:
-            history_data[today_str] = {"portfolio": total_portfolio_value, "spy": spy_price}
+        history_data = (account_returns or {}).get("benchmark_history") or {}
+        if history_data:
             os.makedirs(DATA_DIR, exist_ok=True)
-            with open(history_path, "w") as f: json.dump(history_data, f)
+            with open(history_path, "w") as f:
+                json.dump(history_data, f)
+            storage_client.save_report("portfolio_history.json", json.dumps(history_data))
+        elif spy_price > 0 and total_portfolio_value > 0:
+            if os.path.exists(history_path):
+                try:
+                    with open(history_path, "r") as f:
+                        history_data = json.load(f)
+                except Exception:
+                    history_data = {}
+            today_str = now_local().strftime('%Y%m%d')
+            qqq_price = qqq_adv.get("current_price", 0.0)
+            history_data[today_str] = {
+                "portfolio": total_portfolio_value,
+                "spy": spy_price,
+                "qqq": qqq_price,
+            }
+            os.makedirs(DATA_DIR, exist_ok=True)
+            with open(history_path, "w") as f:
+                json.dump(history_data, f)
             storage_client.save_report("portfolio_history.json", json.dumps(history_data))
 
         if account_returns:
@@ -183,6 +212,9 @@ async def main_batch():
                 logger.warning("Could not persist portfolio_returns.json")
 
         live_qqq_trend = qqq_adv.get("3m_trend", 0.0)
+        portfolio_3m_trend = 0.0
+        if account_returns and account_returns.get("returns"):
+            portfolio_3m_trend = account_returns["returns"].get("Total", {}).get("3m", 0.0) or 0.0
         tradeable_tickers = [sym for sym in master_ledger.keys() if sym != "BRK_LINK" and not sym.startswith("922")]
         sorted_ledger = sorted(master_ledger.items(), key=lambda x: x[1]["Total"], reverse=True)
         live_mandate = generate_dynamic_mandate(total_portfolio_value, 0.15)
@@ -230,7 +262,7 @@ async def main_batch():
         watchlist_str = "\n".join(wl_lines) if wl_lines else "None available."
 
         mega_prompt = (
-            f"[CURRENT SYSTEM DATE: {datetime.now().strftime('%B %d, %Y')}]\n\n"
+            f"[CURRENT SYSTEM DATE: {now_local().strftime('%B %d, %Y')}]\n\n"
             f"=== LIVE MARKET HEADLINES ===\n{news_feed}\n\n"
             f"=== CURRENT PORTFOLIO ===\n{portfolio_str}\n\n"
             f"=== APPROVED WATCHLIST TARGETS ===\n{watchlist_str}\n"
@@ -255,6 +287,7 @@ async def main_batch():
             for key, value in output.items():
                 if key == "oracle" and not value["is_valid"]:
                     logger.error("DATA ORACLE SECURITY ABORT TRIGGERED. EXITING.")
+                    run_error = "data oracle validation failed"
                     return
                 if "messages" in value:
                     for msg in value["messages"]:
@@ -273,6 +306,7 @@ async def main_batch():
         
         if not is_approved_flag or not c_data: 
             logger.error("Compliance processing failed completely.")
+            run_error = "compliance processing failed"
             return
 
         board_matrix = parse_board_matrix(raw_board_messages, all_symbols)
@@ -280,7 +314,8 @@ async def main_batch():
         raw_log_combined = "".join(raw_log_lines)
         
         html_payload = reporting.generate_html_briefing(
-            total_val=total_portfolio_value, qqq_trend=live_qqq_trend, mandate=live_mandate, 
+            total_val=total_portfolio_value, qqq_trend=live_qqq_trend,
+            portfolio_3m_trend=portfolio_3m_trend, mandate=live_mandate, 
             chairman_data=c_data, cos_data=cos_data, matrix_md=matrix_md, unicorn_trades=unicorn_trades,
             sorted_ledger=sorted_ledger, red_team_data=red_team_data, history_data=history_data,
             account_holdings=account_holdings, account_returns=account_returns
@@ -293,11 +328,23 @@ async def main_batch():
         storage_client.save_report(f"qa_summary_{file_timestamp}.md", qa_report_md)
         
         notifier.send_executive_briefing(html_payload)
+        run_outcome = "success"
+        run_status["briefing_blob"] = f"executive_briefing_{file_timestamp}.html"
+        run_status["qa_blob"] = f"qa_summary_{file_timestamp}.md"
         logger.info("Pipeline finalized successfully.")
 
     except Exception as e:
+        run_error = str(e)
         logger.error("Pipeline execution halted due to fatal exception.")
     finally:
+        finished = now_local()
+        run_status.update({
+            "status": run_outcome,
+            "finished_at": finished.isoformat(),
+            "duration_seconds": round((finished - run_started).total_seconds(), 1),
+            "error": run_error,
+        })
+        storage_client.save_run_status(run_status)
         storage_client.save_report(f"api_telemetry_{file_timestamp}.json", json.dumps(api_telemetry, indent=4))
         storage_client.execute_retention_policy(14)
         logger.info("Telemetry ledger flushed. Worker shutting down.")

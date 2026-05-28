@@ -56,37 +56,54 @@ def build_portfolio_pie_chart(sorted_ledger):
     encoded_config = urllib.parse.quote(json.dumps(chart_config))
     return f"https://quickchart.io/chart?w=600&h=300&c={encoded_config}"
 
-def build_account_pie_charts(account_holdings):
-    """Build one allocation pie per account (smaller, for a side-by-side grid).
-    Returns a list of {"title": account, "url": chart_url} for accounts with data."""
-    charts = []
+_ACCOUNT_PIE_LABELS = {
+    "eTrade Taxable": "eTrade",
+    "eTrade Roth IRA": "eTrade Roth",
+    "Fidelity 401K": "Fidelity 401K",
+    "Fidelity Roth 401K": "Fidelity Roth 401K",
+}
+
+
+def build_account_allocation_pie(account_holdings, account_returns):
+    """Single pie: one slice per account (% of total), colored by 12M TWR."""
     if not account_holdings:
-        return charts
-    for account, syms in account_holdings.items():
-        labels, data, colors = [], [], []
-        for sym, info in sorted(syms.items(), key=lambda x: x[1].get("value", 0), reverse=True):
-            if info.get("value", 0) > 1000:
-                labels.append(sym)
-                data.append(int(info["value"]))
-                colors.append(get_color_for_return(info.get("return_pct", 0.0)))
-        if not data:
+        return ""
+
+    rets = (account_returns or {}).get("returns", {})
+    labels, data, colors = [], [], []
+    for account in ["eTrade Taxable", "eTrade Roth IRA", "Fidelity 401K", "Fidelity Roth 401K"]:
+        syms = account_holdings.get(account, {})
+        val = sum(info.get("value", 0) for info in syms.values())
+        if val <= 1000:
             continue
-        chart_config = {
-            "type": "outlabeledPie",
-            "data": {
-                "labels": labels,
-                "datasets": [{"backgroundColor": colors, "data": data}]
-            },
-            "options": {
-                "plugins": {
-                    "legend": {"display": False},
-                    "outlabels": {"text": "%l %p", "color": "white", "stretch": 35, "font": {"resizable": True, "minSize": 10, "maxSize": 16}}
+        labels.append(_ACCOUNT_PIE_LABELS.get(account, account))
+        data.append(int(val))
+        twelve = rets.get(account, {}).get("12m", 0.0) or 0.0
+        colors.append(get_color_for_return(twelve))
+
+    if not data:
+        return ""
+
+    chart_config = {
+        "type": "outlabeledPie",
+        "data": {
+            "labels": labels,
+            "datasets": [{"backgroundColor": colors, "data": data}]
+        },
+        "options": {
+            "plugins": {
+                "legend": {"display": False},
+                "outlabels": {
+                    "text": "%l %p",
+                    "color": "white",
+                    "stretch": 35,
+                    "font": {"resizable": True, "minSize": 12, "maxSize": 18}
                 }
             }
         }
-        encoded_config = urllib.parse.quote(json.dumps(chart_config))
-        charts.append({"title": account, "url": f"https://quickchart.io/chart?w=400&h=300&c={encoded_config}"})
-    return charts
+    }
+    encoded_config = urllib.parse.quote(json.dumps(chart_config))
+    return f"https://quickchart.io/chart?w=600&h=300&c={encoded_config}"
 
 def build_returns_rows(account_returns):
     """Flatten the history-engine output into display rows (Total first)."""
@@ -187,10 +204,10 @@ def build_benchmark_line_chart(history_data):
     encoded_config = urllib.parse.quote(json.dumps(chart_config))
     return f"https://quickchart.io/chart?w=600&h=300&c={encoded_config}"
 
-def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None, account_returns=None):
+def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None, account_returns=None):
 
     pie_chart_url = build_portfolio_pie_chart(sorted_ledger)
-    account_charts = build_account_pie_charts(account_holdings)
+    account_pie_url = build_account_allocation_pie(account_holdings, account_returns)
     returns_rows = build_returns_rows(account_returns)
     returns_updated = (account_returns or {}).get("updated", "")
     bar_chart_url = build_returns_bar_chart(sorted_ledger)
@@ -246,8 +263,8 @@ def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_dat
             
             <div class="metric-box">
                 <strong>Portfolio Value:</strong> {{ total_val }}<br>
-                <strong>QQQ 3M Trend:</strong> {{ qqq_trend }}<br>
-                <strong>Mandate:</strong> {{ mandate }}
+                <strong>3M Trend — Portfolio:</strong> {{ portfolio_3m_trend }} &nbsp;|&nbsp; <strong>QQQ:</strong> {{ qqq_trend }}<br>
+                <strong>Investment Mandate:</strong> {{ mandate }}
             </div>
 
             {% if returns_rows %}
@@ -283,20 +300,12 @@ def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_dat
             </div>
             {% endif %}
 
-            {% if account_charts %}
-            <h2>Allocation by Account</h2>
-            <table style="width:100%; border-collapse:collapse; margin: 10px 0;">
-                {% for pair in account_charts|batch(2) %}
-                <tr>
-                    {% for chart in pair %}
-                    <td style="width:50%; text-align:center; vertical-align:top; padding:8px;">
-                        <div style="font-weight:bold; color:#374151; margin-bottom:6px;">{{ chart.title }}</div>
-                        <img class="chart-img" src="{{ chart.url }}" alt="{{ chart.title }} Allocation">
-                    </td>
-                    {% endfor %}
-                </tr>
-                {% endfor %}
-            </table>
+            {% if account_pie_url %}
+            <h2>Portfolio by Account</h2>
+            <p style="font-size:12px; color:#6b7280; margin-top:-10px;">Slice size = account weight. Color = trailing 12-month time-weighted return.</p>
+            <div class="chart-container">
+                <img class="chart-img" src="{{ account_pie_url }}" alt="Portfolio by Account Pie Chart">
+            </div>
             {% endif %}
 
             {% if bar_chart_url %}
@@ -451,6 +460,7 @@ def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_dat
     rendered_html = template.render(
         total_val=fmt_dol(total_val),
         qqq_trend=fmt(qqq_trend),
+        portfolio_3m_trend=fmt(portfolio_3m_trend),
         mandate=mandate,
         sotu_quotes=sotu_quotes,
         brawl_text=brawl_text,
@@ -459,7 +469,7 @@ def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_dat
         alpha_pick=alpha_pick,
         events=events,
         pie_chart_url=pie_chart_url,
-        account_charts=account_charts,
+        account_pie_url=account_pie_url,
         returns_rows=returns_rows,
         returns_updated=returns_updated,
         bar_chart_url=bar_chart_url,
