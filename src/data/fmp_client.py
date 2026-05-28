@@ -46,35 +46,38 @@ async def fetch_json_endpoint(session: aiohttp.ClientSession, url: str) -> list:
             raise RateLimitError("API capacity exhausted.")
         return data if isinstance(data, list) else [data]
 
-async def fetch_momentum_trend(symbol: str, telemetry: dict = None) -> float:
-    def get_trend():
-        end_date = datetime.datetime.today()
-        start_date = end_date - datetime.timedelta(days=90)
-        start_str = start_date.strftime("%Y" + dash + "%m" + dash + "%d")
-        end_str = end_date.strftime("%Y" + dash + "%m" + dash + "%d")
-        
-        df = yf.download(symbol, start=start_str, end=end_str, progress=False)
-        if df.empty:
-            return 'N/A'
-        try:
-            close_prices = df['Close'].squeeze()
-            start_price = float(close_prices.iloc[0])
-            end_price = float(close_prices.iloc[-1])
-            if start_price > 0:
-                return round(((end_price - start_price) / start_price) * 100, 2)
-        except Exception:
-            pass
-        return 'N/A'
-    
+async def fetch_momentum_trend(symbol: str, api_key: str, session: aiohttp.ClientSession, telemetry: dict = None) -> float:
+    # 3-month price momentum from FMP's stable EOD endpoint. The legacy v3
+    # endpoint is 403 on the starter tier and yfinance is unreliable, so we
+    # source this directly from the same FMP feed as the rest of the metrics.
+    end_date = datetime.datetime.today()
+    start_date = end_date - datetime.timedelta(days=95)
+    start_str = start_date.strftime("%Y" + dash + "%m" + dash + "%d")
+    end_str = end_date.strftime("%Y" + dash + "%m" + dash + "%d")
+    url = f"https://financialmodelingprep.com/stable/historical-price-eod/light?symbol={symbol}&from={start_str}&to={end_str}&apikey={api_key}"
+
+    trend = 'N/A'
     try:
-        trend = await asyncio.to_thread(get_trend)
-        if telemetry is not None:
-            if symbol not in telemetry: telemetry[symbol] = {}
-            telemetry[symbol]["3m_momentum"] = {"source": "yfinance", "response": trend}
-        return trend
-    except Exception as e:
-        logger.warning(f"Trend fetch failed for {symbol}")
-        return 'N/A'
+        data = await fetch_json_endpoint(session, url)
+        # Records are newest-first: index 0 is the latest close, [-1] the oldest.
+        prices = [d.get("price") for d in data if isinstance(d, dict) and d.get("price") is not None]
+        if len(prices) >= 2:
+            end_price = float(prices[0])
+            start_price = float(prices[~0])
+            if start_price > 0:
+                trend = round(((end_price - start_price) / start_price) * 100, 2)
+    except Exception:
+        logger.warning(f"FMP momentum fetch failed for {symbol}")
+        trend = 'N/A'
+
+    if telemetry is not None:
+        if symbol not in telemetry: telemetry[symbol] = {}
+        telemetry[symbol]["3m_momentum"] = {
+            "source": "fmp_stable_eod_light",
+            "url": url.replace(api_key, "REDACTED"),
+            "response": trend,
+        }
+    return trend
 
 async def fetch_yfinance_fallback(symbol: str, telemetry: dict = None) -> dict:
     def get_yf_data():
@@ -124,7 +127,7 @@ async def get_fmp_advanced_metrics(symbol: str, api_key: str, session: aiohttp.C
         is_etf = yf_info.get("quoteType", "") == "ETF"
         beta = safe_float(yf_info.get('beta'))
 
-    trend_3m = await fetch_momentum_trend(symbol, telemetry_ledger)
+    trend_3m = await fetch_momentum_trend(symbol, api_key, session, telemetry_ledger)
 
     if is_etf:
         quote_url = f"{base_url}/quote?symbol={symbol}&apikey={api_key}"

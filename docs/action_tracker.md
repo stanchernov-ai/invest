@@ -61,13 +61,20 @@ This document tracks identified bugs, architectural improvements, and long-term 
   * In `src/main.py`, wrap the core logic of `main_batch()` in a global `try/except`.
   * On caught exceptions (or explicit `FatalDataError`), trigger the error alert email so the user is immediately aware of the failure.
 
-### 2.3 Investigate FMP Historical Endpoints vs. yfinance
-* **Description:** `yfinance` is used for the 3M trend but is prone to rate-limiting and scraping blocks. FMP is preferred but has tier limits and deprecated endpoints.
+### 2.3 Replace yfinance 3M Momentum with FMP — DONE (May 28, 2026)
+* **Description:** `yfinance` was used for the 3M trend but is prone to rate-limiting and scraping blocks. FMP is preferred but has tier limits and deprecated endpoints.
 * **Implementation Details:**
   * **Action:** Create an isolated test script (e.g., `tests/test_fmp_historical.py`).
   * Test FMP's `/api/v3/historical-price-full/{symbol}` endpoint using the Starter Tier API key.
   * Validate if it supports the required throughput without hitting 429s.
   * *Decision Gate:* If successful, refactor `fetch_momentum_trend` in `fmp_client.py` to use FMP. If it fails tier limits, keep `yfinance` as the primary with enhanced error handling.
+* **Root cause (confirmed from live run `20260528_195832` telemetry):** Every `3m_momentum` returned `"N/A"` from yfinance, so `3M Trend` rendered as `0.00%` for all assets. This broke Livermore's momentum strategy (blanket Sell/Pass) and skewed the debate.
+* **Resolution:**
+  * Endpoint validation against the live starter-tier key: `stable/historical-price-eod/light` and `.../full` both return **HTTP 200** (~67 trading days for a 95-day window); the legacy `v3/historical-price-full` returns **403** (deprecated / not on starter tier).
+  * Refactored `fetch_momentum_trend` in `fmp_client.py` to call `stable/historical-price-eod/light` via the existing `aiohttp` session + `fetch_json_endpoint` (so it inherits `tenacity` retry/backoff). Records are newest-first; trend = `(price[0] - price[-1]) / price[-1] * 100`. Signature changed to `(symbol, api_key, session, telemetry)`; call site updated.
+  * **Removed yfinance from the momentum path** entirely. Telemetry now records `source: fmp_stable_eod_light` with the redacted URL. (`fetch_yfinance_fallback` remains only as a last-resort fundamentals net when FMP profile/quote fails.)
+  * Verified locally against live FMP: NVDA +11.85%, AVGO +29.13%, GOOGL +25.25%, META −0.31%, SPY +10.59%, QQQ +22.31%, MNDY +10.49%.
+* **Follow-up (optional):** `3y_cagr` is still hardcoded `"N/A"`; the same EOD endpoint with a wider window could populate it. yfinance remains a dependency only for the fundamentals fallback — a future cleanup could drop it if FMP proves consistently sufficient.
 
 ---
 

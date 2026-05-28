@@ -21,7 +21,7 @@ flowchart TB
     subgraph External["External systems"]
         BrokerCSV["Brokerage CSV exports\n(Fidelity / E*TRADE)"]
         FMP["Financial Modeling Prep API\n(stable + v3)"]
-        YF["yfinance\n(3M momentum + fallback)"]
+        YF["yfinance\n(fundamentals fallback only)"]
         Yahoo["Yahoo Finance trending\n(Scout scrape)"]
         Gemini["Google Gemini API\n(2.5 Pro / Flash)"]
         Gmail["Gmail SMTP"]
@@ -294,7 +294,7 @@ flowchart LR
         Parallel["Parallel stable endpoints\nquote, metrics, ratios, rating,\nprice target, earnings, growth"]
         ETF["ETF fast path\nquote + yfinance fallback"]
         FCS["Forward Catalyst Score\n-5 to +5"]
-        Momentum["yfinance 90d close\n→ 3m_trend %"]
+        Momentum["FMP stable EOD (light)\n95d close → 3m_trend %"]
         Macro["TLT + VXX quotes"]
     end
 
@@ -321,7 +321,7 @@ flowchart LR
 | **Primary API** | FMP **stable** base (`https://financialmodelingprep.com/stable`) |
 | **ETF detection** | `profile` → `isEtf` / `isFund`; simplified return path (no PE/growth; FCS = 0) |
 | **Equity path** | Seven endpoints fetched in parallel via `asyncio.gather` |
-| **3M trend** | Always from **yfinance** (`asyncio.to_thread` on 90-day download), not FMP |
+| **3M trend** | FMP `stable/historical-price-eod/light` over a 95-day window (`(newest - oldest) / oldest`); no Yahoo dependency |
 | **Fallback** | If profile or quote/ratio chains fail → `yfinance.Ticker.info` |
 | **Fatal exit** | `FatalDataError` when all sources exhausted or `current_price` is N/A/zero |
 | **Retries** | `tenacity` on `fetch_json_endpoint`: 5 attempts, exponential backoff, handles 429 |
@@ -333,7 +333,7 @@ flowchart LR
 |-------|----------------|
 | `current_price` | FMP quote, else yfinance |
 | `fwd_pe`, `peg`, `ps`, `de` | FMP ratios TTM, else yfinance |
-| `3m_trend` | yfinance momentum % |
+| `3m_trend` | FMP stable EOD (light) momentum % |
 | `3y_cagr` | Placeholder `"N/A"` (reserved) |
 | `rev_growth`, `eps_growth` | FMP financial-growth, else yfinance |
 | `consensus`, `price_target` | FMP rating + price-target-consensus |
@@ -390,7 +390,7 @@ Email subject: `SC Invest: Executive Boardroom Briefing - {date}`.
 | Compute | Azure Functions v4 (timer trigger) |
 | LLM | Google GenAI SDK (`google-genai`), Gemini 2.5 Pro & Flash |
 | Validation | Pydantic v2 models + Gemini JSON schema mode |
-| Market data | FMP stable + v3 (`fmp_client`, `news_client`); **yfinance** for 3M trend and quote fallback |
+| Market data | FMP stable + v3 (`fmp_client`, `news_client`); **yfinance** as fundamentals fallback only |
 | HTTP | `aiohttp` for concurrent FMP fetches; `tenacity` retries on rate limits |
 | Scraping | `requests` + BeautifulSoup (Scout / Yahoo) |
 | Storage | Azure Blob Storage (inputs, state, reports) |
@@ -398,7 +398,7 @@ Email subject: `SC Invest: Executive Boardroom Briefing - {date}`.
 | Notifications | Gmail SMTP (`smtplib`) |
 | Config | `python-dotenv`, `Settings.validate()` |
 
-**Notable dependencies in `requirements.txt`:** `yfinance` and `tenacity` are on the **hot path** (`fmp_client` momentum + retries). `pandas` is a transitive dependency of yfinance; `pipeline.py` uses native CSV parsing, not pandas.
+**Notable dependencies in `requirements.txt`:** `tenacity` is on the **hot path** (FMP retry/backoff). `yfinance` is now only a last-resort fundamentals fallback (no longer used for 3M momentum); `pandas` is a transitive dependency of yfinance. `pipeline.py` uses native CSV parsing, not pandas.
 
 ### 3.2 Design Strengths
 
@@ -501,5 +501,6 @@ The metaphor layer (Buffett, Livermore, etc.) is not decorative: prompts encode 
 | Price target consensus | `GET /stable/price-target-consensus?symbol=` |
 | Earnings calendar | `GET /stable/earning_calendar?symbol=` |
 | Financial growth | `GET /stable/financial-growth?symbol=` |
+| 3M momentum | `GET /stable/historical-price-eod/light?symbol=&from=&to=` |
 | Macro hedge | `GET /stable/quote?symbol=TLT` and `VXX` |
 | News (`news_client`) | `GET /api/v3/stock_news?tickers=&limit=15` |
