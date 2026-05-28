@@ -135,6 +135,23 @@ Reference briefing: `executive_briefing_20260528_204417.html` (Azure `boardroom-
 * **Scope:** Template-only change in `generate_html_briefing` (no data-model impact). Pairs well with the 4.2 chart work.
 * **Resolution (2026-05-28):** Updated `src/output/reporting.py`. Added a `.verdict-pill` CSS class and a `pill_styles` Jinja map (green = Strong Buy/Buy, gray = Hold, amber = Trim, red = Sell/Strong Sell). Replaced the `<h3>CATEGORY</h3>` + `<h4>TICKER</h4>` structure with a single per-position pill (`CATEGORY : TICKER`), wrapped Champion/Dissent names in parentheses, and added a divider between positions. Verified via isolated Jinja render.
 
+### 4.4 Time-Weighted Returns (YTD + Trailing 12M, per Account) — DONE
+* **Description:** Stan wants real performance returns (not just unrealized gain) — YTD and trailing-12-month, for the total portfolio and each account — reconstructed from trade activity since we lack a balance history.
+* **Decisions (confirmed with Stan):**
+  * **Methodology:** Time-Weighted Return (flow-neutral; the standard "how am I doing" metric). Neutralizes deposits, withdrawals, 401(k) contributions, and trades.
+  * **Window:** Trailing 12 months (YTD derived from the same series).
+  * **Basis:** Securities only (consistent with the value/pie numbers); reinvested dividends treated as share additions, not return.
+* **How it works:** Anchored on today's actual per-account holdings, the engine walks the brokerage activity files backward (signed share events) to reconstruct shares held on every past trading day, values them with FMP EOD closes, and daily-links each day's price-only return: `r_t = Σ(shares_overnight × Δprice) / value_yesterday`. Cumulative product → YTD and 12M. Computed per account and aggregated to Total.
+* **Self-healing backfill:** The full trailing window is recomputed from source every run, so a missed run (or a missed week) is automatically caught up on the next execution — no separate gap-fill job needed.
+* **Resolution (2026-05-28):**
+  * New `src/history.py` — `parse_share_events()` (eTrade by activity filename, Fidelity by per-row `Account` column) + `build_account_returns()` (async TWR engine, concurrency-capped at 5 FMP calls, share-class ticker normalization e.g. `BRK.B`→`BRK-B`, fully non-fatal).
+  * New `fetch_price_series()` in `src/data/fmp_client.py` (reuses the proven `stable/historical-price-eod/light` feed).
+  * `pipeline.build_account_holdings()` now also returns per-symbol `shares` (the TWR anchor).
+  * `reporting.py` renders a **Time-Weighted Returns** table (Total + 4 accounts, YTD + 12M, green/red) near the top of the briefing.
+  * `main.py` computes returns inside the existing aiohttp session and persists `portfolio_returns.json` to blob.
+  * **Verified end-to-end** against live Azure CSVs: 254 trading days reconstructed; daily total grew $11K→$155K over the year while TWR correctly reported **Total +38.26% (12M) / +9.68% (YTD)** — confirming contributions are excluded. Engine runtime ~33s.
+* **Possible follow-ups:** money-weighted (XIRR) view; benchmark the 12M line chart against the new daily-total series; surface a small per-account sparkline.
+
 ---
 
 ## Phase 5: Standing QA Review Team & Cost Governance

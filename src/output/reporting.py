@@ -88,6 +88,25 @@ def build_account_pie_charts(account_holdings):
         charts.append({"title": account, "url": f"https://quickchart.io/chart?w=400&h=300&c={encoded_config}"})
     return charts
 
+def build_returns_rows(account_returns):
+    """Flatten the history-engine output into display rows (Total first)."""
+    if not account_returns or not account_returns.get("returns"):
+        return []
+    order = ["Total", "eTrade Taxable", "eTrade Roth IRA", "Fidelity 401K", "Fidelity Roth 401K"]
+    rets = account_returns["returns"]
+    rows = []
+    for name in order:
+        if name not in rets:
+            continue
+        ytd = rets[name].get("ytd", 0.0) or 0.0
+        twelve = rets[name].get("12m", 0.0) or 0.0
+        rows.append({
+            "name": name,
+            "ytd": ytd, "ytd_color": "#166534" if ytd >= 0 else "#991b1b",
+            "twelve": twelve, "twelve_color": "#166534" if twelve >= 0 else "#991b1b",
+        })
+    return rows
+
 def build_returns_bar_chart(sorted_ledger):
     labels = []
     data = []
@@ -168,10 +187,12 @@ def build_benchmark_line_chart(history_data):
     encoded_config = urllib.parse.quote(json.dumps(chart_config))
     return f"https://quickchart.io/chart?w=600&h=300&c={encoded_config}"
 
-def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None):
+def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None, account_returns=None):
 
     pie_chart_url = build_portfolio_pie_chart(sorted_ledger)
     account_charts = build_account_pie_charts(account_holdings)
+    returns_rows = build_returns_rows(account_returns)
+    returns_updated = (account_returns or {}).get("updated", "")
     bar_chart_url = build_returns_bar_chart(sorted_ledger)
     line_chart_url = build_benchmark_line_chart(history_data)
     
@@ -228,7 +249,26 @@ def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_dat
                 <strong>QQQ 3M Trend:</strong> {{ qqq_trend }}<br>
                 <strong>Mandate:</strong> {{ mandate }}
             </div>
-            
+
+            {% if returns_rows %}
+            <h2>Time-Weighted Returns</h2>
+            <table style="width:100%; border-collapse:collapse; margin:10px 0;">
+                <tr style="text-align:left; color:#6b7280; font-size:13px;">
+                    <th style="padding:6px 8px; border-bottom:2px solid #e5e7eb;">Account</th>
+                    <th style="padding:6px 8px; border-bottom:2px solid #e5e7eb; text-align:right;">YTD</th>
+                    <th style="padding:6px 8px; border-bottom:2px solid #e5e7eb; text-align:right;">12 Mo</th>
+                </tr>
+                {% for r in returns_rows %}
+                <tr>
+                    <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6;{% if r.name == 'Total' %} font-weight:bold;{% endif %}">{{ r.name }}</td>
+                    <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6; text-align:right; font-weight:bold; color:{{ r.ytd_color }};">{{ '%+.2f'|format(r.ytd) }}%</td>
+                    <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6; text-align:right; font-weight:bold; color:{{ r.twelve_color }};">{{ '%+.2f'|format(r.twelve) }}%</td>
+                </tr>
+                {% endfor %}
+            </table>
+            <p style="font-size:11px; color:#9ca3af; margin-top:4px;">Time-weighted return (securities only); neutralizes deposits, withdrawals, and trades. Updated {{ returns_updated }}.</p>
+            {% endif %}
+
             {% if line_chart_url %}
             <h2>Performance vs. S&P 500 & NASDAQ</h2>
             <div class="chart-container">
@@ -420,6 +460,8 @@ def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_dat
         events=events,
         pie_chart_url=pie_chart_url,
         account_charts=account_charts,
+        returns_rows=returns_rows,
+        returns_updated=returns_updated,
         bar_chart_url=bar_chart_url,
         line_chart_url=line_chart_url,
         red_team_case=red_team_case,

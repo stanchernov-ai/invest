@@ -267,17 +267,20 @@ def build_account_holdings(data_dir=None):
                     continue
                 value = clean_num(_get_col(row, ["current value", "value"]))
                 ret = clean_num(_get_col(row, ["total gain/loss percent"]))
+                shares = clean_num(_get_col(row, ["quantity"]))
             else:
                 account = etrade_account
                 value = clean_num(_get_col(row, ["value $", "current value", "value"]))
                 ret = clean_num(_get_col(row, ["total gain %"]))
+                shares = clean_num(_get_col(row, ["quantity"]))
 
             if value <= 0:
                 continue
 
-            bucket = holdings[account].setdefault(sym, {"value": 0.0, "return_pct": ret})
+            bucket = holdings[account].setdefault(sym, {"value": 0.0, "return_pct": ret, "shares": 0.0})
             bucket["value"] += value
             bucket["return_pct"] = ret
+            bucket["shares"] += shares
 
     return holdings
 

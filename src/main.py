@@ -9,6 +9,7 @@ from google.genai import types
 
 from src import pipeline
 from src import scout
+from src import history
 from src import storage_client
 from src.data.news_client import fetch_ticker_news
 
@@ -85,7 +86,9 @@ async def run_post_flight_qa(raw_log: str, chairman_json: str):
 
 async def main_batch():
     logger.info("Initializing high performance quantitative pipeline engine.")
-    settings.validate()
+    if not settings.validate():
+        logger.error("FATAL ABORT: Required environment variables missing. Halting pipeline.")
+        return
     file_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     api_telemetry = {}
 
@@ -131,6 +134,9 @@ async def main_batch():
                     return
                 advanced_data[sym] = res
 
+            # Time-weighted YTD / trailing-12M returns (non-fatal; self-healing).
+            account_returns = await history.build_account_returns(DATA_DIR, settings.FMP_API_KEY, session)
+
         spy_price = spy_adv.get("current_price", 0.0)
         total_portfolio_value = 0.0
         
@@ -169,6 +175,12 @@ async def main_batch():
             os.makedirs(DATA_DIR, exist_ok=True)
             with open(history_path, "w") as f: json.dump(history_data, f)
             storage_client.save_report("portfolio_history.json", json.dumps(history_data))
+
+        if account_returns:
+            try:
+                storage_client.save_report("portfolio_returns.json", json.dumps(account_returns))
+            except Exception:
+                logger.warning("Could not persist portfolio_returns.json")
 
         live_qqq_trend = qqq_adv.get("3m_trend", 0.0)
         tradeable_tickers = [sym for sym in master_ledger.keys() if sym != "BRK_LINK" and not sym.startswith("922")]
@@ -271,7 +283,7 @@ async def main_batch():
             total_val=total_portfolio_value, qqq_trend=live_qqq_trend, mandate=live_mandate, 
             chairman_data=c_data, cos_data=cos_data, matrix_md=matrix_md, unicorn_trades=unicorn_trades,
             sorted_ledger=sorted_ledger, red_team_data=red_team_data, history_data=history_data,
-            account_holdings=account_holdings
+            account_holdings=account_holdings, account_returns=account_returns
         )
         
         storage_client.save_report(f"executive_briefing_{file_timestamp}.html", html_payload)

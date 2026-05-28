@@ -79,6 +79,21 @@ async def fetch_momentum_trend(symbol: str, api_key: str, session: aiohttp.Clien
         }
     return trend
 
+async def fetch_price_series(symbol: str, api_key: str, session: aiohttp.ClientSession, start_str: str, end_str: str) -> dict:
+    # Daily EOD closes for [start, end] from FMP's stable light endpoint (the same
+    # feed used for momentum). Returns {"YYYY-MM-DD": close_price}. Empty on failure
+    # so the history engine can degrade gracefully without killing the pipeline.
+    url = f"https://financialmodelingprep.com/stable/historical-price-eod/light?symbol={symbol}&from={start_str}&to={end_str}&apikey={api_key}"
+    series = {}
+    try:
+        data = await fetch_json_endpoint(session, url)
+        for d in data:
+            if isinstance(d, dict) and d.get("date") and d.get("price") is not None:
+                series[str(d["date"])[:10]] = float(d["price"])
+    except Exception:
+        logger.warning(f"FMP price series fetch failed for {symbol}")
+    return series
+
 async def fetch_yfinance_fallback(symbol: str, telemetry: dict = None) -> dict:
     def get_yf_data():
         ticker = yf.Ticker(symbol)
