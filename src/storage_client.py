@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 from azure.storage.blob import BlobServiceClient
 from dotenv import load_dotenv
 
+from src.config.settings import DATA_DIR, OUTPUT_DIR
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
@@ -30,7 +32,7 @@ def sync_inputs_from_cloud():
         return 
     
     try:
-        data_dir = "/tmp/data"
+        data_dir = DATA_DIR
         os.makedirs(data_dir, exist_ok=True)
         
         input_client = client.get_container_client(INPUT_CONTAINER)
@@ -57,7 +59,7 @@ def save_memory(data):
     client = get_blob_service_client()
     json_str = json.dumps(data, indent=4)
     
-    filepath = "/tmp/data/board_verdicts.json"
+    filepath = os.path.join(DATA_DIR, "board_verdicts.json")
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, "w") as f:
         f.write(json_str)
@@ -73,7 +75,7 @@ def save_memory(data):
 def save_report(filename, content):
     client = get_blob_service_client()
     
-    filepath = f"/tmp/output/{filename}"
+    filepath = os.path.join(OUTPUT_DIR, filename)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, "w", encoding="utf" + chr(45) + "8") as f:
         f.write(content)

@@ -5,6 +5,8 @@ import csv
 import re
 import glob
 
+from src.config.settings import DATA_DIR
+
 logger = logging.getLogger(__name__)
 
 def clean_num(val_str):
@@ -18,7 +20,7 @@ def clean_num(val_str):
         return 0.0
 
 def parse_activity_dates():
-    data_dir = "/tmp/data"
+    data_dir = DATA_DIR
     purchase_dates = {}
     for file in glob.glob(os.path.join(data_dir, "*.csv")):
         if "activity" not in file.lower():
@@ -140,7 +142,7 @@ def process_portfolios():
         "Consumer Cyclical": 15.0
     }
 
-    data_dir = "/tmp/data"
+    data_dir = DATA_DIR
     os.makedirs(data_dir, exist_ok=True)
     verdict_path = os.path.join(data_dir, "board_verdicts.json")
     
@@ -189,7 +191,7 @@ def process_portfolios():
     return master_ledger, total_portfolio_value, dummy_qqq_trend, historical_trades, verdict_history, sector_weights
 
 def save_verdict_history(new_verdicts):
-    data_dir = "/tmp/data"
+    data_dir = DATA_DIR
     os.makedirs(data_dir, exist_ok=True)
     verdict_path = os.path.join(data_dir, "board_verdicts.json")
     

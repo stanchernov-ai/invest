@@ -17,7 +17,7 @@ from src.output import notifier
 from src.core.schemas import generate_dynamic_mandate
 from src.core.engine import app
 from src.data.fmp_client import get_fmp_advanced_metrics, get_fmp_macro
-from src.config.settings import settings
+from src.config.settings import settings, DATA_DIR
 from src.core.agents import call_gemini_async, agent_config, FAST_MODEL, FLASH_TOKEN_LIMIT
 
 logger = logging.getLogger()
@@ -92,7 +92,7 @@ async def main_batch():
     try:
         storage_client.sync_inputs_from_cloud()
         
-        target_path = "/tmp/data/daily_target_list.json"
+        target_path = os.path.join(DATA_DIR, "daily_target_list.json")
         if not os.path.exists(target_path): 
             scout.run_scout_pipeline()
 
@@ -155,7 +155,7 @@ async def main_batch():
             if adv.get("current_price", 0.0) > 0:
                 d["price"] = adv["current_price"]
 
-        history_path = "/tmp/data/portfolio_history.json"
+        history_path = os.path.join(DATA_DIR, "portfolio_history.json")
         history_data = {}
         if os.path.exists(history_path):
             try:
@@ -165,7 +165,7 @@ async def main_batch():
         today_str = datetime.now().strftime('%Y%m%d')
         if spy_price > 0 and total_portfolio_value > 0:
             history_data[today_str] = {"portfolio": total_portfolio_value, "spy": spy_price}
-            os.makedirs("/tmp/data", exist_ok=True)
+            os.makedirs(DATA_DIR, exist_ok=True)
             with open(history_path, "w") as f: json.dump(history_data, f)
             storage_client.save_report("portfolio_history.json", json.dumps(history_data))
 

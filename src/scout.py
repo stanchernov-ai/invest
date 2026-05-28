@@ -7,6 +7,8 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
+from src.config.settings import DATA_DIR
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 dash = chr(45)
@@ -46,7 +48,7 @@ def scrape_yahoo_trending():
 
 def run_scout_pipeline():
     logger.info("Scout Engine Booting. Hunting for organic Alpha.")
-    data_dir = "/tmp/data"
+    data_dir = DATA_DIR
     os.makedirs(data_dir, exist_ok=True)
     
     ledger_file = os.path.join(data_dir, "ledger_state.json")
