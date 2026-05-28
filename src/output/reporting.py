@@ -161,26 +161,36 @@ def build_benchmark_line_chart(history_data):
         return ""
 
     dates = sorted(history_data.keys())
+    # Backfilled history may start with $0 portfolio before holdings existed.
+    # Anchor the chart on the first date with a meaningful portfolio value.
+    baseline_idx = 0
+    for i, d in enumerate(dates):
+        row = history_data[d]
+        if row.get("portfolio", 0) > 1000 and row.get("spy", 0) > 0:
+            baseline_idx = i
+            break
+    dates = dates[baseline_idx:]
+    if len(dates) < 2:
+        return ""
+
+    base_port = history_data[dates[0]].get("portfolio", 0)
+    base_spy = history_data[dates[0]].get("spy", 0)
+    base_qqq = history_data[dates[0]].get("qqq", 0)
+    if base_port <= 0 or base_spy <= 0 or base_qqq <= 0:
+        return ""
+
     port_data = []
     spy_data = []
     qqq_data = []
 
-    base_port = history_data[dates[0]].get('portfolio', 1)
-    base_spy = history_data[dates[0]].get('spy', 1)
-    base_qqq = history_data[dates[0]].get('qqq', 1)
-
     for d in dates:
-        p_val = history_data[d].get('portfolio', base_port)
-        s_val = history_data[d].get('spy', base_spy)
-        q_val = history_data[d].get('qqq', base_qqq)
+        p_val = history_data[d].get("portfolio", base_port)
+        s_val = history_data[d].get("spy", base_spy)
+        q_val = history_data[d].get("qqq", base_qqq)
 
-        p_pct = ((p_val - base_port) / base_port) * 100
-        s_pct = ((s_val - base_spy) / base_spy) * 100
-        q_pct = ((q_val - base_qqq) / base_qqq) * 100 if base_qqq != 1 else 0
-
-        port_data.append(round(p_pct, 2))
-        spy_data.append(round(s_pct, 2))
-        qqq_data.append(round(q_pct, 2))
+        port_data.append(round(((p_val - base_port) / base_port) * 100, 2))
+        spy_data.append(round(((s_val - base_spy) / base_spy) * 100, 2))
+        qqq_data.append(round(((q_val - base_qqq) / base_qqq) * 100, 2))
 
     chart_config = {
         "type": "line",

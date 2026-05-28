@@ -51,6 +51,13 @@ def main() -> None:
     interval = args.interval
     last_printed = None
 
+    if not os.getenv("AZURE_STORAGE_CONNECTION_STRING"):
+        print(
+            "WARNING: AZURE_STORAGE_CONNECTION_STRING not set — cannot read run_status.json from Azure.\n"
+            "Set it in .env or export it before running this script.",
+            file=sys.stderr,
+        )
+
     label = args.run_id or "latest"
     print(f"Monitoring run_status.json for {label} (timeout {args.timeout}s)...")
 
