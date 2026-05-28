@@ -19,7 +19,9 @@ project.lock.json
 /tools/NuGet.exe
 /App_Data
 /secrets
-/data
+# src/data: track clients + sample state; exclude local-only reference/cache folders
+/src/data/extracts/
+/src/data/knowledge/
 .secrets
 appsettings.json
 local.settings.json

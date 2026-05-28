@@ -1,0 +1,182 @@
+{
+    "DDOG": {
+        "symbol": "DDOG",
+        "name": "Datadog, Inc.",
+        "reason": "Compounder 3Y CAGR: 26.95 percent",
+        "price": 222.32,
+        "fwd_pe": null,
+        "3m_trend": 116.643929058663,
+        "3y_cagr": 26.95
+    },
+    "NET": {
+        "symbol": "NET",
+        "name": "Cloudflare, Inc.",
+        "reason": "Compounder 3Y CAGR: 30.51 percent",
+        "price": 216.16,
+        "fwd_pe": null,
+        "3m_trend": 34.93975903614458,
+        "3y_cagr": 30.51
+    },
+    "AMD": {
+        "symbol": "AMD",
+        "name": "Advanced Micro Devices, Inc.",
+        "reason": "Momentum Near 52 Week High",
+        "price": 467.51,
+        "fwd_pe": null,
+        "3m_trend": 137.79755849440488,
+        "3y_cagr": 13.64
+    },
+    "SNOW": {
+        "symbol": "SNOW",
+        "name": "Snowflake Inc.",
+        "reason": "Compounder 3Y CAGR: 31.38 percent",
+        "price": 172.2,
+        "fwd_pe": null,
+        "3m_trend": 9.263959390862942,
+        "3y_cagr": 31.38
+    },
+    "SYM": {
+        "symbol": "SYM",
+        "name": "Symbotic Inc.",
+        "reason": "Compounder 3Y CAGR: 55.87 percent",
+        "price": 54.03,
+        "fwd_pe": null,
+        "3m_trend": -0.5887764489420428,
+        "3y_cagr": 55.87
+    },
+    "ASTS": {
+        "symbol": "ASTS",
+        "name": "AST SpaceMobile, Inc.",
+        "reason": "Compounder 3Y CAGR: 72.46 percent",
+        "price": 105.86,
+        "fwd_pe": null,
+        "3m_trend": 26.174016686531576,
+        "3y_cagr": 72.46
+    },
+    "CRWD": {
+        "symbol": "CRWD",
+        "name": "CrowdStrike Holdings, Inc.",
+        "reason": "Compounder 3Y CAGR: 29.01 percent",
+        "price": 663.46,
+        "fwd_pe": null,
+        "3m_trend": 89.38144035623556,
+        "3y_cagr": 29.01
+    },
+    "ARM": {
+        "symbol": "ARM",
+        "name": "Arm Holdings plc American Depositary Shares",
+        "reason": "Compounder 3Y CAGR: 22.46 percent",
+        "price": 306.51,
+        "fwd_pe": null,
+        "3m_trend": 147.6248182258846,
+        "3y_cagr": 22.46
+    },
+    "META": {
+        "symbol": "META",
+        "name": "Meta Platforms, Inc.",
+        "reason": "Compounder 3Y CAGR: 19.89 percent",
+        "price": 610.26,
+        "fwd_pe": null,
+        "3m_trend": -4.235386426049432,
+        "3y_cagr": 19.89
+    },
+    "ALAB": {
+        "symbol": "ALAB",
+        "name": "Astera Labs, Inc. Common Stock",
+        "reason": "Compounder 3Y CAGR: 120.18 percent",
+        "price": 306.88,
+        "fwd_pe": null,
+        "3m_trend": 139.3013100436681,
+        "3y_cagr": 120.18
+    },
+    "AAPL": {
+        "symbol": "AAPL",
+        "name": "Apple Inc.",
+        "reason": "Momentum Near 52 Week High",
+        "price": 308.82,
+        "fwd_pe": null,
+        "3m_trend": 16.019235104064915,
+        "3y_cagr": 1.81
+    },
+    "GMM": {
+        "symbol": "GMM",
+        "name": "Global Mofy Metaverse Limited",
+        "reason": "Compounder 3Y CAGR: 48.19 percent",
+        "price": 0.2711,
+        "fwd_pe": null,
+        "3m_trend": -77.02542372881356,
+        "3y_cagr": 48.19
+    },
+    "AMZN": {
+        "symbol": "AMZN",
+        "name": "Amazon.com, Inc.",
+        "reason": "Momentum Near 52 Week High",
+        "price": 266.32,
+        "fwd_pe": null,
+        "3m_trend": 29.741316315097176,
+        "3y_cagr": 11.73
+    },
+    "MNDY": {
+        "symbol": "MNDY",
+        "name": "monday.com Ltd.",
+        "reason": "Compounder 3Y CAGR: 33.39 percent",
+        "price": 79.055,
+        "fwd_pe": null,
+        "3m_trend": 12.726365321545718,
+        "3y_cagr": 33.39
+    },
+    "PLTR": {
+        "symbol": "PLTR",
+        "name": "Palantir Technologies Inc.",
+        "reason": "Compounder 3Y CAGR: 32.92 percent",
+        "price": 136.88,
+        "fwd_pe": null,
+        "3m_trend": 4.808575803981625,
+        "3y_cagr": 32.92
+    },
+    "RKLB": {
+        "symbol": "RKLB",
+        "name": "Rocket Lab USA, Inc.",
+        "reason": "Compounder 3Y CAGR: 41.82 percent",
+        "price": 135.76,
+        "fwd_pe": null,
+        "3m_trend": 93.3627688363481,
+        "3y_cagr": 41.82
+    },
+    "SMCI": {
+        "symbol": "SMCI",
+        "name": "Super Micro Computer, Inc.",
+        "reason": "Compounder 3Y CAGR: 61.71 percent",
+        "price": 35.58,
+        "fwd_pe": null,
+        "3m_trend": 15.858026701400185,
+        "3y_cagr": 61.71
+    },
+    "LLY": {
+        "symbol": "LLY",
+        "name": "Eli Lilly and Company",
+        "reason": "Compounder 3Y CAGR: 31.69 percent",
+        "price": 1065.0,
+        "fwd_pe": null,
+        "3m_trend": 0.6083736396614321,
+        "3y_cagr": 31.69
+    },
+    "RYOJ": {
+        "symbol": "RYOJ",
+        "name": "rYojbaba Co., Ltd. Common Shares",
+        "reason": "Rookie Exemption Hyper Growth",
+        "price": 5.0,
+        "fwd_pe": null,
+        "3m_trend": 81.81818181818183,
+        "3y_cagr": null
+    },
+    "CELH": {
+        "symbol": "CELH",
+        "name": "Celsius Holdings, Inc.",
+        "reason": "Compounder 3Y CAGR: 56.71 percent",
+        "price": 30.12,
+        "fwd_pe": null,
+        "3m_trend": -38.80536367330353,
+        "3y_cagr": 56.71
+    }
+}
