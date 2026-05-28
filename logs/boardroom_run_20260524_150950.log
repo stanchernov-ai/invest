@@ -1,0 +1,844 @@
+2026-05-24 15:09:50,680 [INFO] <module>:54 Forensic logging initialized. Writing detailed trace to C:\Projects\sc-invest-boardroom\src\../logs\boardroom_run_20260524_150950.log
+2026-05-24 15:09:50,680 [DEBUG] __init__:633 Using proactor: IocpProactor
+2026-05-24 15:09:50,681 [INFO] main_batch:81 Initiating Asynchronous Portfolio Level Map Reduce Processing.
+2026-05-24 15:09:50,759 [INFO] on_request:535 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-inputs?restype=REDACTED&comp=REDACTED'
+Request method: 'GET'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '48d59ebb-57bd-11f1-bd20-f4b3017536f8'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2026-05-24 15:09:50,768 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): stboardroomprod.blob.core.windows.net:443
+2026-05-24 15:09:51,105 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "GET /boardroom-inputs?restype=container&comp=list HTTP/1.1" 200 None
+2026-05-24 15:09:51,129 [INFO] on_response:581 Response status: 200
+Response headers:
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/xml'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '41f0b85f-101e-0036-0aca-eb6840000000'
+    'x-ms-client-request-id': '48d59ebb-57bd-11f1-bd20-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:09:50 GMT'
+2026-05-24 15:09:51,142 [INFO] on_request:535 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-inputs/daily_target_list.json'
+Request method: 'GET'
+Request headers:
+    'x-ms-range': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '49101c92-57bd-11f1-85db-f4b3017536f8'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2026-05-24 15:09:51,178 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "GET /boardroom-inputs/daily_target_list.json HTTP/1.1" 206 5290
+2026-05-24 15:09:51,179 [INFO] on_response:581 Response status: 206
+Response headers:
+    'Content-Length': '5290'
+    'Content-Type': 'application/json'
+    'Content-Range': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:06:20 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DEB9E0AF9F2A27"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '41f0b87a-101e-0036-1bca-eb6840000000'
+    'x-ms-client-request-id': '49101c92-57bd-11f1-85db-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-blob-content-md5': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:09:50 GMT'
+2026-05-24 15:09:51,180 [INFO] on_request:535 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-inputs/etrade_invest_activity_2025.csv'
+Request method: 'GET'
+Request headers:
+    'x-ms-range': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '4915f684-57bd-11f1-bf25-f4b3017536f8'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2026-05-24 15:09:51,214 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "GET /boardroom-inputs/etrade_invest_activity_2025.csv HTTP/1.1" 206 29057
+2026-05-24 15:09:51,214 [INFO] on_response:581 Response status: 206
+Response headers:
+    'Content-Length': '29057'
+    'Content-Type': 'text/csv'
+    'Content-Range': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:05:49 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DEB9E09D107179"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '41f0b895-101e-0036-27ca-eb6840000000'
+    'x-ms-client-request-id': '4915f684-57bd-11f1-bf25-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-blob-content-md5': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:09:50 GMT'
+2026-05-24 15:09:51,216 [INFO] on_request:535 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-inputs/etrade_invest_activity_ytd.csv'
+Request method: 'GET'
+Request headers:
+    'x-ms-range': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '491b5fad-57bd-11f1-a268-f4b3017536f8'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2026-05-24 15:09:51,245 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "GET /boardroom-inputs/etrade_invest_activity_ytd.csv HTTP/1.1" 206 8188
+2026-05-24 15:09:51,245 [INFO] on_response:581 Response status: 206
+Response headers:
+    'Content-Length': '8188'
+    'Content-Type': 'text/csv'
+    'Content-Range': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:05:49 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DEB9E09D0CA27B"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '41f0b8a8-101e-0036-35ca-eb6840000000'
+    'x-ms-client-request-id': '491b5fad-57bd-11f1-a268-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-blob-content-md5': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:09:50 GMT'
+2026-05-24 15:09:51,247 [INFO] on_request:535 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-inputs/etrade_roth.csv'
+Request method: 'GET'
+Request headers:
+    'x-ms-range': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '49201927-57bd-11f1-a790-f4b3017536f8'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2026-05-24 15:09:51,274 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "GET /boardroom-inputs/etrade_roth.csv HTTP/1.1" 206 718
+2026-05-24 15:09:51,274 [INFO] on_response:581 Response status: 206
+Response headers:
+    'Content-Length': '718'
+    'Content-Type': 'text/csv'
+    'Content-Range': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:05:49 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DEB9E09D0CC978"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '41f0b8b3-101e-0036-3dca-eb6840000000'
+    'x-ms-client-request-id': '49201927-57bd-11f1-a790-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-blob-content-md5': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:09:50 GMT'
+2026-05-24 15:09:51,276 [INFO] on_request:535 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-inputs/etrade_roth_activity_ytd.csv'
+Request method: 'GET'
+Request headers:
+    'x-ms-range': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '492478c5-57bd-11f1-a46f-f4b3017536f8'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2026-05-24 15:09:51,310 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "GET /boardroom-inputs/etrade_roth_activity_ytd.csv HTTP/1.1" 206 2566
+2026-05-24 15:09:51,310 [INFO] on_response:581 Response status: 206
+Response headers:
+    'Content-Length': '2566'
+    'Content-Type': 'text/csv'
+    'Content-Range': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:05:49 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DEB9E09D0CF07B"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '41f0b8c2-101e-0036-48ca-eb6840000000'
+    'x-ms-client-request-id': '492478c5-57bd-11f1-a46f-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-blob-content-md5': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:09:50 GMT'
+2026-05-24 15:09:51,312 [INFO] on_request:535 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-inputs/etrade_taxable.csv'
+Request method: 'GET'
+Request headers:
+    'x-ms-range': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '492a009a-57bd-11f1-90bc-f4b3017536f8'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2026-05-24 15:09:51,345 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "GET /boardroom-inputs/etrade_taxable.csv HTTP/1.1" 206 934
+2026-05-24 15:09:51,345 [INFO] on_response:581 Response status: 206
+Response headers:
+    'Content-Length': '934'
+    'Content-Type': 'text/csv'
+    'Content-Range': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:05:49 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DEB9E09D0CA27B"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '41f0b8ce-101e-0036-50ca-eb6840000000'
+    'x-ms-client-request-id': '492a009a-57bd-11f1-90bc-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-blob-content-md5': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:09:50 GMT'
+2026-05-24 15:09:51,347 [INFO] on_request:535 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-inputs/fidelity_activity_2025.csv'
+Request method: 'GET'
+Request headers:
+    'x-ms-range': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '492f5995-57bd-11f1-b5a4-f4b3017536f8'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2026-05-24 15:09:51,378 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "GET /boardroom-inputs/fidelity_activity_2025.csv HTTP/1.1" 206 41348
+2026-05-24 15:09:51,379 [INFO] on_response:581 Response status: 206
+Response headers:
+    'Content-Length': '41348'
+    'Content-Type': 'text/csv'
+    'Content-Range': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:05:49 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DEB9E09D1C2C81"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '41f0b8e3-101e-0036-60ca-eb6840000000'
+    'x-ms-client-request-id': '492f5995-57bd-11f1-b5a4-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-blob-content-md5': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:09:50 GMT'
+2026-05-24 15:09:51,381 [INFO] on_request:535 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-inputs/fidelity_activity_ytd.csv'
+Request method: 'GET'
+Request headers:
+    'x-ms-range': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '49347f30-57bd-11f1-a4da-f4b3017536f8'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2026-05-24 15:09:51,410 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "GET /boardroom-inputs/fidelity_activity_ytd.csv HTTP/1.1" 206 18534
+2026-05-24 15:09:51,411 [INFO] on_response:581 Response status: 206
+Response headers:
+    'Content-Length': '18534'
+    'Content-Type': 'text/csv'
+    'Content-Range': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:05:49 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DEB9E09D188480"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '41f0b8ff-101e-0036-77ca-eb6840000000'
+    'x-ms-client-request-id': '49347f30-57bd-11f1-a4da-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-blob-content-md5': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:09:50 GMT'
+2026-05-24 15:09:51,411 [INFO] sync_inputs_from_cloud:43 Successfully synced 8 input files from Azure.
+2026-05-24 15:09:51,413 [INFO] process_portfolios:94 Booting up the data pipeline and Memory Engine
+2026-05-24 15:09:51,458 [INFO] process_portfolios:98 Historical trades baseline established
+2026-05-24 15:09:51,459 [INFO] on_request:535 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-state/board_verdicts.json'
+Request method: 'HEAD'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '4940674b-57bd-11f1-a9ed-f4b3017536f8'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2026-05-24 15:09:51,459 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): stboardroomprod.blob.core.windows.net:443
+2026-05-24 15:09:51,747 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "HEAD /boardroom-state/board_verdicts.json HTTP/1.1" 200 0
+2026-05-24 15:09:51,747 [INFO] on_response:581 Response status: 200
+Response headers:
+    'Content-Length': '27684'
+    'Content-Type': 'application/octet-stream'
+    'Content-MD5': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:01:33 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DEB9E00462D974"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': 'af535c18-501e-009e-26ca-ebf6ee000000'
+    'x-ms-client-request-id': '4940674b-57bd-11f1-a9ed-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:09:51 GMT'
+2026-05-24 15:09:51,748 [INFO] on_request:535 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-state/board_verdicts.json'
+Request method: 'GET'
+Request headers:
+    'x-ms-range': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': '496c963a-57bd-11f1-a4f2-f4b3017536f8'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2026-05-24 15:09:51,778 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "GET /boardroom-state/board_verdicts.json HTTP/1.1" 206 27684
+2026-05-24 15:09:51,778 [INFO] on_response:581 Response status: 206
+Response headers:
+    'Content-Length': '27684'
+    'Content-Type': 'application/octet-stream'
+    'Content-Range': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:01:33 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DEB9E00462D974"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': 'af535c26-501e-009e-2fca-ebf6ee000000'
+    'x-ms-client-request-id': '496c963a-57bd-11f1-a4f2-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-blob-content-md5': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:09:51 GMT'
+2026-05-24 15:09:51,800 [INFO] load_memory:57 Memory successfully loaded from Azure Blob Storage.
+2026-05-24 15:09:51,802 [INFO] main_batch:110 Fetching advanced FMP metrics (PEG, P/S, D/E, Beta) and Macro Environment to arm the board...
+2026-05-24 15:09:51,804 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,329 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/quote-short?symbol=TLT&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 95
+2026-05-24 15:09:52,330 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,820 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/quote-short?symbol=VXX&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 94
+2026-05-24 15:09:52,824 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,824 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,825 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,827 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,828 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,829 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,829 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,832 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,832 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,832 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,834 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,834 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,834 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,835 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,836 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,836 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,836 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,838 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,838 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:52,838 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:53,983 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=AAPL&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:53,984 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:53,985 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=ARM&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:53,985 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,023 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=VRT&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,024 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,029 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=LLY&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,030 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,099 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=AMD&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,100 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,127 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=NET&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,128 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,198 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=PLTR&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,199 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=SNOW&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,199 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=SMCI&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,200 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=RYOJ&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,200 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=MNDY&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,200 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=GMM&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,201 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=ASTS&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,201 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=TSM&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,201 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=AMZN&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,201 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=SYM&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,202 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=ALAB&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,202 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=DDOG&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,202 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=GOOGL&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,202 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=ASML&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,204 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,204 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,205 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,205 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,206 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,207 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,208 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,208 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,209 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,209 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,210 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,210 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,213 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,213 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,876 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=ARM&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,880 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:54,991 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=AAPL&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:54,995 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:55,035 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=VRT&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,039 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:55,083 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=LLY&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,087 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:55,294 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=AMD&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,295 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=NET&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,299 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:55,300 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:55,390 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=GMM&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,393 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:55,407 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=ASML&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,423 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=MNDY&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,440 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=TSM&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,446 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=DDOG&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,447 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=ALAB&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,448 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=AMZN&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,448 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=GOOGL&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,448 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=PLTR&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,458 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=SNOW&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,461 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=SMCI&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,472 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=SYM&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,477 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=RYOJ&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,486 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=ASTS&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,740 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=RKLB&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,741 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:55,782 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=AVGO&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,783 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:55,800 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=ANET&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,801 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:55,821 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=CRWD&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,822 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:55,995 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=META&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:55,996 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:56,005 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=CELH&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:56,006 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:56,034 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/profile?symbol=NVDA&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:56,035 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-05-24 15:09:56,370 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=RKLB&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:56,480 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=AVGO&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:56,534 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=ANET&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:56,551 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=CRWD&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:56,685 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=CELH&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:56,699 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=NVDA&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:56,704 [DEBUG] _make_request:544 https://financialmodelingprep.com:443 "GET /stable/key-metrics-ttm?symbol=META&apikey=k4ZLb56zZtl4Y52fQhssX3d7tZwcjd2d HTTP/1.1" 200 None
+2026-05-24 15:09:56,707 [INFO] main_batch:192 Executing Master Graph Run.
+2026-05-24 15:09:56,710 [INFO] full_board_node:46 Fan Out. Triggering all 5 agents concurrently to evaluate the entire portfolio.
+2026-05-24 15:09:56,710 [DEBUG] run_single_agent:18 Building prompt for buffett evaluating entire portfolio.
+2026-05-24 15:09:56,711 [DEBUG] call_gemini_async:29 Executing API call for agent buffett using model gemini-2.5-pro
+2026-05-24 15:09:56,711 [INFO] generate_content:8580 AFC is enabled with max remote calls: 10.
+2026-05-24 15:09:56,713 [DEBUG] run_single_agent:18 Building prompt for lynch evaluating entire portfolio.
+2026-05-24 15:09:56,714 [DEBUG] call_gemini_async:29 Executing API call for agent lynch using model gemini-2.5-pro
+2026-05-24 15:09:56,714 [INFO] generate_content:8580 AFC is enabled with max remote calls: 10.
+2026-05-24 15:09:56,716 [DEBUG] run_single_agent:18 Building prompt for livermore evaluating entire portfolio.
+2026-05-24 15:09:56,716 [DEBUG] call_gemini_async:29 Executing API call for agent livermore using model gemini-2.5-pro
+2026-05-24 15:09:56,716 [INFO] generate_content:8580 AFC is enabled with max remote calls: 10.
+2026-05-24 15:09:56,716 [DEBUG] _get_explicit_environ_credentials:334 Checking '' for explicit credentials as part of auth process...
+2026-05-24 15:09:56,718 [DEBUG] _get_gcloud_sdk_credentials:304 Checking Cloud SDK credentials as part of auth process...
+2026-05-24 15:09:56,718 [DEBUG] run_single_agent:18 Building prompt for huang evaluating entire portfolio.
+2026-05-24 15:09:56,718 [DEBUG] call_gemini_async:29 Executing API call for agent huang using model gemini-2.5-pro
+2026-05-24 15:09:56,719 [INFO] generate_content:8580 AFC is enabled with max remote calls: 10.
+2026-05-24 15:09:56,720 [DEBUG] run_single_agent:18 Building prompt for simons evaluating entire portfolio.
+2026-05-24 15:09:56,720 [DEBUG] call_gemini_async:29 Executing API call for agent simons using model gemini-2.5-pro
+2026-05-24 15:09:56,720 [INFO] generate_content:8580 AFC is enabled with max remote calls: 10.
+2026-05-24 15:09:58,013 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): oauth2.googleapis.com:443
+2026-05-24 15:09:58,350 [DEBUG] _make_request:544 https://oauth2.googleapis.com:443 "POST /token HTTP/1.1" 200 None
+2026-05-24 15:09:58,357 [DEBUG] atrace:87 connect_tcp.started host='us-central1-aiplatform.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2026-05-24 15:09:58,357 [DEBUG] atrace:87 connect_tcp.started host='us-central1-aiplatform.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2026-05-24 15:09:58,358 [DEBUG] atrace:87 connect_tcp.started host='us-central1-aiplatform.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2026-05-24 15:09:58,358 [DEBUG] atrace:87 connect_tcp.started host='us-central1-aiplatform.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2026-05-24 15:09:58,358 [DEBUG] atrace:87 connect_tcp.started host='us-central1-aiplatform.googleapis.com' port=443 local_address=None timeout=None socket_options=None
+2026-05-24 15:09:58,406 [DEBUG] atrace:87 connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000020EB395F380>
+2026-05-24 15:09:58,406 [DEBUG] atrace:87 start_tls.started ssl_context=<ssl.SSLContext object at 0x0000020EB1A74F80> server_hostname='us-central1-aiplatform.googleapis.com' timeout=None
+2026-05-24 15:09:58,408 [DEBUG] atrace:87 connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000020EB5F31810>
+2026-05-24 15:09:58,408 [DEBUG] atrace:87 start_tls.started ssl_context=<ssl.SSLContext object at 0x0000020EB1A74F80> server_hostname='us-central1-aiplatform.googleapis.com' timeout=None
+2026-05-24 15:09:58,413 [DEBUG] atrace:87 connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000020EB5F31D10>
+2026-05-24 15:09:58,413 [DEBUG] atrace:87 start_tls.started ssl_context=<ssl.SSLContext object at 0x0000020EB1A74F80> server_hostname='us-central1-aiplatform.googleapis.com' timeout=None
+2026-05-24 15:09:58,414 [DEBUG] atrace:87 connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000020EB3E5AEA0>
+2026-05-24 15:09:58,414 [DEBUG] atrace:87 start_tls.started ssl_context=<ssl.SSLContext object at 0x0000020EB1A74F80> server_hostname='us-central1-aiplatform.googleapis.com' timeout=None
+2026-05-24 15:09:58,414 [DEBUG] atrace:87 connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000020EB5F36190>
+2026-05-24 15:09:58,414 [DEBUG] atrace:87 start_tls.started ssl_context=<ssl.SSLContext object at 0x0000020EB1A74F80> server_hostname='us-central1-aiplatform.googleapis.com' timeout=None
+2026-05-24 15:09:58,438 [DEBUG] atrace:87 start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000020EB3EC9EB0>
+2026-05-24 15:09:58,438 [DEBUG] atrace:87 send_request_headers.started request=<Request [b'POST']>
+2026-05-24 15:09:58,438 [DEBUG] atrace:87 send_request_headers.complete
+2026-05-24 15:09:58,438 [DEBUG] atrace:87 send_request_body.started request=<Request [b'POST']>
+2026-05-24 15:09:58,439 [DEBUG] atrace:87 send_request_body.complete
+2026-05-24 15:09:58,439 [DEBUG] atrace:87 receive_response_headers.started request=<Request [b'POST']>
+2026-05-24 15:09:58,441 [DEBUG] atrace:87 start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000020EB3E93240>
+2026-05-24 15:09:58,442 [DEBUG] atrace:87 send_request_headers.started request=<Request [b'POST']>
+2026-05-24 15:09:58,442 [DEBUG] atrace:87 send_request_headers.complete
+2026-05-24 15:09:58,442 [DEBUG] atrace:87 send_request_body.started request=<Request [b'POST']>
+2026-05-24 15:09:58,442 [DEBUG] atrace:87 send_request_body.complete
+2026-05-24 15:09:58,442 [DEBUG] atrace:87 receive_response_headers.started request=<Request [b'POST']>
+2026-05-24 15:09:58,445 [DEBUG] atrace:87 start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000020EB3E93350>
+2026-05-24 15:09:58,445 [DEBUG] atrace:87 send_request_headers.started request=<Request [b'POST']>
+2026-05-24 15:09:58,450 [DEBUG] atrace:87 send_request_headers.complete
+2026-05-24 15:09:58,450 [DEBUG] atrace:87 send_request_body.started request=<Request [b'POST']>
+2026-05-24 15:09:58,450 [DEBUG] atrace:87 start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000020EB39BE650>
+2026-05-24 15:09:58,450 [DEBUG] atrace:87 start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000020EB39BED50>
+2026-05-24 15:09:58,451 [DEBUG] atrace:87 send_request_body.complete
+2026-05-24 15:09:58,451 [DEBUG] atrace:87 receive_response_headers.started request=<Request [b'POST']>
+2026-05-24 15:09:58,451 [DEBUG] atrace:87 send_request_headers.started request=<Request [b'POST']>
+2026-05-24 15:09:58,451 [DEBUG] atrace:87 send_request_headers.started request=<Request [b'POST']>
+2026-05-24 15:09:58,452 [DEBUG] atrace:87 send_request_headers.complete
+2026-05-24 15:09:58,452 [DEBUG] atrace:87 send_request_body.started request=<Request [b'POST']>
+2026-05-24 15:09:58,452 [DEBUG] atrace:87 send_request_headers.complete
+2026-05-24 15:09:58,452 [DEBUG] atrace:87 send_request_body.started request=<Request [b'POST']>
+2026-05-24 15:09:58,452 [DEBUG] atrace:87 send_request_body.complete
+2026-05-24 15:09:58,452 [DEBUG] atrace:87 receive_response_headers.started request=<Request [b'POST']>
+2026-05-24 15:09:58,452 [DEBUG] atrace:87 send_request_body.complete
+2026-05-24 15:09:58,452 [DEBUG] atrace:87 receive_response_headers.started request=<Request [b'POST']>
+2026-05-24 15:10:34,844 [DEBUG] atrace:87 receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sun, 24 May 2026 22:10:34 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2026-05-24 15:10:34,844 [INFO] _send_single_request:1740 HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/sc-invest-boardroom/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-24 15:10:34,844 [DEBUG] atrace:87 receive_response_body.started request=<Request [b'POST']>
+2026-05-24 15:10:34,845 [DEBUG] atrace:87 receive_response_body.complete
+2026-05-24 15:10:34,845 [DEBUG] atrace:87 response_closed.started
+2026-05-24 15:10:34,845 [DEBUG] atrace:87 response_closed.complete
+2026-05-24 15:10:34,846 [DEBUG] call_gemini_async:39 API call successful and validated for agent simons
+2026-05-24 15:10:42,754 [DEBUG] atrace:87 receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sun, 24 May 2026 22:10:42 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2026-05-24 15:10:42,754 [INFO] _send_single_request:1740 HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/sc-invest-boardroom/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-24 15:10:42,754 [DEBUG] atrace:87 receive_response_body.started request=<Request [b'POST']>
+2026-05-24 15:10:42,755 [DEBUG] atrace:87 receive_response_body.complete
+2026-05-24 15:10:42,755 [DEBUG] atrace:87 response_closed.started
+2026-05-24 15:10:42,755 [DEBUG] atrace:87 response_closed.complete
+2026-05-24 15:10:42,755 [DEBUG] atrace:87 close.started
+2026-05-24 15:10:42,755 [DEBUG] atrace:87 close.complete
+2026-05-24 15:10:42,756 [DEBUG] call_gemini_async:39 API call successful and validated for agent livermore
+2026-05-24 15:10:46,173 [DEBUG] atrace:87 receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sun, 24 May 2026 22:10:45 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2026-05-24 15:10:46,173 [INFO] _send_single_request:1740 HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/sc-invest-boardroom/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-24 15:10:46,173 [DEBUG] atrace:87 receive_response_body.started request=<Request [b'POST']>
+2026-05-24 15:10:46,174 [DEBUG] atrace:87 receive_response_body.complete
+2026-05-24 15:10:46,174 [DEBUG] atrace:87 response_closed.started
+2026-05-24 15:10:46,174 [DEBUG] atrace:87 response_closed.complete
+2026-05-24 15:10:46,175 [DEBUG] call_gemini_async:39 API call successful and validated for agent buffett
+2026-05-24 15:10:49,767 [DEBUG] atrace:87 receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sun, 24 May 2026 22:10:49 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2026-05-24 15:10:49,768 [INFO] _send_single_request:1740 HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/sc-invest-boardroom/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-24 15:10:49,768 [DEBUG] atrace:87 receive_response_body.started request=<Request [b'POST']>
+2026-05-24 15:10:49,768 [DEBUG] atrace:87 receive_response_body.complete
+2026-05-24 15:10:49,768 [DEBUG] atrace:87 response_closed.started
+2026-05-24 15:10:49,768 [DEBUG] atrace:87 response_closed.complete
+2026-05-24 15:10:49,769 [DEBUG] atrace:87 close.started
+2026-05-24 15:10:49,769 [DEBUG] atrace:87 close.complete
+2026-05-24 15:10:49,769 [DEBUG] call_gemini_async:39 API call successful and validated for agent lynch
+2026-05-24 15:10:53,259 [DEBUG] atrace:87 receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sun, 24 May 2026 22:10:52 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2026-05-24 15:10:53,259 [INFO] _send_single_request:1740 HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/sc-invest-boardroom/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-24 15:10:53,260 [DEBUG] atrace:87 receive_response_body.started request=<Request [b'POST']>
+2026-05-24 15:10:53,260 [DEBUG] atrace:87 receive_response_body.complete
+2026-05-24 15:10:53,260 [DEBUG] atrace:87 response_closed.started
+2026-05-24 15:10:53,260 [DEBUG] atrace:87 response_closed.complete
+2026-05-24 15:10:53,260 [DEBUG] atrace:87 close.started
+2026-05-24 15:10:53,260 [DEBUG] atrace:87 close.complete
+2026-05-24 15:10:53,261 [DEBUG] call_gemini_async:39 API call successful and validated for agent huang
+2026-05-24 15:10:53,262 [INFO] synthesize_node:67 Reduce. Synthesizing the portfolio debate.
+2026-05-24 15:10:53,262 [DEBUG] call_gemini_async:29 Executing API call for agent clerk using model gemini-2.5-flash
+2026-05-24 15:10:53,262 [INFO] generate_content:8580 AFC is enabled with max remote calls: 10.
+2026-05-24 15:10:53,264 [DEBUG] atrace:87 send_request_headers.started request=<Request [b'POST']>
+2026-05-24 15:10:53,264 [DEBUG] atrace:87 send_request_headers.complete
+2026-05-24 15:10:53,264 [DEBUG] atrace:87 send_request_body.started request=<Request [b'POST']>
+2026-05-24 15:10:53,264 [DEBUG] atrace:87 send_request_body.complete
+2026-05-24 15:10:53,264 [DEBUG] atrace:87 receive_response_headers.started request=<Request [b'POST']>
+2026-05-24 15:11:21,625 [DEBUG] atrace:87 receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sun, 24 May 2026 22:11:21 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2026-05-24 15:11:21,625 [INFO] _send_single_request:1740 HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/sc-invest-boardroom/locations/us-central1/publishers/google/models/gemini-2.5-flash:generateContent "HTTP/1.1 200 OK"
+2026-05-24 15:11:21,626 [DEBUG] atrace:87 receive_response_body.started request=<Request [b'POST']>
+2026-05-24 15:11:21,628 [DEBUG] atrace:87 receive_response_body.complete
+2026-05-24 15:11:21,628 [DEBUG] atrace:87 response_closed.started
+2026-05-24 15:11:21,628 [DEBUG] atrace:87 response_closed.complete
+2026-05-24 15:11:21,628 [DEBUG] atrace:87 close.started
+2026-05-24 15:11:21,629 [DEBUG] atrace:87 close.complete
+2026-05-24 15:11:21,629 [DEBUG] call_gemini_async:45 API call successful for agent clerk
+2026-05-24 15:11:21,630 [INFO] chairman_node:140 Chairman Node executing. Attempt 1.
+2026-05-24 15:11:21,630 [DEBUG] call_gemini_async:29 Executing API call for agent chairman using model gemini-2.5-pro
+2026-05-24 15:11:21,631 [INFO] generate_content:8580 AFC is enabled with max remote calls: 10.
+2026-05-24 15:11:21,636 [DEBUG] atrace:87 send_request_headers.started request=<Request [b'POST']>
+2026-05-24 15:11:21,636 [DEBUG] atrace:87 send_request_headers.complete
+2026-05-24 15:11:21,636 [DEBUG] atrace:87 send_request_body.started request=<Request [b'POST']>
+2026-05-24 15:11:21,636 [DEBUG] atrace:87 send_request_body.complete
+2026-05-24 15:11:21,636 [DEBUG] atrace:87 receive_response_headers.started request=<Request [b'POST']>
+2026-05-24 15:12:12,611 [DEBUG] atrace:87 receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sun, 24 May 2026 22:12:12 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2026-05-24 15:12:12,611 [INFO] _send_single_request:1740 HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/sc-invest-boardroom/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-24 15:12:12,611 [DEBUG] atrace:87 receive_response_body.started request=<Request [b'POST']>
+2026-05-24 15:12:12,612 [DEBUG] atrace:87 receive_response_body.complete
+2026-05-24 15:12:12,612 [DEBUG] atrace:87 response_closed.started
+2026-05-24 15:12:12,612 [DEBUG] atrace:87 response_closed.complete
+2026-05-24 15:12:12,613 [DEBUG] call_gemini_async:45 API call successful for agent chairman
+2026-05-24 15:12:12,613 [DEBUG] chairman_node:175 Chairman draft generated. Routing to QA.
+2026-05-24 15:12:12,613 [INFO] compliance_node:183 Harry Markopolos auditing Chairman draft...
+2026-05-24 15:12:12,614 [DEBUG] call_gemini_async:29 Executing API call for agent compliance using model gemini-2.5-pro
+2026-05-24 15:12:12,614 [INFO] generate_content:8580 AFC is enabled with max remote calls: 10.
+2026-05-24 15:12:12,615 [DEBUG] atrace:87 send_request_headers.started request=<Request [b'POST']>
+2026-05-24 15:12:12,616 [DEBUG] atrace:87 send_request_headers.complete
+2026-05-24 15:12:12,616 [DEBUG] atrace:87 send_request_body.started request=<Request [b'POST']>
+2026-05-24 15:12:12,616 [DEBUG] atrace:87 send_request_body.complete
+2026-05-24 15:12:12,616 [DEBUG] atrace:87 receive_response_headers.started request=<Request [b'POST']>
+2026-05-24 15:12:34,358 [DEBUG] atrace:87 receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sun, 24 May 2026 22:12:34 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2026-05-24 15:12:34,359 [INFO] _send_single_request:1740 HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/sc-invest-boardroom/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-24 15:12:34,359 [DEBUG] atrace:87 receive_response_body.started request=<Request [b'POST']>
+2026-05-24 15:12:34,361 [DEBUG] atrace:87 receive_response_body.complete
+2026-05-24 15:12:34,361 [DEBUG] atrace:87 response_closed.started
+2026-05-24 15:12:34,361 [DEBUG] atrace:87 response_closed.complete
+2026-05-24 15:12:34,361 [DEBUG] call_gemini_async:39 API call successful and validated for agent compliance
+2026-05-24 15:12:34,362 [WARNING] compliance_node:237 Compliance Audit FAILED. Violations: ["Unanimous Hold Exception Violation: For existing portfolio holdings VRT, AVGO, and ANET, the entire board voted 'Hold'. As per the rules, the `aggregate_conviction_score` for these positions must be set to 0. The Chairman incorrectly assigned scores of 37, 35, and 38, respectively."]
+2026-05-24 15:12:34,362 [INFO] qa_router:253 Routing back to Chairman for rewrite.
+2026-05-24 15:12:34,363 [INFO] chairman_node:140 Chairman Node executing. Attempt 2.
+2026-05-24 15:12:34,363 [WARNING] chairman_node:156 Applying QA Feedback to Chairman Prompt.
+2026-05-24 15:12:34,363 [DEBUG] call_gemini_async:29 Executing API call for agent chairman using model gemini-2.5-pro
+2026-05-24 15:12:34,363 [INFO] generate_content:8580 AFC is enabled with max remote calls: 10.
+2026-05-24 15:12:34,366 [DEBUG] atrace:87 send_request_headers.started request=<Request [b'POST']>
+2026-05-24 15:12:34,367 [DEBUG] atrace:87 send_request_headers.complete
+2026-05-24 15:12:34,367 [DEBUG] atrace:87 send_request_body.started request=<Request [b'POST']>
+2026-05-24 15:12:34,367 [DEBUG] atrace:87 send_request_body.complete
+2026-05-24 15:12:34,367 [DEBUG] atrace:87 receive_response_headers.started request=<Request [b'POST']>
+2026-05-24 15:13:23,458 [DEBUG] atrace:87 receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sun, 24 May 2026 22:13:23 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2026-05-24 15:13:23,459 [INFO] _send_single_request:1740 HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/sc-invest-boardroom/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-24 15:13:23,459 [DEBUG] atrace:87 receive_response_body.started request=<Request [b'POST']>
+2026-05-24 15:13:23,460 [DEBUG] atrace:87 receive_response_body.complete
+2026-05-24 15:13:23,460 [DEBUG] atrace:87 response_closed.started
+2026-05-24 15:13:23,460 [DEBUG] atrace:87 response_closed.complete
+2026-05-24 15:13:23,461 [DEBUG] call_gemini_async:45 API call successful for agent chairman
+2026-05-24 15:13:23,461 [DEBUG] chairman_node:175 Chairman draft generated. Routing to QA.
+2026-05-24 15:13:23,461 [INFO] compliance_node:183 Harry Markopolos auditing Chairman draft...
+2026-05-24 15:13:23,462 [DEBUG] call_gemini_async:29 Executing API call for agent compliance using model gemini-2.5-pro
+2026-05-24 15:13:23,462 [INFO] generate_content:8580 AFC is enabled with max remote calls: 10.
+2026-05-24 15:13:23,463 [DEBUG] atrace:87 send_request_headers.started request=<Request [b'POST']>
+2026-05-24 15:13:23,464 [DEBUG] atrace:87 send_request_headers.complete
+2026-05-24 15:13:23,464 [DEBUG] atrace:87 send_request_body.started request=<Request [b'POST']>
+2026-05-24 15:13:23,464 [DEBUG] atrace:87 send_request_body.complete
+2026-05-24 15:13:23,464 [DEBUG] atrace:87 receive_response_headers.started request=<Request [b'POST']>
+2026-05-24 15:13:48,498 [DEBUG] atrace:87 receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sun, 24 May 2026 22:13:48 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2026-05-24 15:13:48,498 [INFO] _send_single_request:1740 HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/sc-invest-boardroom/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-24 15:13:48,498 [DEBUG] atrace:87 receive_response_body.started request=<Request [b'POST']>
+2026-05-24 15:13:48,499 [DEBUG] atrace:87 receive_response_body.complete
+2026-05-24 15:13:48,500 [DEBUG] atrace:87 response_closed.started
+2026-05-24 15:13:48,500 [DEBUG] atrace:87 response_closed.complete
+2026-05-24 15:13:48,501 [DEBUG] call_gemini_async:39 API call successful and validated for agent compliance
+2026-05-24 15:13:48,501 [INFO] compliance_node:228 Compliance Audit PASSED.
+2026-05-24 15:13:48,502 [DEBUG] generate_executive_summary:25 Generating executive summary via Simons.
+2026-05-24 15:13:48,502 [DEBUG] call_gemini_async:29 Executing API call for agent simons_exec using model gemini-2.5-pro
+2026-05-24 15:13:48,502 [INFO] generate_content:8580 AFC is enabled with max remote calls: 10.
+2026-05-24 15:13:48,503 [DEBUG] atrace:87 send_request_headers.started request=<Request [b'POST']>
+2026-05-24 15:13:48,503 [DEBUG] atrace:87 send_request_headers.complete
+2026-05-24 15:13:48,503 [DEBUG] atrace:87 send_request_body.started request=<Request [b'POST']>
+2026-05-24 15:13:48,503 [DEBUG] atrace:87 send_request_body.complete
+2026-05-24 15:13:48,503 [DEBUG] atrace:87 receive_response_headers.started request=<Request [b'POST']>
+2026-05-24 15:14:03,293 [DEBUG] atrace:87 receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sun, 24 May 2026 22:14:02 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2026-05-24 15:14:03,293 [INFO] _send_single_request:1740 HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/sc-invest-boardroom/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-24 15:14:03,293 [DEBUG] atrace:87 receive_response_body.started request=<Request [b'POST']>
+2026-05-24 15:14:03,314 [DEBUG] atrace:87 receive_response_body.complete
+2026-05-24 15:14:03,315 [DEBUG] atrace:87 response_closed.started
+2026-05-24 15:14:03,315 [DEBUG] atrace:87 response_closed.complete
+2026-05-24 15:14:03,316 [DEBUG] call_gemini_async:45 API call successful for agent simons_exec
+2026-05-24 15:14:03,316 [DEBUG] generate_closing_bell:41 Generating closing bell summary via Chairman.
+2026-05-24 15:14:03,316 [DEBUG] call_gemini_async:29 Executing API call for agent chairman_closing using model gemini-2.5-pro
+2026-05-24 15:14:03,316 [INFO] generate_content:8580 AFC is enabled with max remote calls: 10.
+2026-05-24 15:14:03,318 [DEBUG] atrace:87 send_request_headers.started request=<Request [b'POST']>
+2026-05-24 15:14:03,318 [DEBUG] atrace:87 send_request_headers.complete
+2026-05-24 15:14:03,318 [DEBUG] atrace:87 send_request_body.started request=<Request [b'POST']>
+2026-05-24 15:14:03,319 [DEBUG] atrace:87 send_request_body.complete
+2026-05-24 15:14:03,319 [DEBUG] atrace:87 receive_response_headers.started request=<Request [b'POST']>
+2026-05-24 15:14:23,563 [DEBUG] atrace:87 receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Content-Type', b'application/json; charset=UTF-8'), (b'Vary', b'Origin'), (b'Vary', b'X-Origin'), (b'Vary', b'Referer'), (b'Content-Encoding', b'gzip'), (b'Date', b'Sun, 24 May 2026 22:14:23 GMT'), (b'Server', b'scaffolding on HTTPServer2'), (b'X-XSS-Protection', b'0'), (b'X-Frame-Options', b'SAMEORIGIN'), (b'X-Content-Type-Options', b'nosniff'), (b'Alt-Svc', b'h3=":443"; ma=2592000,h3-29=":443"; ma=2592000'), (b'Transfer-Encoding', b'chunked')])
+2026-05-24 15:14:23,563 [INFO] _send_single_request:1740 HTTP Request: POST https://us-central1-aiplatform.googleapis.com/v1beta1/projects/sc-invest-boardroom/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent "HTTP/1.1 200 OK"
+2026-05-24 15:14:23,564 [DEBUG] atrace:87 receive_response_body.started request=<Request [b'POST']>
+2026-05-24 15:14:23,565 [DEBUG] atrace:87 receive_response_body.complete
+2026-05-24 15:14:23,565 [DEBUG] atrace:87 response_closed.started
+2026-05-24 15:14:23,566 [DEBUG] atrace:87 response_closed.complete
+2026-05-24 15:14:23,566 [DEBUG] call_gemini_async:45 API call successful for agent chairman_closing
+2026-05-24 15:14:23,568 [INFO] on_request:532 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-reports/raw_debate_log.md'
+Request method: 'PUT'
+Request headers:
+    'Content-Length': '59473'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Content-Type': 'application/octet-stream'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'eb7104d9-57bd-11f1-bcb4-f4b3017536f8'
+    'Authorization': 'REDACTED'
+A body is sent with the request
+2026-05-24 15:14:23,570 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): stboardroomprod.blob.core.windows.net:443
+2026-05-24 15:14:23,987 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "PUT /boardroom-reports/raw_debate_log.md HTTP/1.1" 201 0
+2026-05-24 15:14:23,988 [INFO] on_response:581 Response status: 201
+Response headers:
+    'Content-Length': '0'
+    'Content-MD5': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:14:23 GMT'
+    'ETag': '"0x8DEB9E1CFB0BB5A"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '6b3e7476-601e-0085-37ca-ebc8ed000000'
+    'x-ms-client-request-id': 'eb7104d9-57bd-11f1-bcb4-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-content-crc64': 'REDACTED'
+    'x-ms-request-server-encrypted': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:14:23 GMT'
+2026-05-24 15:14:23,988 [INFO] save_report:96 Report raw_debate_log.md uploaded to Azure Blob Storage.
+2026-05-24 15:14:23,990 [INFO] on_request:532 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-reports/executive_briefing.md'
+Request method: 'PUT'
+Request headers:
+    'Content-Length': '4862'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Content-Type': 'application/octet-stream'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'ebb15e74-57bd-11f1-bbb9-f4b3017536f8'
+    'Authorization': 'REDACTED'
+A body is sent with the request
+2026-05-24 15:14:23,991 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): stboardroomprod.blob.core.windows.net:443
+2026-05-24 15:14:24,288 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "PUT /boardroom-reports/executive_briefing.md HTTP/1.1" 201 0
+2026-05-24 15:14:24,289 [INFO] on_response:581 Response status: 201
+Response headers:
+    'Content-Length': '0'
+    'Content-MD5': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:14:23 GMT'
+    'ETag': '"0x8DEB9E1CFE279E7"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '56c8ca46-401e-00e0-45ca-eb66a9000000'
+    'x-ms-client-request-id': 'ebb15e74-57bd-11f1-bbb9-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-content-crc64': 'REDACTED'
+    'x-ms-request-server-encrypted': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:14:23 GMT'
+2026-05-24 15:14:24,289 [INFO] save_report:96 Report executive_briefing.md uploaded to Azure Blob Storage.
+2026-05-24 15:14:24,291 [INFO] on_request:535 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-state/board_verdicts.json'
+Request method: 'HEAD'
+Request headers:
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'ebdf48a2-57bd-11f1-af17-f4b3017536f8'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2026-05-24 15:14:24,292 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): stboardroomprod.blob.core.windows.net:443
+2026-05-24 15:14:24,582 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "HEAD /boardroom-state/board_verdicts.json HTTP/1.1" 200 0
+2026-05-24 15:14:24,582 [INFO] on_response:581 Response status: 200
+Response headers:
+    'Content-Length': '27684'
+    'Content-Type': 'application/octet-stream'
+    'Content-MD5': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:01:33 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DEB9E00462D974"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '527d6958-b01e-002f-0fca-ebe8fb000000'
+    'x-ms-client-request-id': 'ebdf48a2-57bd-11f1-af17-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:14:23 GMT'
+2026-05-24 15:14:24,583 [INFO] on_request:535 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-state/board_verdicts.json'
+Request method: 'GET'
+Request headers:
+    'x-ms-range': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'ec0bedeb-57bd-11f1-8fc7-f4b3017536f8'
+    'Authorization': 'REDACTED'
+No body was attached to the request
+2026-05-24 15:14:24,614 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "GET /boardroom-state/board_verdicts.json HTTP/1.1" 206 27684
+2026-05-24 15:14:24,614 [INFO] on_response:581 Response status: 206
+Response headers:
+    'Content-Length': '27684'
+    'Content-Type': 'application/octet-stream'
+    'Content-Range': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:01:33 GMT'
+    'Accept-Ranges': 'REDACTED'
+    'ETag': '"0x8DEB9E00462D974"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '527d6961-b01e-002f-14ca-ebe8fb000000'
+    'x-ms-client-request-id': 'ec0bedeb-57bd-11f1-8fc7-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-creation-time': 'REDACTED'
+    'x-ms-blob-content-md5': 'REDACTED'
+    'x-ms-lease-status': 'REDACTED'
+    'x-ms-lease-state': 'REDACTED'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-server-encrypted': 'REDACTED'
+    'x-ms-access-tier': 'REDACTED'
+    'x-ms-access-tier-inferred': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:14:23 GMT'
+2026-05-24 15:14:24,637 [INFO] load_memory:57 Memory successfully loaded from Azure Blob Storage.
+2026-05-24 15:14:24,639 [INFO] on_request:532 Request URL: 'https://stboardroomprod.blob.core.windows.net/boardroom-state/board_verdicts.json'
+Request method: 'PUT'
+Request headers:
+    'Content-Length': '25422'
+    'x-ms-blob-type': 'REDACTED'
+    'x-ms-version': 'REDACTED'
+    'Content-Type': 'application/octet-stream'
+    'Accept': 'application/xml'
+    'User-Agent': 'azsdk-python-storage-blob/12.29.0 Python/3.14.3 (Windows-11-10.0.26200-SP0)'
+    'x-ms-date': 'REDACTED'
+    'x-ms-client-request-id': 'ec147b18-57bd-11f1-be97-f4b3017536f8'
+    'Authorization': 'REDACTED'
+A body is sent with the request
+2026-05-24 15:14:24,640 [DEBUG] _new_conn:1062 Starting new HTTPS connection (1): stboardroomprod.blob.core.windows.net:443
+2026-05-24 15:14:24,976 [DEBUG] _make_request:544 https://stboardroomprod.blob.core.windows.net:443 "PUT /boardroom-state/board_verdicts.json HTTP/1.1" 201 0
+2026-05-24 15:14:24,976 [INFO] on_response:581 Response status: 201
+Response headers:
+    'Content-Length': '0'
+    'Content-MD5': 'REDACTED'
+    'Last-Modified': 'Sun, 24 May 2026 22:14:24 GMT'
+    'ETag': '"0x8DEB9E1D04B2308"'
+    'Server': 'Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': 'a2c74596-701e-00a6-35ca-eb522e000000'
+    'x-ms-client-request-id': 'ec147b18-57bd-11f1-be97-f4b3017536f8'
+    'x-ms-version': 'REDACTED'
+    'x-ms-content-crc64': 'REDACTED'
+    'x-ms-request-server-encrypted': 'REDACTED'
+    'Date': 'Sun, 24 May 2026 22:14:24 GMT'
+2026-05-24 15:14:24,977 [INFO] save_memory:77 Memory seamlessly uploaded to Azure Blob Storage.
+2026-05-24 15:14:24,978 [INFO] main_batch:292 Master processing complete. Check Azure Blob Storage (or local output directory) for your reports.
