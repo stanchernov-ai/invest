@@ -176,8 +176,9 @@ def build_benchmark_line_chart(history_data):
     base_port = history_data[dates[0]].get("portfolio", 0)
     base_spy = history_data[dates[0]].get("spy", 0)
     base_qqq = history_data[dates[0]].get("qqq", 0)
-    if base_port <= 0 or base_spy <= 0 or base_qqq <= 0:
+    if base_port <= 0 or base_spy <= 0:
         return ""
+    has_qqq = base_qqq > 0
 
     port_data = []
     spy_data = []
@@ -186,21 +187,24 @@ def build_benchmark_line_chart(history_data):
     for d in dates:
         p_val = history_data[d].get("portfolio", base_port)
         s_val = history_data[d].get("spy", base_spy)
-        q_val = history_data[d].get("qqq", base_qqq)
-
         port_data.append(round(((p_val - base_port) / base_port) * 100, 2))
         spy_data.append(round(((s_val - base_spy) / base_spy) * 100, 2))
-        qqq_data.append(round(((q_val - base_qqq) / base_qqq) * 100, 2))
+        if has_qqq:
+            q_val = history_data[d].get("qqq", base_qqq)
+            qqq_data.append(round(((q_val - base_qqq) / base_qqq) * 100, 2))
+
+    datasets = [
+        {"label": "Portfolio", "data": port_data, "borderColor": "#2563eb", "fill": False, "tension": 0.1},
+        {"label": "S&P 500", "data": spy_data, "borderColor": "#9ca3af", "fill": False, "tension": 0.1},
+    ]
+    if has_qqq:
+        datasets.append({"label": "NASDAQ", "data": qqq_data, "borderColor": "#10b981", "fill": False, "tension": 0.1})
 
     chart_config = {
         "type": "line",
         "data": {
             "labels": dates,
-            "datasets": [
-                {"label": "Portfolio", "data": port_data, "borderColor": "#2563eb", "fill": False, "tension": 0.1},
-                {"label": "S&P 500", "data": spy_data, "borderColor": "#9ca3af", "fill": False, "tension": 0.1},
-                {"label": "NASDAQ", "data": qqq_data, "borderColor": "#10b981", "fill": False, "tension": 0.1}
-            ]
+            "datasets": datasets
         },
         "options": {
             "plugins": {

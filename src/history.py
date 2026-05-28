@@ -170,6 +170,11 @@ async def build_account_returns(data_dir=None, api_key=None, session=None, windo
             logger.warning("History engine: no symbols to value.")
             return None
 
+        # Fetch benchmark indices first (before the heavier per-holding series) so
+        # starter-tier rate limits don't leave SPY/QQQ empty at the end.
+        spy_series = await fetch_price_series("SPY", api_key, session, start_str, end_str)
+        qqq_series = await fetch_price_series("QQQ", api_key, session, start_str, end_str)
+
         # Cap concurrency so the extra EOD calls don't trip FMP starter-tier rate
         # limits (which would trigger long exponential backoff against the 10-min
         # Azure Functions budget).
@@ -257,10 +262,6 @@ async def build_account_returns(data_dir=None, api_key=None, session=None, windo
                 "3m": round((factor[acct]["3m"] - 1) * 100, 2),
             }
 
-        spy_series, qqq_series = await asyncio.gather(
-            fetch_price_series("SPY", api_key, session, start_str, end_str),
-            fetch_price_series("QQQ", api_key, session, start_str, end_str),
-        )
         spy_aligned = _forward_fill_prices(spy_series, global_dates)
         qqq_aligned = _forward_fill_prices(qqq_series, global_dates)
         benchmark_history = {}
