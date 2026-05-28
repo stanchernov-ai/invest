@@ -29,7 +29,7 @@ class StateOfTheUnionQuote(BaseModel):
     quote: str = Field(description="Their specific 'OVERALL CRITIQUE' extracted exactly as they said it.")
 
 class ChiefOfStaffSynthesis(BaseModel):
-    boardroom_brawl: str = Field(description="A 3-4 sentence narrative summarizing the massive conflict and clash of philosophies among the board members today. Pit specific members against each other by name.")
+    boardroom_brawl: str = Field(description="A dramatic narrative of today's debate, formatted as EXACTLY 3 paragraphs separated by newline characters (\\n\\n between paragraphs). Each paragraph must be 3-4 sentences. Pit specific members against each other by name and describe how they attacked each other's premises in the rebuttal round. Do NOT return a single run-on block.")
     state_of_the_union_quotes: list[StateOfTheUnionQuote] = Field(description="Extract the overall critique from every single board member.")
 
 class TradeNarrative(BaseModel):

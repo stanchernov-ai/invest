@@ -102,6 +102,7 @@ async def main_batch():
             watchlist_data = {}
 
         master_ledger, total_portfolio_value, dummy_trend, dummy_trades, historical_verdicts, sector_weights = pipeline.process_portfolios()
+        account_holdings = pipeline.build_account_holdings()
         
         keys_to_delete = [sym for sym, data in master_ledger.items() if data["Total"] < 50.0]
         for k in keys_to_delete: del master_ledger[k]
@@ -269,7 +270,8 @@ async def main_batch():
         html_payload = reporting.generate_html_briefing(
             total_val=total_portfolio_value, qqq_trend=live_qqq_trend, mandate=live_mandate, 
             chairman_data=c_data, cos_data=cos_data, matrix_md=matrix_md, unicorn_trades=unicorn_trades,
-            sorted_ledger=sorted_ledger, red_team_data=red_team_data, history_data=history_data
+            sorted_ledger=sorted_ledger, red_team_data=red_team_data, history_data=history_data,
+            account_holdings=account_holdings
         )
         
         storage_client.save_report(f"executive_briefing_{file_timestamp}.html", html_payload)

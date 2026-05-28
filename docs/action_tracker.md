@@ -94,6 +94,114 @@ This document tracks identified bugs, architectural improvements, and long-term 
 
 ---
 
+## Phase 4: Reporting & Visual Formatting
+
+Reference briefing: `executive_briefing_20260528_204417.html` (Azure `boardroom-reports`).
+
+### 4.1 Guarantee Multi-Paragraph Debate — DONE (May 28, 2026)
+* **Description:** The "Debate" section should render as multiple paragraphs, not one long block.
+* **Finding:** The renderer (`reporting.py`) already splits `boardroom_brawl` on newlines, and the `clerk` prompt asks for "exactly 3 paragraphs" — so 204417 renders correctly. However, the `ChiefOfStaffSynthesis.boardroom_brawl` **schema description** contradicted the prompt ("3-4 sentence narrative"), risking a single-blob regression if the model follows the schema.
+* **Resolution:** Updated the `boardroom_brawl` field description in `src/core/schemas.py` to explicitly require exactly 3 newline-separated paragraphs (`\n\n` between them), aligning schema with prompt so paragraph layout is guaranteed rather than incidental.
+
+### 4.2 Per-Account Asset Allocation Pie Charts — DONE
+* **Description:** Keep the existing total-portfolio pie chart, and add a second visual breaking allocation out **per account** (side-by-side pies) so Stan can see performance/allocation by account.
+* **Data availability (CONFIRMED):** All four requested accounts exist in the input data:
+  | Account | Source |
+  |---------|--------|
+  | eTrade Taxable | `etrade_taxable.csv` |
+  | eTrade Roth IRA | `etrade_roth.csv` |
+  | Fidelity 401K | `fidelity_portfolio.csv` → `Account Name` in {`WORKDAY 401(K)`, `BrokerageLink`} |
+  | Fidelity Roth 401K | `fidelity_portfolio.csv` → `Account Name` = `BrokerageLink Roth` |
+* **Required changes:**
+  1. **Data model (`pipeline.py`):** Today the ledger collapses to 3 buckets (`Taxable`/`Roth`/`401K`) and mis-files all Fidelity holdings as "Taxable" (filename has no roth/401k token). Refactor `parse_broker_csv` / `process_portfolios` to tag each position with a specific account key (eTrade Taxable, eTrade Roth, Fidelity 401K, Fidelity Roth 401K), using the Fidelity `Account Name` column and the eTrade filename.
+  2. **Parsing caveat:** Exclude the Fidelity `$85,728.18 "BROKERAGELINK"` aggregate/sweep line from `WORKDAY 401(K)` to avoid double-counting against the individual BrokerageLink holdings.
+  3. **Reporting (`reporting.py`):** Add a `build_account_pie_charts(...)` helper producing up to 4 QuickChart pie URLs, and render them side-by-side under "Asset Allocation" (email-client-safe layout, e.g., a 2x2 table of images).
+* **Decision (confirmed with Stan):** Fidelity 401K = `WORKDAY 401(K)` + `BrokerageLink`; Fidelity Roth 401K = `BrokerageLink Roth`.
+* **Resolution (2026-05-28):** Added `pipeline.build_account_holdings()` — an independent re-parse of the input CSVs that groups symbol-level holdings into the 4 accounts (eTrade by filename, Fidelity by `Account Name` column), avoiding the unreliable filename-derived `Taxable/Roth/401K` ledger buckets. Added `reporting.build_account_pie_charts()` (smaller 400x300 outlabeledPie per account, colored by per-account return) and a new "Allocation by Account" section rendered as a 2-per-row table via Jinja `batch(2)`. Wired through `main.py`. Verified end-to-end against the live Azure input CSVs: all 4 accounts populate correctly and QuickChart returns `200 image/png`.
+* **Note for Stan:** Each account pie shows **securities held** (value > $1,000), consistent with the existing total pie. The Fidelity 401K's large symbol-less `BROKERAGELINK` sweep line (~$85K uninvested) and the $2 VANG money-market are intentionally excluded, so the 401K pie reflects the BrokerageLink securities (TSM/ANET/NVDA), not the full account cash balance.
+
+### 4.3 Action Plan "Verdict Pill" Restyle — DONE
+* **Description:** Restore the preferred Action Plan layout (confirmed via Stan's reference screenshot, saved at `assets/...image-bf0ed61d...png`).
+* **Target layout (per position):**
+  1. A **colored rounded pill** reading `VERDICT : TICKER` (e.g., `STRONG BUY : META`) — green for Strong Buy/Buy, neutral/gray for Hold, amber/red for Trim/Sell. This replaces the current plain `<h3>CATEGORY</h3>` header + `<h4>TICKER</h4>`.
+  2. `**Strategic Context:**` paragraph (unchanged content, uses `pos.synthesis`).
+  3. `**The Champion (Name):**` "quote" — champion name wrapped in **parentheses** (currently rendered without parens).
+  4. `**The Dissent (Name):**` "quote" — e.g., `The Dissent (None): "N/A"` when unanimous.
+  5. A thin horizontal divider between positions.
+* **Delta vs current `reporting.py` template (lines ~285-300):**
+  * Swap the category `<h3>`/ticker `<h4>` structure for a per-position pill badge built from `category` + `pos.symbol`, while keeping the existing category sort order (STRONG BUY → BUY → HOLD → TRIM → SELL).
+  * Wrap `pos.narrative.champion` / `dissenter` names in parentheses.
+  * Reuse existing `.champion` (green) / `.dissenter` (red) CSS; add a small pill style with verdict-based background color (inline styles for email-client safety).
+* **Scope:** Template-only change in `generate_html_briefing` (no data-model impact). Pairs well with the 4.2 chart work.
+* **Resolution (2026-05-28):** Updated `src/output/reporting.py`. Added a `.verdict-pill` CSS class and a `pill_styles` Jinja map (green = Strong Buy/Buy, gray = Hold, amber = Trim, red = Sell/Strong Sell). Replaced the `<h3>CATEGORY</h3>` + `<h4>TICKER</h4>` structure with a single per-position pill (`CATEGORY : TICKER`), wrapped Champion/Dissent names in parentheses, and added a divider between positions. Verified via isolated Jinja render.
+
+---
+
+## Phase 5: Standing QA Review Team & Cost Governance
+
+**Goal:** A recurring, multi-specialist review of the *framework itself* (code, logs, data, cost) that produces consolidated recommendations — distinct from the existing per-run debate QA.
+
+**What already exists (build on, don't duplicate):**
+* In-pipeline post-flight QA (`run_post_flight_qa` in `main.py`) already runs three reviewers against each run's debate log: `post_mortem_qa` (procedural), `system_architect` (technical/data-structure), `prompt_engineer` (persona drift). These review a *single run's output*, not the framework over time.
+* `storage_client.execute_retention_policy(days_to_keep=14)` already purges blobs older than 14 days from the state/report containers (protecting `daily_execution.lock`, `board_verdicts.json`, `portfolio_history.json`).
+* Phase 3.2 (Cursor Architecture & QA Agents) is the natural home for implementing these as Cursor subagents/rules on a weekly cadence.
+
+### 5.1 Specialized QA Review Team — PLANNED
+A team of focused reviewers, each producing a short scored report + prioritized recommendations. Proposed as **Cursor subagents/skills** run on a weekly cadence (reading the repo + the latest Azure logs/telemetry via the Phase 3.1 fetch script), with outputs consolidated into a single weekly digest.
+
+| Reviewer | Focus | Primary inputs |
+|----------|-------|----------------|
+| **Data Flow** | Ingestion → ledger → prompt → report integrity; null/zero handling; double-counting; data quality | `pipeline.py`, telemetry JSON, raw debate log |
+| **Prompt Engineering** | Persona drift, sycophancy, prompt/schema conflicts, instruction adherence | `agents.py`, `schemas.py`, debate logs |
+| **APIs** | Endpoint health, deprecations, 4xx/429 rates, fallback usage, redundant calls | telemetry JSON (per-endpoint URLs + responses) |
+| **Tech Stack & Orchestration** | Pipeline structure, concurrency, retries, error handling, deploy/runtime health | `engine.py`, `main.py`, `function_app.py`, Actions logs |
+| **Finance / Cost** | Full monthly cost (Gemini tokens, FMP tier, Azure Functions + Storage + App Insights, email); identify cheaper alternatives **without losing functionality** | telemetry, Azure billing, model/plan choices |
+| **Opportunity / Value Extraction** | Are we extracting maximum value from each agent + each paid API call? Identify unused data fields, underused agents, "gold on the ground" | full agent roster, prompts, raw data vs what's actually used |
+| **HR Efficiency Consultant** | Right-size the agent roster: track every agent's activity/utilization, flag redundant, idle, or low-impact agents, surface gaps where a missing role would add value | agent roster, per-run debate logs, telemetry (which agents fired + token spend) |
+| **Graphics Designer** | Final report visual polish — layout, typography, color, chart quality/legibility, responsive/email rendering — so the briefing looks "amazing" | `reporting.py` template, rendered HTML briefing, chart outputs |
+
+* **Implementation notes:**
+  * Each reviewer = a Cursor subagent with a tight system prompt + a scoring rubric (e.g., 1-5 per area + top 3 actions).
+  * Orchestrate via a "QA Lead" prompt/skill that runs all reviewers and merges into a ranked weekly recommendation list appended to a `docs/qa_reviews/` log.
+  * **Open questions for Stan:** (a) Cursor subagents vs adding more in-pipeline LLM agents? (b) Weekly cadence acceptable? (c) Should the weekly digest be emailed like the briefing?
+
+### 5.2 Opportunity Audit — Value per API Call — PLANNED
+* **Description:** Stan's concern: "leaving gold on the ground." Audit each agent and each paid data field to ensure we're using what we pay for.
+* **Examples to investigate:** FMP fields fetched but unused in prompts (e.g., `3y_cagr` always `N/A`, `de`/`ps` ratios, `beta` for Kelly sizing); the unused `POLYGON_API_KEY` app setting; watchlist data richness vs how agents use it; whether Munger audit / QA agent outputs are surfaced.
+* **Action:** Produce a coverage matrix (data field / agent capability → where consumed → value rating) and a prioritized list of high-value, low-effort additions.
+
+### 5.3 Azure Storage Housekeeping & Cost Control — PLANNED
+* **Description:** A dedicated "clean house" routine to delete older Azure files and keep monthly storage cost down. Stan wants this more deliberate than the current passive retention.
+* **What exists:** `execute_retention_policy(14)` runs at the end of every pipeline run.
+* **Enhancements to consider:**
+  * Make retention window configurable (env var) and tier-aware (e.g., keep last N briefings regardless of age; aggressively purge large `api_telemetry_*.json` sooner — those are ~700 KB each).
+  * Optionally move cold artifacts to a cheaper access tier (Cool/Archive) instead of deleting, if history is valuable.
+  * A standalone Cursor/maintenance task (or scheduled function) to report current storage footprint + projected monthly cost and prune on demand.
+  * Verify the deployment storage account (`rgboardroomprod93bf`) isn't accumulating old build artifacts.
+
+### 5.4 HR Efficiency Consultant — PLANNED
+* **Description:** A meta-governance reviewer that keeps the *agent roster itself* lean as we keep adding agents. Stan's concern: "I think we almost need an HR Efficiency Consultant to ensure we are not using unneeded agents." Tracks activity across all agents and reports on team efficiency, redundancy, and gaps.
+* **Distinct from 5.2 (Opportunity):** Opportunity maximizes value extracted from each *API call/data field*; HR right-sizes the *headcount* — eliminating redundant/idle/low-impact agents and recommending new roles only where they add clear value.
+* **What it tracks:**
+  * **Utilization** — which agents actually fire each run, how often, and their token/cost footprint (from telemetry + debate logs).
+  * **Redundancy** — agents whose outputs overlap or are never consumed downstream (e.g., results discarded like the historical Munger-audit issue).
+  * **Impact** — does an agent's contribution change a verdict/outcome, or is it decorative?
+  * **Gaps** — missing roles that would materially improve decisions or governance.
+* **Output:** A per-period "org chart + utilization report" — table of agent → invocations → token cost → consumed-by → keep/merge/cut recommendation, plus proposed new roles. Feeds the weekly QA digest.
+* **Implementation notes:** Likely a Cursor subagent reading the agent roster (`agents.py`), per-run debate logs, and telemetry. Needs lightweight per-agent activity logging if not already captured (tie into Phase 3.1 fetch + telemetry).
+
+### 5.5 Graphics Designer — PLANNED
+* **Description:** A design-focused reviewer/agent whose sole job is to make the final report "amazing." Stan: "want a graphics designer agent to make sure final report is amazing."
+* **Scope:**
+  * Visual hierarchy, typography, spacing, and color consistency across the HTML briefing.
+  * Chart quality and legibility (pie/bar/line) — labels, contrast, sizing, the new per-account grid (4.2), and the verdict pills (4.3).
+  * Rendering robustness across email clients and browsers (inline styles, table-based layouts, image fallbacks for QuickChart).
+  * Brand/polish: header, section dividers, mobile/responsive behavior.
+* **Output:** A prioritized list of concrete visual improvements (with before/after notes) and, where low-risk, proposed template diffs to `reporting.py`. Could run after each design change or weekly.
+* **Implementation notes:** Cursor subagent that reads `reporting.py` + a rendered sample briefing (pulled from Azure via Phase 3.1) and critiques against a design rubric. Pairs naturally with the Phase 4 reporting work just completed.
+
+---
+
 ## Backlog (Deferred Items)
 
 * **Single Bad Ticker Abort:** Currently, one bad ticker kills the FMP fetch. *Decision:* Kept as-is intentionally to fail-fast during active development. Will implement graceful degradation when the solution matures.

@@ -56,6 +56,38 @@ def build_portfolio_pie_chart(sorted_ledger):
     encoded_config = urllib.parse.quote(json.dumps(chart_config))
     return f"https://quickchart.io/chart?w=600&h=300&c={encoded_config}"
 
+def build_account_pie_charts(account_holdings):
+    """Build one allocation pie per account (smaller, for a side-by-side grid).
+    Returns a list of {"title": account, "url": chart_url} for accounts with data."""
+    charts = []
+    if not account_holdings:
+        return charts
+    for account, syms in account_holdings.items():
+        labels, data, colors = [], [], []
+        for sym, info in sorted(syms.items(), key=lambda x: x[1].get("value", 0), reverse=True):
+            if info.get("value", 0) > 1000:
+                labels.append(sym)
+                data.append(int(info["value"]))
+                colors.append(get_color_for_return(info.get("return_pct", 0.0)))
+        if not data:
+            continue
+        chart_config = {
+            "type": "outlabeledPie",
+            "data": {
+                "labels": labels,
+                "datasets": [{"backgroundColor": colors, "data": data}]
+            },
+            "options": {
+                "plugins": {
+                    "legend": {"display": False},
+                    "outlabels": {"text": "%l %p", "color": "white", "stretch": 35, "font": {"resizable": True, "minSize": 10, "maxSize": 16}}
+                }
+            }
+        }
+        encoded_config = urllib.parse.quote(json.dumps(chart_config))
+        charts.append({"title": account, "url": f"https://quickchart.io/chart?w=400&h=300&c={encoded_config}"})
+    return charts
+
 def build_returns_bar_chart(sorted_ledger):
     labels = []
     data = []
@@ -136,9 +168,10 @@ def build_benchmark_line_chart(history_data):
     encoded_config = urllib.parse.quote(json.dumps(chart_config))
     return f"https://quickchart.io/chart?w=600&h=300&c={encoded_config}"
 
-def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text=""):
-    
+def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None):
+
     pie_chart_url = build_portfolio_pie_chart(sorted_ledger)
+    account_charts = build_account_pie_charts(account_holdings)
     bar_chart_url = build_returns_bar_chart(sorted_ledger)
     line_chart_url = build_benchmark_line_chart(history_data)
     
@@ -179,6 +212,7 @@ def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_dat
             .red-team-box { background-color: #fef2f2; padding: 12px; border-radius: 4px; border-left: 4px solid #dc2626; color: #991b1b; }
             .champion { color: #166534; font-weight: bold; }
             .dissenter { color: #991b1b; font-weight: bold; }
+            .verdict-pill { display: inline-block; padding: 6px 14px; border-radius: 6px; font-weight: bold; font-size: 13px; letter-spacing: 0.5px; margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.06); }
             .chart-container { margin: 20px 0; text-align: center; border: 1px solid #e5e7eb; padding: 10px; border-radius: 5px;}
             .chart-img { max-width: 100%; height: auto; }
             .footer { margin-top: 40px; font-size: 0.8em; color: #6b7280; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 20px; }
@@ -207,6 +241,22 @@ def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_dat
             <div class="chart-container">
                 <img class="chart-img" src="{{ pie_chart_url }}" alt="Portfolio Allocation Pie Chart">
             </div>
+            {% endif %}
+
+            {% if account_charts %}
+            <h2>Allocation by Account</h2>
+            <table style="width:100%; border-collapse:collapse; margin: 10px 0;">
+                {% for pair in account_charts|batch(2) %}
+                <tr>
+                    {% for chart in pair %}
+                    <td style="width:50%; text-align:center; vertical-align:top; padding:8px;">
+                        <div style="font-weight:bold; color:#374151; margin-bottom:6px;">{{ chart.title }}</div>
+                        <img class="chart-img" src="{{ chart.url }}" alt="{{ chart.title }} Allocation">
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </table>
             {% endif %}
 
             {% if bar_chart_url %}
@@ -283,16 +333,23 @@ def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_dat
             {% endif %}
 
             {% set action_categories = ['STRONG BUY', 'BUY', 'HOLD', 'TRIM', 'SELL', 'STRONG SELL'] %}
+            {% set pill_styles = {
+                'STRONG BUY':  'background-color:#dcfce7; color:#166534;',
+                'BUY':         'background-color:#dcfce7; color:#166534;',
+                'HOLD':        'background-color:#f3f4f6; color:#374151;',
+                'TRIM':        'background-color:#fef3c7; color:#92400e;',
+                'SELL':        'background-color:#fee2e2; color:#991b1b;',
+                'STRONG SELL': 'background-color:#fee2e2; color:#991b1b;'
+            } %}
             {% for category in action_categories %}
                 {% if grouped_actions[category] %}
-                    <h3>{{ category }}</h3>
                     {% for pos in grouped_actions[category] %}
-                        <div style="margin-bottom: 20px; padding-bottom: 15px;">
-                            <h4>{{ pos.symbol }}</h4>
+                        <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
+                            <span class="verdict-pill" style="{{ pill_styles[category] }}">{{ category }} : {{ pos.symbol }}</span>
                             <p><strong>Strategic Context:</strong> {{ pos.synthesis }}</p>
                             {% if pos.narrative %}
-                                <p><span class="champion">The Champion {{ pos.narrative.champion }}:</span> "{{ pos.narrative.champion_quote }}"</p>
-                                <p><span class="dissenter">The Dissent {{ pos.narrative.dissenter }}:</span> "{{ pos.narrative.dissenter_quote }}"</p>
+                                <p><span class="champion">The Champion ({{ pos.narrative.champion }}):</span> "{{ pos.narrative.champion_quote }}"</p>
+                                <p><span class="dissenter">The Dissent ({{ pos.narrative.dissenter }}):</span> "{{ pos.narrative.dissenter_quote }}"</p>
                             {% endif %}
                         </div>
                     {% endfor %}
@@ -362,6 +419,7 @@ def generate_html_briefing(total_val, qqq_trend, mandate, chairman_data, cos_dat
         alpha_pick=alpha_pick,
         events=events,
         pie_chart_url=pie_chart_url,
+        account_charts=account_charts,
         bar_chart_url=bar_chart_url,
         line_chart_url=line_chart_url,
         red_team_case=red_team_case,

@@ -190,6 +190,97 @@ def process_portfolios():
     logger.info("Brokerage parsing complete. Master ledger synchronized successfully.")
     return master_ledger, total_portfolio_value, dummy_qqq_trend, historical_trades, verdict_history, sector_weights
 
+
+# Display order for the per-account allocation charts.
+ACCOUNT_ORDER = ["eTrade Taxable", "eTrade Roth IRA", "Fidelity 401K", "Fidelity Roth 401K"]
+
+# Fidelity exports all sub-accounts in one file; map the "Account Name" column to
+# Stan's preferred groupings (Fidelity 401K = WORKDAY 401(K) + BrokerageLink).
+FIDELITY_ACCOUNT_MAP = {
+    "workday 401(k)": "Fidelity 401K",
+    "brokeragelink": "Fidelity 401K",
+    "brokeragelink roth": "Fidelity Roth 401K",
+}
+
+
+def _get_col(row, names):
+    names_l = [n.lower() for n in names]
+    for key, val in row.items():
+        if key and str(key).lower().strip() in names_l:
+            return val
+    return ""
+
+
+def build_account_holdings(data_dir=None):
+    """Build symbol-level holdings grouped by individual account for the per-account
+    allocation pie charts. Independent of the master ledger's filename-derived
+    Taxable/Roth/401K buckets (which cannot split the single Fidelity file).
+
+    Returns: {account_name: {symbol: {"value": float, "return_pct": float}}}
+    """
+    data_dir = data_dir or DATA_DIR
+    holdings = {acct: {} for acct in ACCOUNT_ORDER}
+    enc = "utf" + chr(45) + "8" + chr(45) + "sig"
+
+    for file in glob.glob(os.path.join(data_dir, "*.csv")):
+        file_lower = file.lower()
+        if "activity" in file_lower:
+            continue
+        broker = "fidelity" if "fidelity" in file_lower else "etrade"
+
+        try:
+            with open(file, mode="r", encoding=enc) as f:
+                lines = f.readlines()
+        except Exception:
+            logger.warning("Could not read CSV for account holdings.")
+            continue
+
+        header_idx = -1
+        for i, line in enumerate(lines):
+            line_lower = line.lower()
+            if "symbol" in line_lower and ("value" in line_lower or "last price" in line_lower):
+                if broker == "etrade" and "sort by" in line_lower:
+                    continue
+                header_idx = i
+                break
+        if header_idx < 0:
+            continue
+
+        etrade_account = "eTrade Roth IRA" if "roth" in file_lower else "eTrade Taxable"
+
+        reader = csv.DictReader(lines[header_idx:])
+        for row in reader:
+            sym_key = next((k for k in row.keys() if k and "symbol" in str(k).lower()), None)
+            if not sym_key:
+                continue
+            raw_sym = row.get(sym_key)
+            sym = str(raw_sym).strip().upper() if raw_sym else ""
+            if not sym or sym == "NAN" or sym in ["CASH", "CORE", "TOTAL", "PENDING"]:
+                continue
+            if "**" in sym or "FDRXX" in sym or "SPAXX" in sym:
+                continue
+
+            if broker == "fidelity":
+                acct_name = str(_get_col(row, ["account name"])).strip().lower()
+                account = FIDELITY_ACCOUNT_MAP.get(acct_name)
+                if not account:
+                    continue
+                value = clean_num(_get_col(row, ["current value", "value"]))
+                ret = clean_num(_get_col(row, ["total gain/loss percent"]))
+            else:
+                account = etrade_account
+                value = clean_num(_get_col(row, ["value $", "current value", "value"]))
+                ret = clean_num(_get_col(row, ["total gain %"]))
+
+            if value <= 0:
+                continue
+
+            bucket = holdings[account].setdefault(sym, {"value": 0.0, "return_pct": ret})
+            bucket["value"] += value
+            bucket["return_pct"] = ret
+
+    return holdings
+
 def save_verdict_history(new_verdicts):
     data_dir = DATA_DIR
     os.makedirs(data_dir, exist_ok=True)
