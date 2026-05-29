@@ -1,11 +1,25 @@
 import os
 import urllib.parse
+import requests
 import json
 import re
 from jinja2 import Template
 import logging
 
 logger = logging.getLogger(__name__)
+
+def get_quickchart_short_url(chart_config):
+    try:
+        response = requests.post(
+            'https://quickchart.io/chart/create',
+            json={'chart': chart_config}
+        )
+        response.raise_for_status()
+        return response.json().get('url')
+    except Exception as e:
+        logger.error(f"Failed to create short URL for chart: {e}")
+        encoded_config = urllib.parse.quote(json.dumps(chart_config))
+        return f"https://quickchart.io/chart?w=600&h=300&c={encoded_config}"
 
 def fmt_dol(val):
     try:
@@ -53,8 +67,7 @@ def build_portfolio_pie_chart(sorted_ledger):
             }
         }
     }
-    encoded_config = urllib.parse.quote(json.dumps(chart_config))
-    return f"https://quickchart.io/chart?w=600&h=300&c={encoded_config}"
+    return get_quickchart_short_url(chart_config)
 
 _ACCOUNT_PIE_LABELS = {
     "eTrade Taxable": "eTrade",
@@ -102,8 +115,7 @@ def build_account_allocation_pie(account_holdings, account_returns):
             }
         }
     }
-    encoded_config = urllib.parse.quote(json.dumps(chart_config))
-    return f"https://quickchart.io/chart?w=600&h=300&c={encoded_config}"
+    return get_quickchart_short_url(chart_config)
 
 def build_returns_rows(account_returns):
     """Flatten the history-engine output into display rows (Total first)."""
@@ -153,8 +165,7 @@ def build_returns_bar_chart(sorted_ledger):
             }
         }
     }
-    encoded_config = urllib.parse.quote(json.dumps(chart_config))
-    return f"https://quickchart.io/chart?w=600&h=300&c={encoded_config}"
+    return get_quickchart_short_url(chart_config)
 
 def build_benchmark_line_chart(history_data):
     if not history_data or len(history_data) < 2:
@@ -215,8 +226,7 @@ def build_benchmark_line_chart(history_data):
             }
         }
     }
-    encoded_config = urllib.parse.quote(json.dumps(chart_config))
-    return f"https://quickchart.io/chart?w=600&h=300&c={encoded_config}"
+    return get_quickchart_short_url(chart_config)
 
 def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None, account_returns=None):
 
@@ -300,40 +310,48 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             <p style="font-size:11px; color:#9ca3af; margin-top:4px;">Time-weighted return (securities only); neutralizes deposits, withdrawals, and trades. Updated {{ returns_updated }}.</p>
             {% endif %}
 
-            {% if line_chart_url %}
-            <h2>Performance vs. S&P 500 & NASDAQ</h2>
-            <div class="chart-container">
-                <img class="chart-img" src="{{ line_chart_url }}" alt="Benchmark Performance Line Chart">
+            {% if line_chart_url or bar_chart_url %}
+            <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 30px; align-items: flex-start;">
+                {% if line_chart_url %}
+                <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
+                    <h2 style="margin-top: 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; flex-shrink: 0;">Performance vs. Benchmark</h2>
+                    <div class="chart-container" style="margin-top: 10px; flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 0; border: none;">
+                        <img class="chart-img" src="{{ line_chart_url }}" alt="Benchmark Performance Line Chart" style="width: 100%; object-fit: contain;">
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if bar_chart_url %}
+                <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
+                    <h2 style="margin-top: 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; flex-shrink: 0;">Personal Return by Asset</h2>
+                    <div class="chart-container" style="margin-top: 10px; flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 0; border: none;">
+                        <img class="chart-img" src="{{ bar_chart_url }}" alt="Portfolio Returns Bar Chart" style="width: 100%; object-fit: contain;">
+                    </div>
+                </div>
+                {% endif %}
             </div>
             {% endif %}
 
             {% if pie_chart_url or account_pie_url %}
-            <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 30px; align-items: stretch;">
+            <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 30px; align-items: flex-start;">
                 {% if pie_chart_url %}
-                <div style="flex: 1; min-width: 300px;">
-                    <h2 style="margin-top: 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">Unrealized Gains</h2>
-                    <div class="chart-container" style="margin-top: 10px;">
-                        <img class="chart-img" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart">
+                <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
+                    <h2 style="margin-top: 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; flex-shrink: 0;">Unrealized Gains</h2>
+                    <div class="chart-container" style="margin-top: 10px; flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 0; border: none;">
+                        <img class="chart-img" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart" style="width: 100%; object-fit: contain;">
                     </div>
                 </div>
                 {% endif %}
 
                 {% if account_pie_url %}
-                <div style="flex: 1; min-width: 300px;">
-                    <h2 style="margin-top: 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">12 M Return</h2>
-                    <p style="font-size:12px; color:#6b7280; margin-top:-10px;">Slice size = account weight. Color = 12M return.</p>
-                    <div class="chart-container" style="margin-top: 10px;">
-                        <img class="chart-img" src="{{ account_pie_url }}" alt="12 M Return Pie Chart">
+                <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
+                    <h2 style="margin-top: 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; flex-shrink: 0;">12 M Return</h2>
+                    <p style="font-size:12px; color:#6b7280; margin-top:5px; margin-bottom: 0; flex-shrink: 0;">Slice size = account weight. Color = 12M return.</p>
+                    <div class="chart-container" style="margin-top: 10px; flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 0; border: none;">
+                        <img class="chart-img" src="{{ account_pie_url }}" alt="12 M Return Pie Chart" style="width: 100%; object-fit: contain;">
                     </div>
                 </div>
                 {% endif %}
-            </div>
-            {% endif %}
-
-            {% if bar_chart_url %}
-            <h2>Personal Return by Asset</h2>
-            <div class="chart-container">
-                <img class="chart-img" src="{{ bar_chart_url }}" alt="Portfolio Returns Bar Chart">
             </div>
             {% endif %}
 
