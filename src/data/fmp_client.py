@@ -165,12 +165,14 @@ async def get_fmp_advanced_metrics(symbol: str, api_key: str, session: aiohttp.C
         prof_data = prof_res[0]
         is_etf = str(prof_data.get("isEtf", False)).lower() == 'true' or str(prof_data.get("isFund", False)).lower() == 'true'
         beta = safe_float(prof_data.get('beta'))
+        image_url = prof_data.get('image', '')
     else:
         yf_info = await fetch_yfinance_fallback(symbol, telemetry_ledger)
         if not yf_info:
             raise FatalDataError(f"Complete Oracle Failure for {symbol}. All data sources exhausted.")
         is_etf = yf_info.get("quoteType", "") == "ETF"
         beta = safe_float(yf_info.get('beta'))
+        image_url = ''
 
     trend_3m, cagr_3y = await asyncio.gather(
         fetch_momentum_trend(symbol, api_key, session, telemetry_ledger),
@@ -194,7 +196,8 @@ async def get_fmp_advanced_metrics(symbol: str, api_key: str, session: aiohttp.C
             "beta": beta, "peg": "N/A", "ps": "N/A", "de": "N/A", "fwd_pe": "N/A", 
             "3m_trend": trend_3m, "3y_cagr": cagr_3y, "rev_growth": "N/A", "eps_growth": "N/A",
             "current_price": current_price, "consensus": "N/A", "price_target": "N/A", 
-            "next_earnings": "Unknown", "fcs_score": 0, "fcs_rationale": "ETF Structural Exemption."
+            "next_earnings": "Unknown", "fcs_score": 0, "fcs_rationale": "ETF Structural Exemption.",
+            "image": image_url
         }
 
     else:
@@ -310,7 +313,8 @@ async def get_fmp_advanced_metrics(symbol: str, api_key: str, session: aiohttp.C
             "beta": beta, "peg": peg, "ps": ps, "de": de, "fwd_pe": fwd_pe, 
             "3m_trend": trend_3m, "3y_cagr": cagr_3y, "rev_growth": rev_growth, "eps_growth": eps_growth,
             "current_price": current_price, "consensus": consensus, "price_target": price_target, 
-            "next_earnings": next_earnings, "fcs_score": fcs_score, "fcs_rationale": fcs_rationale
+            "next_earnings": next_earnings, "fcs_score": fcs_score, "fcs_rationale": fcs_rationale,
+            "image": image_url
         }
 
 async def get_fmp_macro(api_key: str, session: aiohttp.ClientSession) -> dict:

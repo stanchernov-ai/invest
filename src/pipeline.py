@@ -133,26 +133,10 @@ def process_portfolios():
     logger.info("Initializing native dictionary brokerage data parsing engine.")
     master_ledger = {}
     total_portfolio_value = 0.0
-    dummy_qqq_trend = 20.14
-    historical_trades = []
-    verdict_history = {}
-    sector_weights = {
-        "Technology": 65.0,
-        "Communication Services": 20.0,
-        "Consumer Cyclical": 15.0
-    }
 
     data_dir = DATA_DIR
     os.makedirs(data_dir, exist_ok=True)
-    verdict_path = os.path.join(data_dir, "board_verdicts.json")
     
-    try:
-        if os.path.exists(verdict_path):
-            with open(verdict_path, "r") as f:
-                verdict_history = json.load(f)
-    except Exception:
-        logger.warning("Failed to load historical board verdicts. Proceeding with clean ledger.")
-
     purchase_dates = parse_activity_dates()
 
     for file in glob.glob(os.path.join(data_dir, "*.csv")):
@@ -188,7 +172,7 @@ def process_portfolios():
         data["Personal_Return_Pct"] = (data["Unrealized"] / data["Cost_Basis"]) * 100 if data["Cost_Basis"] > 0 else 0.0
 
     logger.info("Brokerage parsing complete. Master ledger synchronized successfully.")
-    return master_ledger, total_portfolio_value, dummy_qqq_trend, historical_trades, verdict_history, sector_weights
+    return master_ledger, total_portfolio_value
 
 
 # Display order for the per-account allocation charts.

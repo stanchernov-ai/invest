@@ -1,0 +1,16 @@
+---
+description: Ensure context continuity across chat sessions
+globs: *
+---
+
+# Action Tracker and Context Rule
+
+Whenever you start a new conversation or session, your VERY FIRST action should be to read the `docs/action_tracker.md` file. 
+
+This file acts as the central source of truth for the project, tracking:
+- Completed work
+- Ongoing bugs
+- High, Medium, and Low priority backlog items
+- Architectural decisions
+
+By reading this file, you will seamlessly pick up the context from previous conversations and avoid losing progress.

@@ -99,7 +99,7 @@ def run_scout_pipeline():
         
         watchlist[sym] = {
             "source": "Autonomous Scout Engine",
-            "price": 1.0 
+            "price": 0.0 
         }
             
     with open(target_file, "w") as f:

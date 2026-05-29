@@ -1,0 +1,165 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; color: #1f2937; margin: 0; padding: 20px; }
+            .container { max-width: 1000px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+            h1 { color: #111827; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
+            h2 { color: #2563eb; margin-top: 30px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;}
+            h3 { color: #374151; margin-top: 25px; margin-bottom: 10px; }
+            .status-badge { display: inline-block; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 14px; margin-bottom: 15px; }
+            .status-pass { background-color: #dcfce7; color: #166534; border: 1px solid #22c55e; }
+            .status-fail { background-color: #fee2e2; color: #991b1b; border: 1px solid #ef4444; }
+            
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+            th { text-align: left; padding: 10px; background-color: #f8fafc; border-bottom: 2px solid #e5e7eb; color: #4b5563; }
+            td { padding: 12px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+            
+            .sev-CRITICAL { color: #dc2626; font-weight: bold; }
+            .sev-WARNING { color: #d97706; font-weight: bold; }
+            .sev-INFO { color: #2563eb; font-weight: bold; }
+            
+            .summary-box { background-color: #f8fafc; padding: 15px; border-radius: 5px; border-left: 4px solid #64748b; font-style: italic; margin-bottom: 20px; }
+            .footer { margin-top: 40px; font-size: 0.8em; color: #6b7280; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 20px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>SC Invest: QA Audit Dashboard</h1>
+            <p style="color: #6b7280; margin-top: -10px; margin-bottom: 30px;">Generated: 20260528_181003</p>
+            
+            
+            <div style="margin-bottom: 50px;">
+                <h2>Post Mortem QA Auditor Audit</h2>
+                
+                
+                    <span class="status-badge status-fail">❌ AUDIT FAILED</span>
+                
+                
+                <div class="summary-box">
+                    The audit finds the Chairman was partially compliant. He successfully liquidated a weak asset (AVGO) based on a majority vote to fund three new high-conviction buys (META, MNDY, AMZN) and correctly executed the mandatory hedge purchase (TLT). However, the run is deemed non-compliant due to a critical procedural failure: the Chairman incorrectly identified a deadlock on ASML and issued a 'Hold' verdict, ignoring a clear 3/5 majority mandate to sell or trim the position. This failure to adhere to the board's majority decision is a significant deviation from protocol.
+                </div>
+                
+                
+                <h3>Detailed Findings</h3>
+                <table>
+                    <tr>
+                        <th width="10%">Severity</th>
+                        <th width="15%">Category</th>
+                        <th width="40%">Description</th>
+                        <th width="35%">Recommendation</th>
+                    </tr>
+                    
+                    <tr>
+                        <td class="sev-CRITICAL">CRITICAL</td>
+                        <td>Procedural</td>
+                        <td>The Chairman issued a 'Hold' verdict for ASML, citing a deadlock among the board members. A review of the raw debate log shows a clear 3/5 majority voted to reduce the position (Buffett: Trim, Livermore: Sell, Simons: Trim). The Chairman failed to aggregate these sell-side votes and incorrectly declared a deadlock, thereby failing to execute the will of the majority.</td>
+                        <td>The Chairman must correctly tally all votes and aggregate similar intents (e.g., 'Sell' and 'Trim' both represent a mandate to reduce exposure) to determine the majority action. A 'Hold' verdict is only appropriate in a true deadlock where no single action achieves a 3/5 majority.</td>
+                    </tr>
+                    
+                    <tr>
+                        <td class="sev-INFO">INFO</td>
+                        <td>Procedural</td>
+                        <td>The Chairman correctly identified a majority 'Buy' vote for PLTR (3/5) but overrode the decision. This was a valid and compliant action, as the Chairman correctly cited the 'Maximum 3 Buys' institutional risk control to prioritize higher-conviction buys (META, MNDY, AMZN).</td>
+                        <td>No action required. This is an example of the Chairman correctly applying institutional risk controls as an exception to the majority rule.</td>
+                    </tr>
+                    
+                </table>
+                
+            </div>
+            
+            <div style="margin-bottom: 50px;">
+                <h2>Systems Architect QA Audit</h2>
+                
+                
+                    <span class="status-badge status-fail">❌ AUDIT FAILED</span>
+                
+                
+                <div class="summary-box">
+                    The multi-agent system's final output demonstrates good structural integrity and logical consistency in its decision-making process. However, a key area for technical improvement lies in computational efficiency and memory management. The current approach of embedding verbatim agent quotes in the final JSON leads to repetitive data generation and increased payload size. While no hallucinated arrays or critical data structure failures were observed, optimizing data handling for quotes and ensuring efficient parsing of agent inputs would enhance the pipeline's overall performance and scalability.
+                </div>
+                
+                
+                <h3>Detailed Findings</h3>
+                <table>
+                    <tr>
+                        <th width="10%">Severity</th>
+                        <th width="15%">Category</th>
+                        <th width="40%">Description</th>
+                        <th width="35%">Recommendation</th>
+                    </tr>
+                    
+                    <tr>
+                        <td class="sev-WARNING">WARNING</td>
+                        <td>Computational Efficiency</td>
+                        <td>The final output JSON, specifically within the 'portfolio_positions', 'watchlist_positions', and 'alpha_pick' objects, includes verbatim quotes from individual agent analyses ('champion_quote', 'dissenter_quote'). While providing context, this practice leads to repetitive data embedding. The same textual content, already present in the raw debate log (or an intermediate parsed representation), is duplicated in the final output. This increases the overall JSON payload size and memory footprint, which could become a concern at scale.</td>
+                        <td>Implement a more efficient referencing mechanism for agent quotes. Instead of embedding the full text, consider storing a unique identifier for each quote (e.g., 'agent_id' + 'round_number' + 'quote_id') and providing a separate, indexed lookup table for the full quote texts. Alternatively, if the quotes are essential for the final output, ensure they are extracted and stored only once in an intermediate structured representation to avoid redundant processing and storage.</td>
+                    </tr>
+                    
+                    <tr>
+                        <td class="sev-INFO">INFO</td>
+                        <td>Computational Efficiency</td>
+                        <td>The process of identifying the 'champion' and 'dissenter' for each position and then extracting their specific quotes from the raw debate log (or a less structured intermediate representation) for inclusion in the final JSON likely involves string matching or parsing operations. If this extraction is performed repeatedly or without efficient indexing, it could introduce unnecessary computational overhead.</td>
+                        <td>Ensure that agent analyses are parsed into a structured, easily queryable format (e.g., a dictionary or list of objects) early in the pipeline. This would allow for efficient lookup of agent quotes by symbol and agent name, minimizing redundant parsing or string manipulation.</td>
+                    </tr>
+                    
+                </table>
+                
+            </div>
+            
+            <div style="margin-bottom: 50px;">
+                <h2>Prompt Engineer QA Audit</h2>
+                
+                
+                    <span class="status-badge status-pass">✅ AUDIT PASSED</span>
+                
+                
+                <div class="summary-box">
+                    The audit confirms that the debate was compliant and of high quality. All agents adhered strictly to their assigned personas without any detectable prompt drift or AI sycophancy. Warren Buffett acted as a value/GARP investor, Jesse Livermore as a momentum trader, and all other agents performed as expected. The disagreements were logical and productive, leading to a well-reasoned final allocation. The system is operating within design parameters, and no behavioral overrides are necessary.
+                </div>
+                
+                
+                <h3>Detailed Findings</h3>
+                <table>
+                    <tr>
+                        <th width="10%">Severity</th>
+                        <th width="15%">Category</th>
+                        <th width="40%">Description</th>
+                        <th width="35%">Recommendation</th>
+                    </tr>
+                    
+                    <tr>
+                        <td class="sev-INFO">INFO</td>
+                        <td>Behavioral Analysis</td>
+                        <td>All agent personas performed within their specified behavioral lanes. There was no evidence of AI Sycophancy; agents frequently and correctly disagreed with each other based on their core investment philosophies.</td>
+                        <td>No action required. The current prompt architecture and behavioral constraints are effective at maintaining persona integrity and fostering a robust debate.</td>
+                    </tr>
+                    
+                    <tr>
+                        <td class="sev-INFO">INFO</td>
+                        <td>Prompt Drift</td>
+                        <td>Warren Buffett's persona correctly identified and recommended trimming high P/E ratio stocks (AVGO, VRT) while buying reasonably priced growth companies (META, AMZN, MNDY). He did not exhibit any momentum trading behavior, focusing strictly on valuation and business quality.</td>
+                        <td>No action required. The persona's core logic is stable and has not drifted towards other agents' methodologies.</td>
+                    </tr>
+                    
+                    <tr>
+                        <td class="sev-INFO">INFO</td>
+                        <td>Behavioral Analysis</td>
+                        <td>The contrast between Jesse Livermore (pure momentum) and Jim Simons (pure quant) was particularly effective. Livermore recommended buying stocks with the highest 3M trends (e.g., ARM, ALAB), while Simons recommended passing on them due to negative implied upside, demonstrating a healthy and intended conflict between methodologies.</td>
+                        <td>No action required. This ideological conflict is a key feature of the debate and is functioning as designed.</td>
+                    </tr>
+                    
+                </table>
+                
+            </div>
+            
+            
+            <div class="footer">
+                Automated Post-Flight Quality Assurance Report.<br>
+                SC Invest Boardroom AI
+            </div>
+        </div>
+    </body>
+    </html>
+    

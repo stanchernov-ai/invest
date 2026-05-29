@@ -228,7 +228,7 @@ def build_benchmark_line_chart(history_data):
     }
     return get_quickchart_short_url(chart_config)
 
-def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None, account_returns=None):
+def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None, account_returns=None, advanced_data=None):
 
     pie_chart_url = build_portfolio_pie_chart(sorted_ledger)
     account_pie_url = build_account_allocation_pie(account_holdings, account_returns)
@@ -386,7 +386,12 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {% if alpha_pick %}
             <h2>🎯 The Alpha Pick</h2>
             <div class="metric-box" style="border-left-color: #f59e0b;">
-                <p style="margin-top: 0;"><strong>{{ alpha_pick.symbol }}</strong>: "{{ alpha_pick.champion_quote }}"</p>
+                <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">
+                    {% if alpha_pick.image %}
+                    <img src="{{ alpha_pick.image }}" alt="{{ alpha_pick.symbol }} logo" style="width: 48px; height: 48px; border-radius: 6px; margin-right: 15px; object-fit: contain; background-color: #ffffff; flex-shrink: 0;">
+                    {% endif %}
+                    <p style="margin-top: 0; font-size: 1.1em;"><strong>{{ alpha_pick.symbol }}</strong>: "{{ alpha_pick.champion_quote }}"</p>
+                </div>
                 
                 {% if red_team_case %}
                 <h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 1.05em; color: #991b1b; border-bottom: none;">⚠️ The Bear Case Rebuttal</h3>
@@ -441,7 +446,12 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 {% if grouped_actions[category] %}
                     {% for pos in grouped_actions[category] %}
                         <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
-                            <span class="verdict-pill" style="{{ pill_styles[category] }}">{{ category }} : {{ pos.symbol }}</span>
+                            <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                                {% if pos.image %}
+                                <img src="{{ pos.image }}" alt="{{ pos.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; margin-right: 12px; object-fit: contain; background-color: #ffffff;">
+                                {% endif %}
+                                <span class="verdict-pill" style="{{ pill_styles[category] }} margin-bottom: 0;">{{ category }} : {{ pos.symbol }}</span>
+                            </div>
                             <p><strong>Strategic Context:</strong> {{ pos.synthesis }}</p>
                             {% if pos.narrative %}
                                 <p><span class="champion">The Champion ({{ pos.narrative.champion }}):</span> "{{ pos.narrative.champion_quote }}"</p>
@@ -494,16 +504,21 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
 
     all_positions = chairman_data.get('portfolio_positions', []) + chairman_data.get('watchlist_positions', [])
     
+    if advanced_data is None: advanced_data = {}
     grouped_actions = {cat: [] for cat in ['STRONG BUY', 'BUY', 'HOLD', 'TRIM', 'SELL', 'STRONG SELL']}
     for pos in all_positions:
         verdict = pos.get('final_verdict', 'Pass').upper()
         if verdict in grouped_actions:
+            pos['image'] = advanced_data.get(pos['symbol'], {}).get('image', '')
             grouped_actions[verdict].append(pos)
             
     for cat in grouped_actions:
         grouped_actions[cat].sort(key=lambda x: x.get('aggregate_conviction_score', 0), reverse=True)
 
     alpha_pick = chairman_data.get('alpha_pick', {})
+    if alpha_pick and 'symbol' in alpha_pick:
+        alpha_pick['image'] = advanced_data.get(alpha_pick['symbol'], {}).get('image', '')
+        
     events = chairman_data.get('upcoming_events', [])
     red_team_case = red_team_data.get('bear_case_narrative', '')
     chairman_remarks = chairman_data.get('chairman_closing_remarks', '')

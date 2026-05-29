@@ -371,7 +371,8 @@ async def main_batch():
             portfolio_3m_trend=portfolio_3m_trend, mandate=live_mandate, 
             chairman_data=c_data, cos_data=cos_data, matrix_md=matrix_md, unicorn_trades=unicorn_trades,
             sorted_ledger=sorted_ledger, red_team_data=red_team_data, history_data=history_data,
-            qa_summary_text=qa_summary_text, account_holdings=account_holdings, account_returns=account_returns
+            qa_summary_text=qa_summary_text, account_holdings=account_holdings, account_returns=account_returns,
+            advanced_data=advanced_data
         )
         
         storage_client.save_report(f"executive_briefing_{file_timestamp}.html", html_payload)
