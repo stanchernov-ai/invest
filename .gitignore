@@ -57,3 +57,16 @@ __azurite_db*__.json
 # Generated finance oversight reports (re-run on demand)
 docs/finance_oversight/oversight_*.json
 docs/finance_oversight/oversight_*.html
+
+# Pipeline run artifacts (local runs, Azure fetches — not source)
+logs/
+.run_id
+src/output/*.md
+qa_summary_latest.md
+qa_dashboard_latest.html
+tools/fmp_field_probe_results.json
+tools/*_probe_results.json
+
+# Local scratch (one-off probes, commit drafts)
+test_chart.py
+_commitmsg.txt
