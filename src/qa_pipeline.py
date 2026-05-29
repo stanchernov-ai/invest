@@ -3,8 +3,8 @@ the standing qa_review team). Extracted from main.py so the split jobs can reuse
 the exact same QA logic.
 
 Cost/latency notes (see engineering_playbook 4b):
-- Graphics QA is now DETERMINISTIC (no LLM) — built straight from the chart
-  health probe. The LLM graphics reviewer was the first non-crucial QA we cut.
+- Graphics QA: deterministic chart-health gate + multimodal review of the FINAL
+  saved/emailed briefing HTML and its embedded images (not templates/code).
 - The QA Integrity auditor runs on a configurable model with a hard timeout so
   it can never again blow the per-function 10-minute ceiling.
 """
@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 # Hard ceiling for the QA-of-the-QA call. On timeout we emit a non-blocking
 # WARNING report rather than killing the run or false-failing the QA.
 QA_INTEGRITY_TIMEOUT_SECONDS = 90
+GRAPHICS_QA_TIMEOUT_SECONDS = 120
+# Cap HTML passed to the Graphics Designer — the artifact is the saved blob, not templates.
+GRAPHICS_BRIEFING_HTML_CHAR_LIMIT = 45000
 
 
 def reconcile_compliance(report: dict) -> dict:
@@ -138,9 +141,8 @@ async def run_post_flight_qa(raw_log: str, chairman_json: str):
 
 
 def build_graphics_report(chart_health: list[dict]) -> dict:
-    """Deterministic Graphics QA — no LLM. The reviewer could never actually see
-    rendered images, so its only reliable signal was the chart-health HTTP probe.
-    We now turn that probe directly into the report and skip the model call."""
+    """Deterministic chart-health gate. Broken charts are always CRITICAL regardless
+    of any LLM visual review."""
     findings = []
     broken = [h for h in (chart_health or []) if not h.get("ok")]
     for h in broken:
@@ -164,6 +166,111 @@ def build_graphics_report(chart_health: list[dict]) -> dict:
         "findings": findings,
         "summary": summary,
     }
+
+
+def _merge_graphics_reports(deterministic: dict, visual: dict | None) -> dict:
+    """Combine deterministic chart-health failures with LLM visual findings."""
+    if not visual:
+        return deterministic
+    findings = list(deterministic.get("findings") or []) + list(visual.get("findings") or [])
+    is_compliant = bool(deterministic.get("is_compliant")) and bool(visual.get("is_compliant"))
+    summaries = [s for s in (deterministic.get("summary"), visual.get("summary")) if s]
+    return reconcile_compliance({
+        "agent_role": visual.get("agent_role") or "Graphics Designer Visual SME",
+        "is_compliant": is_compliant,
+        "findings": findings,
+        "summary": " | ".join(summaries),
+    })
+
+
+async def run_graphics_designer_qa(
+    final_briefing_html: str,
+    chart_health: list[dict],
+    *,
+    model_override: str = None,
+    timeout_seconds: int = GRAPHICS_QA_TIMEOUT_SECONDS,
+) -> dict:
+    """Review the exact executive briefing HTML saved/emailed — not templates or code.
+
+    Flow:
+    1. Deterministic chart-health gate (hard fail on broken charts).
+    2. Download embedded images from the final HTML artifact.
+    3. Multimodal LLM review of rendered charts + email HTML layout."""
+    from src.output import reporting
+
+    deterministic = build_graphics_report(chart_health)
+    if not deterministic.get("is_compliant"):
+        logger.warning("Graphics QA: deterministic chart-health failed; skipping visual LLM review.")
+        return deterministic
+
+    visual_assets = reporting.fetch_briefing_visual_assets(final_briefing_html)
+    health_text = reporting.format_chart_health(chart_health)
+    html_excerpt = (final_briefing_html or "")[:GRAPHICS_BRIEFING_HTML_CHAR_LIMIT]
+
+    intro = (
+        "You are reviewing the FINAL Executive Briefing artifact — the exact HTML document "
+        "saved to Azure and emailed to the investor. This is NOT Python source, Jinja templates, "
+        "or intermediate pipeline code.\n\n"
+        f"DETERMINISTIC CHART HEALTH (ground truth — never override a BROKEN chart to OK):\n{health_text}\n\n"
+        f"Images attached below were extracted from this HTML (same URLs the email client loads).\n"
+        f"Embedded images fetched: {len(visual_assets)}\n\n"
+        f"FINAL EXECUTIVE BRIEFING HTML (exact email body):\n{html_excerpt}"
+    )
+
+    parts = [types.Part.from_text(text=intro)]
+    for asset in visual_assets:
+        parts.append(types.Part.from_text(text=f"[Rendered image from briefing: {asset['name']}]"))
+        parts.append(types.Part.from_bytes(data=asset["bytes"], mime_type=asset["mime_type"]))
+
+    if not visual_assets:
+        parts.append(types.Part.from_text(
+            text="WARNING: No embedded images could be fetched from the briefing HTML. "
+                 "Audit layout from the HTML structure and flag missing/broken visuals as CRITICAL."
+        ))
+
+    contents = [types.Content(role="user", parts=parts)]
+    info = agent_config["board_members"]["graphics_designer_qa"]
+    model = model_override or FAST_MODEL
+    config_params = {
+        "system_instruction": info["system_instruction"],
+        "temperature": 0.15,
+        "response_mime_type": "application/json",
+        "response_schema": QAAgentReport,
+    }
+    if model == FAST_MODEL:
+        config_params["max_output_tokens"] = FLASH_TOKEN_LIMIT
+
+    try:
+        res = await asyncio.wait_for(
+            call_gemini_async(
+                model,
+                contents,
+                types.GenerateContentConfig(**config_params),
+                agent_name="graphics_designer_qa",
+            ),
+            timeout=timeout_seconds,
+        )
+        parsed = json.loads(res.text)
+        parsed["agent_role"] = info["role"]
+        return _merge_graphics_reports(deterministic, reconcile_compliance(parsed))
+    except asyncio.TimeoutError:
+        logger.warning(f"Graphics Designer QA timed out after {timeout_seconds}s; using deterministic report only.")
+        deterministic["findings"] = list(deterministic.get("findings") or []) + [{
+            "severity": "WARNING",
+            "category": "QA Timeout",
+            "description": f"Visual review did not finish within {timeout_seconds}s.",
+            "recommendation": "Re-run deliver or inspect the saved executive_briefing HTML manually.",
+        }]
+        return deterministic
+    except Exception as e:
+        logger.error(f"Graphics Designer QA failed: {e}")
+        deterministic["findings"] = list(deterministic.get("findings") or []) + [{
+            "severity": "WARNING",
+            "category": "Visual QA Error",
+            "description": f"Visual review agent failed: {e}",
+            "recommendation": "Check Gemini logs; deterministic chart health still applied.",
+        }]
+        return deterministic
 
 
 async def run_qa_integrity_audit(qa_reports, raw_log: str, chairman_json: str,

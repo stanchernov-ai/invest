@@ -2,8 +2,8 @@
 
 All pre-debate data work: sync inputs, parse the brokerage ledger, fetch FMP
 metrics / news / macro, compute time-weighted returns, and assemble the board's
-mega-prompt. Ends with a deterministic + data-oracle QA gate on the prepared feed
-and writes the prepare checkpoint the debate phase consumes.
+mega-prompt. Ends with a deterministic price gate ($0.00 kill switch) and writes
+the prepare checkpoint the debate phase consumes.
 """
 import os
 import json
@@ -11,7 +11,6 @@ import asyncio
 import logging
 
 import aiohttp
-from google.genai import types
 
 from src import pipeline
 from src import scout
@@ -22,8 +21,7 @@ from src.output import notifier
 from src.data.news_client import fetch_ticker_news
 from src.data.fmp_client import get_fmp_advanced_metrics, get_fmp_macro, prefetch_eod_cache
 from src.core.schemas import generate_dynamic_mandate
-from src.core.engine import DataOracleReport
-from src.core.agents import call_gemini_async, agent_config, FAST_MODEL, FLASH_TOKEN_LIMIT
+from src.core.data_oracle import build_price_feed, validate_price_feed
 from src.core import agent_activity
 from src.config.settings import settings, DATA_DIR, now_local
 from src.logging_setup import configure_logging
@@ -63,30 +61,6 @@ def _market_regime_block(macro_data: dict, portfolio_3m: float, qqq_3m: float, s
         f"Portfolio 3M (TWR): {reporting.fmt(portfolio_3m)} | QQQ 3M: {reporting.fmt(qqq_3m)} | SPY 3M: {reporting.fmt(spy_3m)}\n"
         f"Macro hedges — TLT: {reporting.fmt_dol(tlt) if tlt != 'N/A' else 'N/A'} | VXX: {reporting.fmt_dol(vxx) if vxx != 'N/A' else 'N/A'}\n\n"
     )
-
-
-async def _run_data_oracle(base_data_prompt: str) -> dict:
-    """Prepare-phase QA gate: the same data oracle the engine uses, run up front so
-    a corrupt feed fails Job 1 before we spend a single debate token."""
-    logger.info("Initiating Prepare-phase Data Oracle QA.")
-    info = agent_config["board_members"]["data_oracle"]
-    prompt = f"Audit the data feed for corrupt zero values or total metric collapse:\n\n{base_data_prompt}"
-    contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
-    config_params = {
-        "system_instruction": info["system_instruction"],
-        "temperature": 0.15,
-        "response_mime_type": "application/json",
-        "response_schema": DataOracleReport,
-    }
-    if info["model"] == FAST_MODEL:
-        config_params["max_output_tokens"] = FLASH_TOKEN_LIMIT
-    try:
-        res = await call_gemini_async(info["model"], contents, types.GenerateContentConfig(**config_params), agent_name="data_oracle")
-        parsed = json.loads(res.text)
-        return {"is_valid": bool(parsed.get("is_valid", False)), "reason": parsed.get("reason", "Oracle evaluation complete.")}
-    except Exception as e:
-        logger.error(f"Data Oracle QA failed to execute: {e}")
-        return {"is_valid": False, "reason": f"Oracle evaluation threw an exception: {e}"}
 
 
 async def run_prepare(run_id: str = None) -> dict:
@@ -326,8 +300,10 @@ async def run_prepare(run_id: str = None) -> dict:
             f"=== APPROVED WATCHLIST TARGETS ===\n{watchlist_str}\n\n\n"
         )
 
-        # --- Prepare-phase QA gate ---
-        oracle = await _run_data_oracle(mega_prompt)
+        # --- Prepare-phase price gate (deterministic; no LLM) ---
+        price_feed = build_price_feed(master_ledger, watchlist_data, advanced_data)
+        oracle = validate_price_feed(price_feed)
+        logger.info("Prepare-phase price gate: is_valid=%s", oracle["is_valid"])
         if not oracle["is_valid"]:
             error_msg = f"DATA ORACLE SECURITY ABORT (prepare). Reason: {oracle['reason']}"
             logger.error(error_msg)
@@ -357,6 +333,7 @@ async def run_prepare(run_id: str = None) -> dict:
             "portfolio_3m_trend": portfolio_3m_trend,
             "raw_log_header": raw_log_header,
             "oracle": oracle,
+            "price_feed": price_feed,
             "telemetry": api_telemetry,
         }
         storage_client.save_checkpoint(run_id, "prepare", checkpoint)

@@ -10,6 +10,7 @@ from src.core.schemas import (
     TONE_OVERRIDE, MUNGER_DOCTRINE, CHAIRMAN_MANDATE, RETAIL_EDGE_DOCTRINE, 
     WATCHLIST_RULING
 )
+from src.core.data_oracle import validate_price_feed
 from src.core.agents import call_gemini_async, agent_config, FAST_MODEL, FLASH_TOKEN_LIMIT
 
 logger = logging.getLogger(__name__)
@@ -19,10 +20,6 @@ CONCENTRATION_EXEMPTION = (
     "You are strictly FORBIDDEN from voting to Sell or Trim purely to achieve sector diversification. "
     "Evaluate assets on individual mathematical metrics and edge."
 )
-
-class DataOracleReport(BaseModel):
-    is_valid: bool
-    reason: str
 
 class RedTeamReport(BaseModel):
     bear_case_narrative: str
@@ -36,10 +33,23 @@ class StateMachineOrchestrator:
         self.oracle_reason = "Default security stance. Awaiting Oracle clearance."
         self.red_team_json = "{}"
 
+    async def _ensure_oracle_cleared(self) -> None:
+        """Use prepare-phase oracle when present; otherwise run the LLM gate (legacy)."""
+        if self.state.oracle_valid is True:
+            self.oracle_valid = True
+            self.oracle_reason = self.state.oracle_reason or "Validated in prepare phase."
+            logger.info("Skipping debate Data Oracle — prepare checkpoint already validated.")
+            return
+        if self.state.oracle_valid is False:
+            self.oracle_valid = False
+            self.oracle_reason = self.state.oracle_reason or "Oracle rejected in prepare phase."
+            return
+        await self.execute_data_oracle()
+
     async def execute_pipeline(self) -> BoardroomState:
         logger.info("Starting orchestrated execution matrix pipeline.")
-        
-        await self.execute_data_oracle()
+
+        await self._ensure_oracle_cleared()
         if not self.oracle_valid:
             self.state.is_approved = False
             self.state.qa_feedback = f"CRITICAL DATA ORACLE VIOLATION: {self.oracle_reason}"
@@ -109,18 +119,10 @@ class StateMachineOrchestrator:
         return {"raw_text": response.text.strip()}
 
     async def execute_data_oracle(self) -> None:
-        prompt = f"Audit the data feed for corrupt zero values or total metric collapse:\n\n{self.state.base_data_prompt}"
-        try:
-            res = await self._run_agent("data_oracle", prompt, schema=DataOracleReport)
-            if res:
-                self.oracle_valid = res.get("is_valid", False)
-                self.oracle_reason = res.get("reason", "Oracle evaluation complete.")
-            else:
-                self.oracle_valid = False
-                self.oracle_reason = "Oracle parser failed to return a valid JSON payload."
-        except Exception:
-            self.oracle_valid = False
-            self.oracle_reason = "Oracle evaluation threw a fatal exception."
+        """Legacy path: deterministic check when prepare checkpoint is unavailable."""
+        result = validate_price_feed(self.state.oracle_prices or {})
+        self.oracle_valid = result["is_valid"]
+        self.oracle_reason = result["reason"]
 
     async def execute_parallel_board(self) -> None:
         agents = ["buffett", "lynch", "livermore", "huang", "simons"]

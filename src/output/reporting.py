@@ -83,6 +83,48 @@ def format_chart_health(health):
         lines.append(f"- [{status}] {h['name']}: {h['detail']}")
     return "\n".join(lines)
 
+
+def fetch_briefing_visual_assets(html: str, max_images: int = 10) -> list[dict]:
+    """Download chart/avatar images embedded in the final briefing HTML.
+
+    These bytes are what the Graphics Designer agent reviews — the same images
+    a recipient's email client loads from the saved Azure artifact."""
+    from bs4 import BeautifulSoup
+
+    if not html:
+        return []
+
+    assets = []
+    soup = BeautifulSoup(html, "html.parser")
+    for idx, img in enumerate(soup.find_all("img")):
+        if len(assets) >= max_images:
+            break
+        src = (img.get("src") or "").strip()
+        alt = (img.get("alt") or f"briefing_image_{idx + 1}").strip()
+        if not src or src.startswith("data:"):
+            continue
+        try:
+            resp = requests.get(src, timeout=15, stream=True)
+            status = resp.status_code
+            ctype = (resp.headers.get("content-type") or "image/png").split(";")[0].strip().lower()
+            body = resp.content
+            resp.close()
+            if status != 200:
+                logger.warning(f"Briefing image fetch HTTP {status}: {src[:120]}")
+                continue
+            if not ctype.startswith("image/"):
+                logger.warning(f"Briefing image non-image content-type {ctype}: {src[:120]}")
+                continue
+            assets.append({
+                "name": alt,
+                "url": src,
+                "bytes": body,
+                "mime_type": ctype,
+            })
+        except Exception as e:
+            logger.warning(f"Could not fetch briefing image {src[:120]}: {e}")
+    return assets
+
 def fmt_dol(val):
     try:
         return f"${float(val):,.2f}"

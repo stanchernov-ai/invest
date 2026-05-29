@@ -44,8 +44,8 @@ PIPELINE_DATAFLOW_NOTE = (
     "(buffett, lynch, livermore, huang, simons) debate over multiple rounds; the "
     "clerk (Chief of Staff) synthesizes the debate; the chairman makes final "
     "allocations; compliance audits the chairman; red_teamer writes a bear case "
-    "rendered in the briefing but NOT fed back into decisions; data_oracle gates "
-    "the run pre-flight. Post-flight QA agents (post_mortem_qa, system_architect, "
+    "rendered in the briefing but NOT fed back into decisions; data_oracle is a "
+    "deterministic Python price gate in prepare (no LLM). Post-flight QA agents (post_mortem_qa, system_architect, "
     "prompt_engineer, graphics_designer_qa, qa_integrity_auditor) review the run "
     "and populate the QA dashboard."
 )

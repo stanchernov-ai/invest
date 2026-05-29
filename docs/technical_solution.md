@@ -97,7 +97,7 @@ flowchart TB
 
 ### 1.4 Deployment Model
 
-- **Host:** Azure Functions (Python), timer `0 0 11 * * 1-5` (11:00 UTC, Monday–Friday).
+- **Host:** Azure Functions (Python), timer `0 0 6 * * *` (6:00 AM daily in `WEBSITE_TIME_ZONE`, default `America/Los_Angeles`).
 - **Idempotency:** Blob lease on `boardroom-state/daily_execution.lock` prevents overlapping runs in the same window.
 - **Secrets:** `GEMINI_API_KEY`, `FMP_API_KEY`, `AZURE_STORAGE_CONNECTION_STRING`, Gmail credentials (via `.env` / Function App settings).
 - **Local execution:** `python -m src.main` (or equivalent) after placing inputs under `/tmp/data` or syncing from Azure.

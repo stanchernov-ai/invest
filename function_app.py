@@ -116,7 +116,9 @@ def _kickoff_prepare(run_id: str) -> bool:
         return False
 
 
-@app.timer_trigger(schedule="0 0 11 * * 1-5", arg_name="myTimer", run_on_startup=False, use_monitor=False)
+# 6:00 AM daily in WEBSITE_TIME_ZONE (set to America/Los_Angeles on the Function App).
+# Typical finish ~6:07–6:15; briefing email before the 6:30 market open (Pacific).
+@app.timer_trigger(schedule="0 0 6 * * *", arg_name="myTimer", run_on_startup=False, use_monitor=False)
 @app.queue_output(arg_name="debateOut", queue_name=DEBATE_QUEUE, connection="AzureWebJobsStorage")
 def boardroom_prepare(myTimer: func.TimerRequest, debateOut: func.Out[str]) -> None:
     logging.info("Waking up the Board of Directors. Initiating PREPARE phase.")
@@ -191,7 +193,8 @@ def boardroom_deliver_http(req: func.HttpRequest) -> func.HttpResponse:
 # --------------------------------------------------------------------------- #
 # Standing QA & cost review team (unchanged).                                  #
 # --------------------------------------------------------------------------- #
-@app.timer_trigger(schedule="0 30 11 * * 1-5", arg_name="qaTimer", run_on_startup=False, use_monitor=False)
+# 7:00 AM daily (same timezone) — standing QA/cost digest after the pipeline window.
+@app.timer_trigger(schedule="0 0 7 * * *", arg_name="qaTimer", run_on_startup=False, use_monitor=False)
 def qa_review_daily_run(qaTimer: func.TimerRequest) -> None:
     logging.info("Waking up the QA & Cost Review Team. Initiating daily run.")
     try:

@@ -4,7 +4,7 @@ Render the executive briefing + QA dashboard, run the post-work QA, and email
 both. Consumes the prepare and debate checkpoints. This is where all post-flight
 QA lives:
   - Post-flight trio (post-mortem / systems architect / prompt engineer) - parallel
-  - Graphics QA - DETERMINISTIC chart-health report (no LLM)
+  - Graphics QA - deterministic chart health + multimodal review of FINAL briefing HTML
   - QA Integrity (QA-of-the-QA) - Flash model + hard timeout
 Merges all three phases' telemetry into one api_telemetry_{run_id}.json.
 """
@@ -24,8 +24,7 @@ logger = configure_logging()
 
 
 def _merge_agent_activity(*snapshots) -> dict:
-    """Combine per-phase agent_activity ledgers. Same agent across phases (e.g. the
-    data oracle in prepare and the engine's secondary oracle in debate) has its
+    """Combine per-phase agent_activity ledgers. Same agent across phases has its
     counts summed so HR utilization reflects the whole run."""
     merged = {}
     numeric = ("invocations", "errors", "prompt_tokens", "output_tokens", "thinking_tokens", "total_tokens")
@@ -106,8 +105,17 @@ async def run_deliver(run_id: str) -> dict:
         if broken_charts:
             logger.warning(f"Broken/missing briefing charts detected: {', '.join(broken_charts)}")
 
-        # Graphics QA is deterministic now (no LLM) - straight from chart health.
-        qa_reports.append(qa_pipeline.build_graphics_report(chart_health))
+        # Generate the briefing HTML first so Graphics QA reviews the exact Azure/email artifact.
+        briefing_for_visual_qa = reporting.generate_html_briefing(
+            total_val=total_portfolio_value, qqq_trend=live_qqq_trend,
+            portfolio_3m_trend=portfolio_3m_trend, mandate=live_mandate,
+            chairman_data=c_data, cos_data=cos_data, matrix_md=matrix_md, unicorn_trades=unicorn_trades,
+            sorted_ledger=sorted_ledger, red_team_data=red_team_data, history_data=history_data,
+            qa_summary_text="", account_holdings=account_holdings, account_returns=account_returns,
+            advanced_data=advanced_data, chart_urls=chart_urls,
+        )
+        graphics_report = await qa_pipeline.run_graphics_designer_qa(briefing_for_visual_qa, chart_health)
+        qa_reports.append(graphics_report)
 
         # QA-the-QA on Flash + hard timeout so it can't blow the ceiling.
         interim_qa_dashboard_html = reporting.generate_qa_dashboard_html(qa_reports, run_id)

@@ -1,9 +1,9 @@
 """Job 2 - DEBATE.
 
-The board engine: data oracle (secondary guard), parallel panel + rebuttal,
-synthesis, Munger audit, chairman arbitration with the deterministic 10% cap, and
-the compliance gate. Consumes the prepare checkpoint and writes the debate
-checkpoint (chairman allocation, red team, raw debate log) for the deliver phase.
+The board engine: parallel panel + rebuttal, synthesis, Munger audit, chairman
+arbitration with the deterministic 10% cap, and the compliance gate. Consumes the
+prepare checkpoint (including its Data Oracle result — not re-run here) and writes
+the debate checkpoint (chairman allocation, red team, raw debate log) for deliver.
 No rendering or email happens here.
 """
 import json
@@ -42,6 +42,7 @@ async def run_debate(run_id: str) -> dict:
     storage_client.mark_phase(run_id, "debate", "running", started_at=started.isoformat())
 
     try:
+        prep_oracle = prep.get("oracle") or {}
         initial_state = {
             "base_data_prompt": prep["mega_prompt"],
             "live_mandate": prep["live_mandate"],
@@ -49,6 +50,9 @@ async def run_debate(run_id: str) -> dict:
             "all_symbols": prep["all_symbols"],
             "total_portfolio_value": prep["total_portfolio_value"],
             "portfolio_holdings": prep["portfolio_holdings"],
+            "oracle_valid": prep_oracle.get("is_valid") if prep_oracle else None,
+            "oracle_reason": prep_oracle.get("reason", ""),
+            "oracle_prices": prep.get("price_feed") or {},
         }
 
         raw_log_lines = [prep.get("raw_log_header", "# RAW DEBATE LOG\n\n")]

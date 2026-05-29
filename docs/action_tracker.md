@@ -38,6 +38,7 @@ This document tracks identified bugs, architectural improvements, and long-term 
 2. **Buffett caps in code** — conviction ≤ 7 when PE > 40 or P/S > 10.
 3. ~~**Mandate TWR**~~ — **DONE (May 29):** prepare passes real 12M TWR from `account_returns` into `generate_dynamic_mandate`.
 4. ~~**Macro `batch-quote`**~~ — **NOT on Starter (HTTP 402).** Keep parallel `/stable/quote` in `get_fmp_macro`; see `tools/probe_starter_tier.py`.
+5. ~~**Graphics Designer on final HTML artifact**~~ — **DONE (May 29):** `run_graphics_designer_qa` reviews saved `executive_briefing_*.html` + downloaded chart images (not templates/code). Optional future: full-page email-client screenshot via headless browser.
 
 Full API reference + dead URLs: **`docs/fmp_data_dictionary.md`**. Guardrails: **`.cursorrules`**.
 
@@ -372,7 +373,7 @@ A team of focused reviewers, each producing a short scored report + prioritized 
 | **Graphics Designer** | Briefing visual polish | In QA_TEAM_CONFIG + in-pipeline `graphics_designer_qa` (5.5) |
 | **HR Efficiency** | Agent roster right-sizing | **5.4** — wired into digest via `hr_review.py` |
 
-* **What runs today:** `function_app.py` timer **11:30 UTC weekdays** → `run_qa_review_team()` → emails QA digest. Fetches latest blobs from Azure; includes HR section when `AGENT_ACTIVITY` present in telemetry.
+* **What runs today:** `function_app.py` timer **7:00 AM daily** (Pacific via `WEBSITE_TIME_ZONE`) → `run_qa_review_team()` → emails QA digest. Pipeline timer **6:00 AM daily** → prepare. Fetches latest blobs from Azure; includes HR section when `AGENT_ACTIVITY` present in telemetry.
 * **Still open:** Cursor subagent/rules wrapper (3.2), weekly digest log in `docs/qa_reviews/`, orchestrating as a "QA Lead" skill.
 
 ### 5.2 Opportunity Audit — Value per API Call — IN PROGRESS

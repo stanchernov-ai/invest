@@ -100,7 +100,11 @@ class BoardroomState(BaseModel):
     sell_candidates: list[str] = []
     total_portfolio_value: float = 0.0
     portfolio_holdings: dict = {}
-    
+    # When set by prepare checkpoint, debate skips re-running the price gate.
+    oracle_valid: bool | None = None
+    oracle_reason: str = ""
+    oracle_prices: dict[str, float] = {}
+
 DATA_SCHEMA_BINDING = "You are bound by a strict data schema. You must format your final output precisely according to the requested JSON structure. Do not output raw text."
 
 TONE_OVERRIDE = "TONE OVERRIDE: You are speaking to Stan. Drop all cinematic fluff, cliches, and theatrical intros. Be highly concise, unapologetic, and purely analytical. Let your specific persona and investment philosophy bleed into your words."
