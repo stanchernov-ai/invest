@@ -5,7 +5,17 @@ Compliance LLM focuses on debate-log alignment and funding logic.
 """
 from __future__ import annotations
 
-from src.core.guardrails import BUY_VERDICTS, HEDGE_SYMBOLS, MAX_DAILY_BUYS, _normalize_verdict
+import re
+
+from src.core.guardrails import (
+    BUY_VERDICTS,
+    HEDGE_SYMBOLS,
+    MAX_DAILY_BUYS,
+    _normalize_verdict,
+    count_equity_buys,
+)
+
+_SYSTEM_MAX_BUY_OVERRIDE = "[SYSTEM OVERRIDE: Maximum"
 
 
 def count_buy_verdicts(chairman: dict) -> int:
@@ -128,10 +138,55 @@ def format_compliance_failure_summary(
     return "\n".join(lines)
 
 
-def merge_compliance_reports(deterministic_violations: list[str], llm_report: dict | None) -> dict:
+def _find_chairman_position(chairman: dict, symbol: str) -> dict | None:
+    for section in ("portfolio_positions", "watchlist_positions"):
+        for pos in chairman.get(section) or []:
+            if (pos.get("symbol") or "").upper() == (symbol or "").upper():
+                return pos
+    return None
+
+
+def _symbol_from_majority_violation(violation: str) -> str | None:
+    """Best-effort parse e.g. '... for AMZN is non-compliant'."""
+    match = re.search(r"\bfor\s+([A-Z][A-Z0-9.\-]{0,9})\b", violation, re.IGNORECASE)
+    return match.group(1).upper() if match else None
+
+
+def filter_spurious_majority_violations(
+    violations: list[str],
+    chairman: dict,
+) -> list[str]:
+    """Drop LLM majority-alignment noise for valid SYSTEM OVERRIDE max-buy demotions."""
+    kept: list[str] = []
+    for violation in violations:
+        text = violation or ""
+        upper = text.upper()
+        if "MAJORITY VOTE" not in upper and "MAJORITY VOTE ALIGNMENT" not in upper:
+            kept.append(violation)
+            continue
+        sym = _symbol_from_majority_violation(text)
+        if sym:
+            pos = _find_chairman_position(chairman, sym)
+            if pos:
+                if _SYSTEM_MAX_BUY_OVERRIDE in (pos.get("synthesis") or ""):
+                    continue
+                if _normalize_verdict(pos.get("final_verdict", "")) in BUY_VERDICTS:
+                    continue
+        kept.append(violation)
+    return kept
+
+
+def merge_compliance_reports(
+    deterministic_violations: list[str],
+    llm_report: dict | None,
+    *,
+    chairman: dict | None = None,
+) -> dict:
     """Combine Python gate with LLM compliance audit."""
     llm = llm_report or {}
     llm_violations = [str(v) for v in (llm.get("violations") or []) if v]
+    if chairman:
+        llm_violations = filter_spurious_majority_violations(llm_violations, chairman)
     combined = list(dict.fromkeys([*deterministic_violations, *llm_violations]))
 
     feedback_parts = []
@@ -141,12 +196,8 @@ def merge_compliance_reports(deterministic_violations: list[str], llm_report: di
     if llm_feedback:
         feedback_parts.append(llm_feedback)
 
-    if deterministic_violations:
-        is_compliant = False
-    elif llm_report:
-        is_compliant = bool(llm.get("is_compliant")) and not llm_violations
-    else:
-        is_compliant = False
+    # Evidence-based gate: filtered violations are authoritative (same pattern as QA reconcile).
+    is_compliant = len(combined) == 0
 
     return {
         "is_compliant": is_compliant,

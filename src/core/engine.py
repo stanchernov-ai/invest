@@ -216,6 +216,7 @@ class StateMachineOrchestrator:
                 total_portfolio_value=self.state.total_portfolio_value,
                 portfolio_holdings=self.state.portfolio_holdings,
                 purchase_dates=self.state.purchase_dates,
+                raw_verdicts=self.raw_verdicts,
             )
 
         self.state.chairman_draft_json = json.dumps(res) if res else "{}"
@@ -253,7 +254,7 @@ class StateMachineOrchestrator:
             f"{self.state.chairman_draft_json}"
         )
         res = await self._run_agent("compliance", prompt, schema=ComplianceReport)
-        merged = merge_compliance_reports(deterministic_violations, res)
+        merged = merge_compliance_reports(deterministic_violations, res, chairman=chairman)
         self.compliance_attempts.append({
             "attempt": len(self.compliance_attempts) + 1,
             "is_compliant": merged.get("is_compliant", False),

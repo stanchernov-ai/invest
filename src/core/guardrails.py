@@ -62,6 +62,19 @@ def _is_hedge_symbol(symbol: str) -> bool:
     return str(symbol or "").upper() in HEDGE_SYMBOLS
 
 
+def count_equity_buys(chairman: dict) -> int:
+    """Buy/Strong Buy equity positions only (TLT/VXX hedge excluded from the cap)."""
+    count = 0
+    for section in ("portfolio_positions", "watchlist_positions"):
+        for pos in chairman.get(section) or []:
+            sym = pos.get("symbol", "")
+            if _is_hedge_symbol(sym):
+                continue
+            if _normalize_verdict(pos.get("final_verdict", "")) in BUY_VERDICTS:
+                count += 1
+    return count
+
+
 def enforce_max_buys(chairman: dict, *, max_buys: int = MAX_DAILY_BUYS) -> dict:
     """Keep at most ``max_buys`` equity Buy/Strong Buy verdicts; demote the rest by conviction.
 
@@ -210,10 +223,14 @@ def apply_chairman_guardrails(
     portfolio_holdings: dict[str, float],
     purchase_dates: dict[str, str] | None = None,
     ref: datetime | None = None,
+    raw_verdicts: dict[str, dict] | None = None,
 ) -> dict:
     """Apply all P0 chairman guardrails in deterministic order."""
+    from src.core.chairman_alignment import apply_board_and_cap_coherence
+
     result = deepcopy(chairman)
     enforce_max_buys(result)
+    apply_board_and_cap_coherence(result, raw_verdicts)
     enforce_wash_sale(result, purchase_dates or {}, ref=ref)
     enforce_liquidation_cap(
         result,
