@@ -11,6 +11,7 @@
 |-----|---------|
 | [`DOCUMENTATION.md`](DOCUMENTATION.md) | **Master index** — which doc to read or update |
 | [`.cursorrules`](../.cursorrules) | Guardrails, Cursor sub-agents, triggers, failsafes |
+| [`qa_layers.md`](qa_layers.md) | **Which QA module runs when** — quick map (§6 detail lives here) |
 | [`technical_solution.md`](technical_solution.md) | End-to-end system design, data layer, deploy |
 | [`engineering_playbook.md`](engineering_playbook.md) | Rejected approaches — read before retrying |
 | [`action_tracker.md`](action_tracker.md) | Backlog and Session Handoff |
@@ -30,6 +31,7 @@ Update **`docs/agent_architecture.md`** whenever you change any of the following
 | QA agent or validation layer change | §6 QA stack, §7–§8 golden fixtures |
 | Agent promoted 🟡 → 🟢 (code-enforced) | §8 enforcement legend + roster notes |
 | Cross-run state / scout cooldown change | §3.6 verdict memory |
+| New QA module or deliver QA order change | [`qa_layers.md`](qa_layers.md) + §6 here |
 
 **Do not duplicate** guardrail prose here — edit `.cursorrules` only.  
 **Do not duplicate** FMP/API details — see `fmp_data_dictionary.md`.

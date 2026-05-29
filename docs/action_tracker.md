@@ -65,7 +65,8 @@ This document tracks identified bugs, architectural improvements, and long-term 
 | Document | Use when |
 |----------|----------|
 | [`DOCUMENTATION.md`](DOCUMENTATION.md) | Unsure which doc to read or update |
-| [`agent_architecture.md`](agent_architecture.md) | Agent diagrams, inventory, QA layers — **update when roster changes** |
+| [`qa_layers.md`](qa_layers.md) | Which QA module runs when — deliver vs weekly vs dev |
+| [`agent_architecture.md`](agent_architecture.md) | Agent diagrams, inventory, QA L0–L7 — **update when roster changes** |
 | [`technical_solution.md`](technical_solution.md) | System design, data layer, deploy |
 | [`engineering_playbook.md`](engineering_playbook.md) | Before retrying a rejected approach |
 | [`post_deliver_checklist.md`](post_deliver_checklist.md) | After every deliver — retrospective + backlog hygiene |
