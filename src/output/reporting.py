@@ -749,6 +749,36 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             </table>
             {% endif %}
 
+            {% if sotu_quotes %}
+            <h2>The State of the Union</h2>
+            {% for quote in sotu_quotes %}
+                {% set box_color = '#f9fafb' %}
+                {% set border_color = '#9ca3af' %}
+                
+                {% if '⭐⭐⭐⭐' in quote.board_member %}
+                    {% set box_color = '#dcfce7' %}
+                    {% set border_color = '#22c55e' %}
+                {% elif '⭐⭐⭐' in quote.board_member %}
+                    {% set box_color = '#dbeafe' %}
+                    {% set border_color = '#3b82f6' %}
+                {% elif '⭐⭐' in quote.board_member or '⭐' in quote.board_member %}
+                    {% set box_color = '#fee2e2' %}
+                    {% set border_color = '#ef4444' %}
+                {% endif %}
+                
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin: 10px 0; border-left: 4px solid {{ border_color }}; background-color: {{ box_color }}; border-radius: 4px;">
+                    <tr>
+                        <td width="65" valign="top" style="padding: 15px 0 15px 15px;">
+                            <img src="{{ quote.avatar_url }}" style="width: 50px; height: 50px; border-radius: 50%; display: block; max-width: 50px;" alt="{{ quote.board_member }} avatar">
+                        </td>
+                        <td valign="middle" style="padding: 15px; font-style: italic;">
+                            <strong>{{ quote.board_member }}:</strong> "{{ quote.quote }}"
+                        </td>
+                    </tr>
+                </table>
+            {% endfor %}
+            {% endif %}
+
             {% if show_alpha_pick %}
             <h2>🎯 The Alpha Pick</h2>
             <div class="metric-box" style="border-left-color: #f59e0b;">
@@ -858,34 +888,6 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             </div>
             {% endif %}
 
-            <h2>The State of the Union</h2>
-            {% for quote in sotu_quotes %}
-                {% set box_color = '#f9fafb' %}
-                {% set border_color = '#9ca3af' %}
-                
-                {% if '⭐⭐⭐⭐' in quote.board_member %}
-                    {% set box_color = '#dcfce7' %}
-                    {% set border_color = '#22c55e' %}
-                {% elif '⭐⭐⭐' in quote.board_member %}
-                    {% set box_color = '#dbeafe' %}
-                    {% set border_color = '#3b82f6' %}
-                {% elif '⭐⭐' in quote.board_member or '⭐' in quote.board_member %}
-                    {% set box_color = '#fee2e2' %}
-                    {% set border_color = '#ef4444' %}
-                {% endif %}
-                
-                <table width="100%" cellpadding="0" cellspacing="0" style="margin: 10px 0; border-left: 4px solid {{ border_color }}; background-color: {{ box_color }}; border-radius: 4px;">
-                    <tr>
-                        <td width="65" valign="top" style="padding: 15px 0 15px 15px;">
-                            <img src="{{ quote.avatar_url }}" style="width: 50px; height: 50px; border-radius: 50%; display: block; max-width: 50px;" alt="{{ quote.board_member }} avatar">
-                        </td>
-                        <td valign="middle" style="padding: 15px; font-style: italic;">
-                            <strong>{{ quote.board_member }}:</strong> "{{ quote.quote }}"
-                        </td>
-                    </tr>
-                </table>
-            {% endfor %}
-            
             <h2>Upcoming Catalysts</h2>
             <ul>
             {% for event in events %}
@@ -950,9 +952,9 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     from src.config.settings import now_local
     briefing_date = now_local().strftime("%B %d, %Y")
 
-    cagr_match = re.search(r"CAGR of ([\d\.]+ percent)", mandate)
+    cagr_match = re.search(r"CAGR of ([\d\.]+)\s*percent", mandate, re.I)
     proj_match = re.search(r"projected balance at age 65 is (\$[\d\.,]+)", mandate)
-    cagr_text = cagr_match.group(1) if cagr_match else "N/A"
+    cagr_text = f"{cagr_match.group(1)}%" if cagr_match else "N/A"
     proj_text = proj_match.group(1) if proj_match else "N/A"
 
     template = Template(html_template)

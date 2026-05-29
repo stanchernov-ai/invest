@@ -110,7 +110,12 @@ class BriefingHtmlTests(unittest.TestCase):
                 "alpha_pick": {"symbol": "NONE", "champion_quote": "As per the QA Amendment protocol, none."},
                 "upcoming_events": [],
             },
-            cos_data={"state_of_the_union_quotes": [], "boardroom_brawl": "x" * 100},
+            cos_data={
+                "state_of_the_union_quotes": [
+                    {"board_member": "Warren Buffett", "quote": "Markets remain rational long term."},
+                ],
+                "boardroom_brawl": "x" * 100,
+            },
             matrix_md="",
             unicorn_trades=[],
             sorted_ledger=[],
@@ -121,13 +126,15 @@ class BriefingHtmlTests(unittest.TestCase):
             chart_urls={},
         )
         twr_pos = html.find("Time-Weighted Returns")
-        action_pos = html.find("The Action Plan")
         sotu_pos = html.find("The State of the Union")
-        self.assertLess(twr_pos, action_pos)
-        self.assertLess(action_pos, sotu_pos)
+        action_pos = html.find("The Action Plan")
+        self.assertLess(twr_pos, sotu_pos)
+        self.assertLess(sotu_pos, action_pos)
         self.assertIn("Invest AI Daily Briefing", html)
         self.assertNotIn("Generated autonomously", html)
         self.assertNotIn("The Alpha Pick", html)
+        self.assertIn("12.00%", html)
+        self.assertNotIn("12.00 percent", html)
 
 
 if __name__ == "__main__":
