@@ -242,6 +242,8 @@ async def build_account_returns(
         accounts = ACCOUNT_ORDER + ["Total"]
         factor = {acct: {"ytd": 1.0, "12m": 1.0, "3m": 1.0} for acct in accounts}
         daily_total = {}
+        portfolio_index_by_date = {}
+        portfolio_index = 100.0
 
         for i in range(len(global_dates)):
             cur_date = date_objs[i]
@@ -252,6 +254,7 @@ async def build_account_returns(
                     held = _shares_held_at(sh0, events[acct].get(sym, []), cur_date)
                     tot_val += held * aligned.get(sym, [0.0] * len(global_dates))[i]
             daily_total[global_dates[i]] = round(tot_val, 2)
+            portfolio_index_by_date[global_dates[i]] = round(portfolio_index, 2)
 
             if i == 0:
                 continue
@@ -282,6 +285,8 @@ async def build_account_returns(
                         factor[acct]["3m"] *= (1 + r)
             if total_vprev > 1.0:
                 r_tot = total_gain / total_vprev
+                portfolio_index *= (1 + r_tot)
+                portfolio_index_by_date[global_dates[i]] = round(portfolio_index, 2)
                 if cur_date >= ytd_start:
                     factor["Total"]["ytd"] *= (1 + r_tot)
                 if cur_date >= twelve_mo_start:
@@ -303,6 +308,7 @@ async def build_account_returns(
         for i, date_str in enumerate(global_dates):
             benchmark_history[date_str.replace("-", "")] = {
                 "portfolio": daily_total.get(date_str, 0.0),
+                "portfolio_index": portfolio_index_by_date.get(date_str, 100.0),
                 "spy": round(spy_aligned[i], 2),
                 "qqq": round(qqq_aligned[i], 2),
             }

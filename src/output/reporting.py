@@ -61,7 +61,7 @@ def audit_chart_health(chart_urls):
     """Deterministically verify each briefing chart renders. Ground truth for the
     Graphics Designer QA agent, which cannot 'see' rendered images itself."""
     labels = {
-        "line_chart_url": "Performance vs. Benchmark (line)",
+        "line_chart_url": "Performance vs. Benchmark — indexed (line)",
         "bar_chart_url": "Personal Return by Asset (bar)",
         "pie_chart_url": "Unrealized Gains (pie)",
         "account_pie_url": "12M Return by Account (pie)",
@@ -325,10 +325,43 @@ def _downsample(labels, series_list, max_points=90):
     return new_labels, new_series
 
 
+def _rebase_index_series(values):
+    """Rebase a numeric series so the first valid point equals 100."""
+    first = next((v for v in values if v is not None), None)
+    if first in (None, 0):
+        return values
+    return [round(v / first * 100, 2) if v is not None else None for v in values]
+
+
+def _sanitize_briefing_text(text: str) -> str:
+    """Strip internal protocol jargon before rendering investor-facing copy."""
+    if not text:
+        return text
+    cleaned = re.sub(r"(?i)\bas per the qa amendment protocol\b[,:\s]*", "", text)
+    cleaned = re.sub(r"(?i)\bqa amendment protocol\b[,:\s]*", "", cleaned)
+    return cleaned.strip()
+
+
+def _alpha_pick_displayable(alpha_pick: dict) -> bool:
+    if not alpha_pick:
+        return False
+    sym = (alpha_pick.get("symbol") or "").strip().upper()
+    if not sym or sym in {"NONE", "N/A", "NULL"}:
+        return False
+    quote = _sanitize_briefing_text(alpha_pick.get("champion_quote", ""))
+    return bool(quote) and quote.upper() not in {"N/A", "NONE"}
+
+
+def _debate_has_content(brawl_text: str) -> bool:
+    plain = re.sub(r"<[^>]+>", "", brawl_text or "")
+    return len(plain.strip()) > 80
+
+
 def build_benchmark_line_chart(history_data):
     if not history_data:
         return ""
 
+    history_data = {d: dict(row) for d, row in history_data.items()}
     # Merge static benchmarks for historical context (one-time scrub data)
     import os, json
     static_path = os.path.join(os.path.dirname(__file__), "..", "data", "static_benchmarks.json")
@@ -338,13 +371,12 @@ def build_benchmark_line_chart(history_data):
                 static_data = json.load(f)
             for d, vals in static_data.items():
                 if d not in history_data:
-                    history_data[d] = vals
-                else:
-                    # Don't overwrite portfolio data, just backfill missing benchmarks
-                    if "spy" not in history_data[d] and "spy" in vals:
-                        history_data[d]["spy"] = vals["spy"]
-                    if "qqq" not in history_data[d] and "qqq" in vals:
-                        history_data[d]["qqq"] = vals["qqq"]
+                    continue
+                # Don't overwrite portfolio data, just backfill missing benchmarks
+                if "spy" not in history_data[d] and "spy" in vals:
+                    history_data[d]["spy"] = vals["spy"]
+                if "qqq" not in history_data[d] and "qqq" in vals:
+                    history_data[d]["qqq"] = vals["qqq"]
         except Exception:
             pass
 
@@ -352,75 +384,118 @@ def build_benchmark_line_chart(history_data):
     if len(dates) < 2:
         return ""
 
-    # Anchor the chart on the first date with a meaningful portfolio value.
-    base_port = 0
-    base_spy = 0
-    base_qqq = 0
-    for d in dates:
+    # Anchor on the first date with benchmark prices; portfolio uses TWR index when available.
+    anchor_idx = None
+    for i, d in enumerate(dates):
         row = history_data[d]
-        if row.get("portfolio", 0) > 1000 and row.get("spy", 0) > 0:
-            base_port = row.get("portfolio")
-            base_spy = row.get("spy")
-            base_qqq = row.get("qqq", 0)
+        if row.get("spy", 0) > 0 and (
+            row.get("portfolio_index") is not None or row.get("portfolio", 0) > 1000
+        ):
+            anchor_idx = i
             break
 
-    if base_port <= 0 or base_spy <= 0:
+    if anchor_idx is None:
         return ""
+
+    base_spy = history_data[dates[anchor_idx]].get("spy", 0)
+    base_qqq = history_data[dates[anchor_idx]].get("qqq", 0)
     has_qqq = base_qqq > 0
+    if base_spy <= 0:
+        return ""
 
     port_data = []
     spy_data = []
     qqq_data = []
 
     for d in dates:
-        p_val = history_data[d].get("portfolio", 0)
-        s_val = history_data[d].get("spy", 0)
-        
-        if p_val > 1000 and base_port > 0:
-            port_data.append(round(((p_val - base_port) / base_port) * 100, 2))
+        row = history_data[d]
+        if row.get("portfolio_index") is not None:
+            port_data.append(round(float(row["portfolio_index"]), 2))
         else:
-            port_data.append(None)
-            
+            p_val = row.get("portfolio", 0)
+            base_port = history_data[dates[anchor_idx]].get("portfolio", 0)
+            if p_val > 1000 and base_port > 0:
+                port_data.append(round((p_val / base_port) * 100, 2))
+            else:
+                port_data.append(None)
+
+        s_val = row.get("spy", 0)
         if s_val > 0 and base_spy > 0:
-            spy_data.append(round(((s_val - base_spy) / base_spy) * 100, 2))
+            spy_data.append(round((s_val / base_spy) * 100, 2))
         else:
             spy_data.append(None)
-            
+
         if has_qqq:
-            q_val = history_data[d].get("qqq", 0)
+            q_val = row.get("qqq", 0)
             if q_val > 0 and base_qqq > 0:
-                qqq_data.append(round(((q_val - base_qqq) / base_qqq) * 100, 2))
+                qqq_data.append(round((q_val / base_qqq) * 100, 2))
             else:
                 qqq_data.append(None)
 
-    # Downsample to keep the QuickChart config compact. A full trailing-12-month
-    # daily series (~250 pts) bloats the URL/payload; ~90 evenly-spaced points
-    # render an identical-looking line at a fraction of the size.
+    port_data, spy_data, qqq_data = (
+        _rebase_index_series(port_data),
+        _rebase_index_series(spy_data),
+        _rebase_index_series(qqq_data),
+    )
+
     dates, (port_data, spy_data, qqq_data) = _downsample(dates, [port_data, spy_data, qqq_data])
 
     datasets = [
-        {"label": "Portfolio", "data": port_data, "borderColor": "#2563eb", "fill": False, "tension": 0.1, "spanGaps": True},
-        {"label": "S&P 500", "data": spy_data, "borderColor": "#9ca3af", "fill": False, "tension": 0.1, "spanGaps": True},
+        {
+            "label": "Portfolio (TWR)",
+            "data": port_data,
+            "borderColor": "#2563eb",
+            "fill": False,
+            "tension": 0.1,
+            "spanGaps": True,
+        },
+        {
+            "label": "S&P 500",
+            "data": spy_data,
+            "borderColor": "#9ca3af",
+            "fill": False,
+            "tension": 0.1,
+            "spanGaps": True,
+        },
     ]
     if has_qqq:
-        datasets.append({"label": "NASDAQ", "data": qqq_data, "borderColor": "#10b981", "fill": False, "tension": 0.1, "spanGaps": True})
+        datasets.append({
+            "label": "NASDAQ",
+            "data": qqq_data,
+            "borderColor": "#10b981",
+            "fill": False,
+            "tension": 0.1,
+            "spanGaps": True,
+        })
 
     chart_config = {
         "type": "line",
         "data": {
             "labels": dates,
-            "datasets": datasets
+            "datasets": datasets,
         },
         "options": {
             "plugins": {
-                "datalabels": {"display": False}
+                "datalabels": {"display": False},
+                "title": {
+                    "display": True,
+                    "text": "Indexed performance (start = 100)",
+                    "font": {"size": 14},
+                },
+                "legend": {"position": "bottom"},
             },
             "scales": {
-                "y": {"beginAtZero": False}
-            }
-        }
+                "x": {
+                    "ticks": {"maxTicksLimit": 8, "maxRotation": 45, "minRotation": 0},
+                },
+                "y": {
+                    "beginAtZero": False,
+                    "title": {"display": True, "text": "Index"},
+                },
+            },
+        },
     }
-    return get_quickchart_short_url(chart_config)
+    return get_quickchart_short_url(chart_config, width=640, height=340)
 
 def build_briefing_charts(sorted_ledger, account_holdings, account_returns, history_data):
     """Build every briefing chart URL once so callers can both render and health-check
@@ -499,7 +574,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 'SELL': 'background-color:#fee2e2; color:#991b1b;',
                 'STRONG SELL': 'background-color:#fee2e2; color:#991b1b;'
             } %}
-            <h1>Invest AI: Executive Briefing</h1>
+            <h1>Invest AI: Executive Briefing{% if briefing_date %} &mdash; {{ briefing_date }}{% endif %}</h1>
             
             <div class="metric-box">
                 <strong>Portfolio Value:</strong> {{ total_val }}<br>
@@ -512,7 +587,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 <tr>
                     {% if line_chart_url %}
                     <td valign="top" width="{{ '50%' if bar_chart_url else '100%' }}" style="padding: 0 {{ '10px' if bar_chart_url else '0' }} 0 0;">
-                        <div class="chart-title">Performance vs. Benchmark</div>
+                        <div class="chart-title">Performance vs. Benchmark (indexed)</div>
                         <div class="chart-container">
                             <img class="chart-img" src="{{ line_chart_url }}" alt="Benchmark Performance Line Chart">
                         </div>
@@ -543,7 +618,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                     {% endif %}
                     {% if account_pie_url %}
                     <td valign="top" width="{{ '50%' if pie_chart_url else '100%' }}" style="padding: 0 0 0 {{ '10px' if pie_chart_url else '0' }};">
-                        <div class="chart-title">1 Yr Return</div>
+                        <div class="chart-title">12M Return by Account</div>
                         <div class="chart-container">
                             <img class="chart-img" src="{{ account_pie_url }}" alt="1 Yr Return Pie Chart">
                         </div>
@@ -553,35 +628,32 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             </table>
             {% endif %}
 
-            <h2>The State of the Union</h2>
-            {% for quote in sotu_quotes %}
-                {% set box_color = '#f9fafb' %}
-                {% set border_color = '#9ca3af' %}
-                
-                {% if '⭐⭐⭐⭐' in quote.board_member %}
-                    {% set box_color = '#dcfce7' %}
-                    {% set border_color = '#22c55e' %}
-                {% elif '⭐⭐⭐' in quote.board_member %}
-                    {% set box_color = '#dbeafe' %}
-                    {% set border_color = '#3b82f6' %}
-                {% elif '⭐⭐' in quote.board_member or '⭐' in quote.board_member %}
-                    {% set box_color = '#fee2e2' %}
-                    {% set border_color = '#ef4444' %}
-                {% endif %}
-                
-                <table width="100%" cellpadding="0" cellspacing="0" style="margin: 10px 0; border-left: 4px solid {{ border_color }}; background-color: {{ box_color }}; border-radius: 4px;">
-                    <tr>
-                        <td width="65" valign="top" style="padding: 15px 0 15px 15px;">
-                            <img src="{{ quote.avatar_url }}" style="width: 50px; height: 50px; border-radius: 50%; display: block; max-width: 50px;" alt="{{ quote.board_member }} avatar">
-                        </td>
-                        <td valign="middle" style="padding: 15px; font-style: italic;">
-                            <strong>{{ quote.board_member }}:</strong> "{{ quote.quote }}"
-                        </td>
-                    </tr>
-                </table>
-            {% endfor %}
+            {% if returns_rows %}
+            <h2>Time-Weighted Returns</h2>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: separate; border-spacing: 0; margin-bottom: 10px;">
+                <tr>
+                    <td valign="top">
+                        <table width="100%" style="border-collapse:collapse; background-color:#f8fafc; border:1px solid #e5e7eb; border-radius:6px;">
+                            <tr style="text-align:left; color:#6b7280; font-size:13px;">
+                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb;">Account</th>
+                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb; text-align:right;">YTD</th>
+                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb; text-align:right;">12 Mo</th>
+                            </tr>
+                            {% for r in returns_rows %}
+                            <tr>
+                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6;{% if r.name == 'Total' %} font-weight:bold;{% endif %}">{{ r.name }}</td>
+                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6; text-align:right; font-weight:bold; color:{{ r.ytd_color }};">{{ '%+.2f'|format(r.ytd) }}%</td>
+                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6; text-align:right; font-weight:bold; color:{{ r.twelve_color }};">{{ '%+.2f'|format(r.twelve) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        <p style="font-size:11px; color:#9ca3af; margin:8px 0 0 0;">Time-weighted return (securities only); neutralizes deposits, withdrawals, and trades. Updated {{ returns_updated }}.</p>
+                    </td>
+                </tr>
+            </table>
+            {% endif %}
 
-            {% if alpha_pick %}
+            {% if show_alpha_pick %}
             <h2>🎯 The Alpha Pick</h2>
             <div class="metric-box" style="border-left-color: #f59e0b;">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
@@ -604,44 +676,6 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 </div>
                 {% endif %}
             </div>
-            {% endif %}
-
-            <h2>The Debate</h2>
-            {% for paragraph in brawl_text.split('\\n') %}
-                {% if paragraph.strip() %}
-                    <p>{{ paragraph.strip() }}</p>
-                {% endif %}
-            {% endfor %}
-            
-            {% if unicorn_protocol_items %}
-            <h2>🦄 Unicorn Protocol</h2>
-            <p style="color:#6b7280; font-size:0.95em; margin-top:-5px;">Unanimous board verdict — full context with Red Team rebuttal.</p>
-            {% for item in unicorn_protocol_items %}
-                <div style="margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
-                    <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
-                        <tr>
-                            {% if item.image %}
-                            <td valign="middle" style="padding-right: 12px;">
-                                <img src="{{ item.image }}" alt="{{ item.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; display: block; max-width: 28px; background-color: #ffffff;">
-                            </td>
-                            {% endif %}
-                            <td valign="middle">
-                                <span class="verdict-pill" style="{{ pill_styles[item.verdict] if item.verdict in pill_styles else pill_styles['HOLD'] }} margin-bottom: 0;">{{ item.verdict }} : {{ item.symbol }}</span>
-                            </td>
-                        </tr>
-                    </table>
-                    {% if item.synthesis %}
-                    <p><strong>Strategic Context:</strong> {{ item.synthesis }}</p>
-                    {% endif %}
-                    {% if item.champion_quote %}
-                    <p><span class="champion">The Champion ({{ item.champion }}):</span> "{{ item.champion_quote }}"</p>
-                    {% endif %}
-                    {% if item.red_team_rebuttal %}
-                    <p style="margin-top: 12px; margin-bottom: 6px; font-weight: bold; color: #991b1b;">⚠️ Red Team Rebuttal</p>
-                    <div class="red-team-box">{{ item.red_team_rebuttal }}</div>
-                    {% endif %}
-                </div>
-            {% endfor %}
             {% endif %}
 
             <h2>The Action Plan</h2>
@@ -680,6 +714,46 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                     {% endfor %}
                 {% endif %}
             {% endfor %}
+
+            {% if show_debate %}
+            <h2>The Debate</h2>
+            {% for paragraph in brawl_text.split('\\n') %}
+                {% if paragraph.strip() %}
+                    <p>{{ paragraph.strip() }}</p>
+                {% endif %}
+            {% endfor %}
+            {% endif %}
+            
+            {% if unicorn_protocol_items %}
+            <h2>🦄 Unicorn Protocol</h2>
+            <p style="color:#6b7280; font-size:0.95em; margin-top:-5px;">Unanimous board verdict — full context with Red Team rebuttal.</p>
+            {% for item in unicorn_protocol_items %}
+                <div style="margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
+                        <tr>
+                            {% if item.image %}
+                            <td valign="middle" style="padding-right: 12px;">
+                                <img src="{{ item.image }}" alt="{{ item.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; display: block; max-width: 28px; background-color: #ffffff;">
+                            </td>
+                            {% endif %}
+                            <td valign="middle">
+                                <span class="verdict-pill" style="{{ pill_styles[item.verdict] if item.verdict in pill_styles else pill_styles['HOLD'] }} margin-bottom: 0;">{{ item.verdict }} : {{ item.symbol }}</span>
+                            </td>
+                        </tr>
+                    </table>
+                    {% if item.synthesis %}
+                    <p><strong>Strategic Context:</strong> {{ item.synthesis }}</p>
+                    {% endif %}
+                    {% if item.champion_quote %}
+                    <p><span class="champion">The Champion ({{ item.champion }}):</span> "{{ item.champion_quote }}"</p>
+                    {% endif %}
+                    {% if item.red_team_rebuttal %}
+                    <p style="margin-top: 12px; margin-bottom: 6px; font-weight: bold; color: #991b1b;">⚠️ Red Team Rebuttal</p>
+                    <div class="red-team-box">{{ item.red_team_rebuttal }}</div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            {% endif %}
             
             {% if chairman_remarks %}
             <h2>Chairman's Closing Thoughts</h2>
@@ -687,6 +761,34 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 <p style="margin: 0;">"{{ chairman_remarks }}"</p>
             </div>
             {% endif %}
+
+            <h2>The State of the Union</h2>
+            {% for quote in sotu_quotes %}
+                {% set box_color = '#f9fafb' %}
+                {% set border_color = '#9ca3af' %}
+                
+                {% if '⭐⭐⭐⭐' in quote.board_member %}
+                    {% set box_color = '#dcfce7' %}
+                    {% set border_color = '#22c55e' %}
+                {% elif '⭐⭐⭐' in quote.board_member %}
+                    {% set box_color = '#dbeafe' %}
+                    {% set border_color = '#3b82f6' %}
+                {% elif '⭐⭐' in quote.board_member or '⭐' in quote.board_member %}
+                    {% set box_color = '#fee2e2' %}
+                    {% set border_color = '#ef4444' %}
+                {% endif %}
+                
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin: 10px 0; border-left: 4px solid {{ border_color }}; background-color: {{ box_color }}; border-radius: 4px;">
+                    <tr>
+                        <td width="65" valign="top" style="padding: 15px 0 15px 15px;">
+                            <img src="{{ quote.avatar_url }}" style="width: 50px; height: 50px; border-radius: 50%; display: block; max-width: 50px;" alt="{{ quote.board_member }} avatar">
+                        </td>
+                        <td valign="middle" style="padding: 15px; font-style: italic;">
+                            <strong>{{ quote.board_member }}:</strong> "{{ quote.quote }}"
+                        </td>
+                    </tr>
+                </table>
+            {% endfor %}
             
             <h2>Upcoming Catalysts</h2>
             <ul>
@@ -697,35 +799,9 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {% endfor %}
             </ul>
 
-            {% if returns_rows %}
-            <h2>Time-Weighted Returns</h2>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: separate; border-spacing: 0;">
-                <tr>
-                    <td width="55%" valign="top">
-                        <table width="100%" style="border-collapse:collapse; background-color:#f8fafc; border:1px solid #e5e7eb; border-radius:6px;">
-                            <tr style="text-align:left; color:#6b7280; font-size:13px;">
-                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb;">Account</th>
-                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb; text-align:right;">YTD</th>
-                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb; text-align:right;">12 Mo</th>
-                            </tr>
-                            {% for r in returns_rows %}
-                            <tr>
-                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6;{% if r.name == 'Total' %} font-weight:bold;{% endif %}">{{ r.name }}</td>
-                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6; text-align:right; font-weight:bold; color:{{ r.ytd_color }};">{{ '%+.2f'|format(r.ytd) }}%</td>
-                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6; text-align:right; font-weight:bold; color:{{ r.twelve_color }};">{{ '%+.2f'|format(r.twelve) }}%</td>
-                            </tr>
-                            {% endfor %}
-                        </table>
-                        <p style="font-size:11px; color:#9ca3af; margin:8px 0 0 0;">Time-weighted return (securities only); neutralizes deposits, withdrawals, and trades. Updated {{ returns_updated }}.</p>
-                    </td>
-                    <td width="45%"></td>
-                </tr>
-            </table>
-            {% endif %}
-
             <div class="footer">
-                Generated autonomously by the AI Board of Directors.<br>
-                Data provided by Financial Modeling Prep and ETrade Fidelity Logs.
+                Invest AI Daily Briefing<br>
+                Data provided by Financial Modeling Prep and brokerage activity logs.
             </div>
             
             {% if qa_summary_text %}
@@ -764,12 +840,19 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     alpha_pick = chairman_data.get('alpha_pick', {})
     if alpha_pick and 'symbol' in alpha_pick:
         alpha_pick['image'] = advanced_data.get(alpha_pick['symbol'], {}).get('image', '')
+        alpha_pick['champion_quote'] = _sanitize_briefing_text(alpha_pick.get('champion_quote', ''))
+    show_alpha_pick = _alpha_pick_displayable(alpha_pick)
         
     events = chairman_data.get('upcoming_events', [])
-    red_team_case = red_team_data.get('bear_case_narrative', '')
-    chairman_remarks = chairman_data.get('chairman_closing_remarks', '')
+    red_team_case = _sanitize_briefing_text(red_team_data.get('bear_case_narrative', ''))
+    chairman_remarks = _sanitize_briefing_text(chairman_data.get('chairman_closing_remarks', ''))
+    show_debate = _debate_has_content(brawl_text)
     
     hedge_action = chairman_data.get('capital_allocation_narrative', '') if 'hedge' in chairman_data.get('capital_allocation_narrative', '').lower() else ''
+    hedge_action = _sanitize_briefing_text(hedge_action)
+
+    from src.config.settings import now_local
+    briefing_date = now_local().strftime("%B %d, %Y")
 
     cagr_match = re.search(r"CAGR of ([\d\.]+ percent)", mandate)
     proj_match = re.search(r"projected balance at age 65 is (\$[\d\.,]+)", mandate)
@@ -788,6 +871,9 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         unicorn_protocol_items=unicorn_protocol_items,
         grouped_actions=grouped_actions,
         alpha_pick=alpha_pick,
+        show_alpha_pick=show_alpha_pick,
+        show_debate=show_debate,
+        briefing_date=briefing_date,
         events=events,
         pie_chart_url=pie_chart_url,
         account_pie_url=account_pie_url,
