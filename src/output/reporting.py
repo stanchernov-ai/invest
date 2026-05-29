@@ -307,18 +307,26 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             </div>
             {% endif %}
 
-            {% if pie_chart_url %}
-            <h2>Asset Allocation</h2>
-            <div class="chart-container">
-                <img class="chart-img" src="{{ pie_chart_url }}" alt="Portfolio Allocation Pie Chart">
-            </div>
-            {% endif %}
+            {% if pie_chart_url or account_pie_url %}
+            <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 30px; align-items: stretch;">
+                {% if pie_chart_url %}
+                <div style="flex: 1; min-width: 300px;">
+                    <h2 style="margin-top: 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">Unrealized Gains</h2>
+                    <div class="chart-container" style="margin-top: 10px;">
+                        <img class="chart-img" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart">
+                    </div>
+                </div>
+                {% endif %}
 
-            {% if account_pie_url %}
-            <h2>Portfolio by Account</h2>
-            <p style="font-size:12px; color:#6b7280; margin-top:-10px;">Slice size = account weight. Color = trailing 12-month time-weighted return.</p>
-            <div class="chart-container">
-                <img class="chart-img" src="{{ account_pie_url }}" alt="Portfolio by Account Pie Chart">
+                {% if account_pie_url %}
+                <div style="flex: 1; min-width: 300px;">
+                    <h2 style="margin-top: 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">12 M Return</h2>
+                    <p style="font-size:12px; color:#6b7280; margin-top:-10px;">Slice size = account weight. Color = 12M return.</p>
+                    <div class="chart-container" style="margin-top: 10px;">
+                        <img class="chart-img" src="{{ account_pie_url }}" alt="12 M Return Pie Chart">
+                    </div>
+                </div>
+                {% endif %}
             </div>
             {% endif %}
 
