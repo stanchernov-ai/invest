@@ -119,6 +119,7 @@ class BoardroomState(BaseModel):
     oracle_valid: bool | None = None
     oracle_reason: str = ""
     oracle_prices: dict[str, float] = {}
+    raw_verdicts: dict = {}
 
 DATA_SCHEMA_BINDING = "You are bound by a strict data schema. You must format your final output precisely according to the requested JSON structure. Do not output raw text."
 

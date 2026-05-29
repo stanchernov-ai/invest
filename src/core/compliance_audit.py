@@ -11,11 +11,18 @@ from src.core.guardrails import (
     BUY_VERDICTS,
     HEDGE_SYMBOLS,
     MAX_DAILY_BUYS,
+    _is_hedge_symbol,
     _normalize_verdict,
     count_equity_buys,
 )
+from src.core.vote_engine import (
+    MAJORITY_THRESHOLD,
+    build_vote_summaries,
+    verdict_bucket,
+)
 
 _SYSTEM_MAX_BUY_OVERRIDE = "[SYSTEM OVERRIDE: Maximum"
+_SYSTEM_VOTE_ENGINE = "[VOTE ENGINE]"
 
 
 def count_buy_verdicts(chairman: dict) -> int:
@@ -52,8 +59,124 @@ def _narrative_mentions_hedge(chairman: dict) -> bool:
     return any(k in text for k in (" HEDGE", "TLT", "VXX", "MANDATORY NON-CORRELATED"))
 
 
-def audit_chairman_compliance(chairman: dict) -> list[str]:
+def _chairman_aligns_with_majority(final_verdict: str, majority_bucket: str) -> bool:
+    cb = verdict_bucket(final_verdict)
+    if majority_bucket == "reduce":
+        return cb == "reduce"
+    return cb == majority_bucket
+
+
+def _has_valid_majority_override(pos: dict, majority_bucket: str) -> bool:
+    syn = pos.get("synthesis") or ""
+    if _SYSTEM_MAX_BUY_OVERRIDE in syn or _SYSTEM_VOTE_ENGINE in syn:
+        return True
+    if "SYSTEM OVERRIDE" in syn and majority_bucket == "buy":
+        return True
+    return False
+
+
+def audit_chairman_vote_alignment(
+    chairman: dict,
+    raw_verdicts: dict[str, dict] | None,
+    *,
+    all_symbols: list[str] | None = None,
+    portfolio_symbols: set[str] | None = None,
+) -> list[str]:
+    """Python checks for compliance checklist A, D, E (majority, originator, alpha pick)."""
+    if not chairman or not raw_verdicts:
+        return []
+
+    portfolio_symbols = portfolio_symbols or set()
+    symbols = all_symbols or []
+    for section in ("portfolio_positions", "watchlist_positions"):
+        for pos in chairman.get(section) or []:
+            sym = (pos.get("symbol") or "").strip()
+            if sym and sym not in symbols:
+                symbols.append(sym)
+
+    summaries = build_vote_summaries(raw_verdicts, symbols, portfolio_symbols=portfolio_symbols)
+    violations: list[str] = []
+
+    for section in ("portfolio_positions", "watchlist_positions"):
+        for pos in chairman.get(section) or []:
+            sym = (pos.get("symbol") or "").strip()
+            if not sym:
+                continue
+            summary = summaries.get(sym)
+            if not summary:
+                continue
+            mb = summary.majority_bucket()
+            if mb is None:
+                continue
+            final = pos.get("final_verdict", "")
+            if _has_valid_majority_override(pos, mb):
+                continue
+            if not _chairman_aligns_with_majority(final, mb):
+                violations.append(
+                    f"MAJORITY VOTE ALIGNMENT: {sym} board majority is {mb} "
+                    f"({summary.bucket_counts.get(mb, 0)}/5) but chairman final_verdict is {final}."
+                )
+
+    for section in ("portfolio_positions", "watchlist_positions"):
+        for pos in chairman.get(section) or []:
+            sym = (pos.get("symbol") or "").strip()
+            if not sym or _is_hedge_symbol(sym):
+                continue
+            if _normalize_verdict(pos.get("final_verdict", "")) not in BUY_VERDICTS:
+                continue
+            summary = summaries.get(sym)
+            if not summary:
+                violations.append(
+                    f"ORIGINATOR RULE: {sym} is Buy/Strong Buy in chairman JSON but has no Round 2 panel votes."
+                )
+                continue
+            if summary.bucket_counts.get("buy", 0) < 1:
+                violations.append(
+                    f"ORIGINATOR RULE: {sym} Buy/Strong Buy not backed by any panelist Buy vote in Round 2."
+                )
+
+    alpha = chairman.get("alpha_pick") or {}
+    alpha_sym = (alpha.get("symbol") or "").strip()
+    any_majority_buy = any(
+        s.bucket_counts.get("buy", 0) >= MAJORITY_THRESHOLD for s in summaries.values()
+    )
+    if alpha_sym and any_majority_buy:
+        alpha_summary = summaries.get(alpha_sym)
+        if not alpha_summary:
+            violations.append(
+                f"ALPHA PICK: {alpha_sym} has no Round 2 panel votes."
+            )
+        elif alpha_summary.bucket_counts.get("buy", 0) < MAJORITY_THRESHOLD:
+            violations.append(
+                f"ALPHA PICK: {alpha_sym} requires majority Buy support "
+                f"({alpha_summary.bucket_counts.get('buy', 0)}/{MAJORITY_THRESHOLD} panelists)."
+            )
+
+    return violations
+
+
+def audit_chairman_compliance(
+    chairman: dict,
+    raw_verdicts: dict[str, dict] | None = None,
+    *,
+    all_symbols: list[str] | None = None,
+    portfolio_symbols: set[str] | None = None,
+) -> list[str]:
     """Return human-readable violation strings; empty list means deterministic pass."""
+    violations = audit_chairman_compliance_limits(chairman)
+    violations.extend(
+        audit_chairman_vote_alignment(
+            chairman,
+            raw_verdicts,
+            all_symbols=all_symbols,
+            portfolio_symbols=portfolio_symbols,
+        )
+    )
+    return violations
+
+
+def audit_chairman_compliance_limits(chairman: dict) -> list[str]:
+    """Max buys, hedge mandate, capital flow presence."""
     if not chairman:
         return ["Chairman output is empty."]
 
@@ -109,7 +232,7 @@ def format_debate_for_compliance(messages: list[dict], *, char_limit: int = 2800
 
 def format_compliance_digest(violations: list[str]) -> str:
     if not violations:
-        return "DETERMINISTIC COMPLIANCE PRE-CHECK: PASS — max buys and hedge execution verified in JSON."
+        return "DETERMINISTIC COMPLIANCE PRE-CHECK: PASS — max buys, hedge, majority alignment, originator, and alpha pick verified."
     lines = ["DETERMINISTIC COMPLIANCE PRE-CHECK: FAIL — fix these before resubmitting:"]
     for v in violations:
         lines.append(f"  - {v}")

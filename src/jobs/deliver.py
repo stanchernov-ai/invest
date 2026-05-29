@@ -90,10 +90,13 @@ async def run_deliver(run_id: str) -> dict:
         cos_data = debate["cos_data"]
         red_team_data = debate["red_team_data"]
         raw_board_messages = debate["raw_board_messages"]
+        raw_verdicts = debate.get("raw_verdicts") or {}
         raw_log_combined = debate["raw_log_combined"]
         unicorn_trades = debate["unicorn_trades"]
 
-        board_matrix = qa_pipeline.parse_board_matrix(raw_board_messages, all_symbols)
+        board_matrix = qa_pipeline.build_board_matrix(
+            raw_board_messages, all_symbols, raw_verdicts=raw_verdicts or None,
+        )
         matrix_md = qa_pipeline.generate_matrix_markdown(board_matrix)
 
         # --- Post-work QA ---

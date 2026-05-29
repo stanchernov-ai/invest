@@ -50,6 +50,18 @@ def reconcile_compliance(report: dict) -> dict:
     return report
 
 
+def build_board_matrix(
+    raw_board_messages: list[dict],
+    all_tickers: list[str],
+    raw_verdicts: dict | None = None,
+) -> dict:
+    """Prefer Round 2 structured JSON; fall back to markdown parse."""
+    if raw_verdicts:
+        from src.core.vote_engine import build_matrix_from_raw_verdicts
+        return build_matrix_from_raw_verdicts(raw_verdicts, all_tickers)
+    return parse_board_matrix(raw_board_messages, all_tickers)
+
+
 def parse_board_matrix(raw_messages, all_tickers):
     matrix = {ticker: {"buffett": "", "lynch": "", "livermore": "", "huang": "", "simons": ""} for ticker in all_tickers}
     agent_names = {

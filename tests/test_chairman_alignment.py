@@ -1,9 +1,9 @@
 """Tests for chairman ↔ board majority coherence (P0.2 / run 20260529_134042)."""
 import unittest
 
+from src.core.vote_engine import board_majority_buy_counts
 from src.core.chairman_alignment import (
     apply_board_and_cap_coherence,
-    board_majority_buy_counts,
     ensure_majority_symbol_rows,
     fill_majority_buys_within_cap,
     reconcile_false_max_buy_narratives,

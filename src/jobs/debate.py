@@ -59,6 +59,7 @@ async def run_debate(run_id: str) -> dict:
         raw_log_lines = [prep.get("raw_log_header", "# RAW DEBATE LOG\n\n")]
         c_data, cos_data, red_team_data = {}, {}, {}
         raw_board_messages = []
+        raw_verdicts = {}
         unicorn_trades = []
         is_approved_flag = False
         compliance_failure_detail = None
@@ -86,6 +87,8 @@ async def run_debate(run_id: str) -> dict:
                             pass
                     if "unicorn_trades" in value:
                         unicorn_trades = value["unicorn_trades"]
+                    if value.get("raw_verdicts"):
+                        raw_verdicts = value["raw_verdicts"]
                 if key == "compliance":
                     is_approved_flag = value.get("is_approved", False)
                     if is_approved_flag:
@@ -139,6 +142,7 @@ async def run_debate(run_id: str) -> dict:
             "cos_data": cos_data,
             "red_team_data": red_team_data,
             "raw_board_messages": raw_board_messages,
+            "raw_verdicts": raw_verdicts,
             "raw_log_combined": raw_log_combined,
             "unicorn_trades": unicorn_trades,
             "telemetry": telemetry,

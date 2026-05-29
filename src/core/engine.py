@@ -13,6 +13,15 @@ from src.core.schemas import (
 from src.core.data_oracle import validate_price_feed
 from src.core.guardrails import apply_chairman_guardrails
 from src.core.state_of_union import build_state_of_union_quotes
+from src.core.vote_engine import (
+    apply_conviction_scores,
+    build_chairman_skeleton,
+    build_vote_summaries,
+    can_bypass_chairman,
+    detect_sell_candidates,
+    detect_unicorn_trades,
+    format_vote_digest,
+)
 from src.core.agents import call_gemini_async, agent_config, FAST_MODEL, FLASH_TOKEN_LIMIT
 
 logger = logging.getLogger(__name__)
@@ -32,6 +41,34 @@ class StateMachineOrchestrator:
         self.oracle_reason = "Default security stance. Awaiting Oracle clearance."
         self.red_team_json = "{}"
         self.compliance_attempts: list[dict] = []
+        self.chairman_bypassed: bool = False
+
+    def _portfolio_symbols(self) -> set[str]:
+        return set((self.state.portfolio_holdings or {}).keys())
+
+    def _watchlist_symbols(self) -> set[str]:
+        universe = set(self.state.all_symbols or []) | self._portfolio_symbols()
+        return universe - self._portfolio_symbols()
+
+    def _vote_summaries(self):
+        return build_vote_summaries(
+            self.raw_verdicts,
+            self.state.all_symbols,
+            portfolio_symbols=self._portfolio_symbols(),
+        )
+
+    def _finalize_chairman(self, chairman: dict | None) -> dict | None:
+        if not chairman:
+            return None
+        chairman = apply_conviction_scores(chairman, self.raw_verdicts)
+        return apply_chairman_guardrails(
+            chairman,
+            total_portfolio_value=self.state.total_portfolio_value,
+            portfolio_holdings=self.state.portfolio_holdings,
+            purchase_dates=self.state.purchase_dates,
+            raw_verdicts=self.raw_verdicts,
+            all_symbols=self.state.all_symbols,
+        )
 
     async def _ensure_oracle_cleared(self) -> None:
         """Use prepare-phase oracle when present; otherwise run the LLM gate (legacy)."""
@@ -167,22 +204,12 @@ class StateMachineOrchestrator:
                     msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10).\n"
             self.state.messages.append({"role": "assistant", "content": msg})
 
-    async def execute_synthesis(self) -> None:
-        matrix = {t: [] for t in self.state.all_symbols}
-        sell_candidates = set()
-        
-        for agent, data in self.raw_verdicts.items():
-            if not data: continue
-            for v in data.get("portfolio_verdicts", []) + data.get("watchlist_verdicts", []):
-                sym = v.get("symbol")
-                verdict = v.get("verdict", "").upper()
-                if sym in matrix:
-                    matrix[sym].append(verdict)
-                    if "SELL" in verdict or "TRIM" in verdict:
-                        sell_candidates.add(sym)
+        self.state.raw_verdicts = dict(self.raw_verdicts)
 
-        self.state.unicorn_trades = [{"symbol": s, "verdict": v[0].title()} for s, v in matrix.items() if len(v) == 5 and len(set(v)) == 1]
-        self.state.sell_candidates = list(sell_candidates)
+    async def execute_synthesis(self) -> None:
+        summaries = self._vote_summaries()
+        self.state.unicorn_trades = detect_unicorn_trades(summaries)
+        self.state.sell_candidates = detect_sell_candidates(summaries)
         
         history = "\n\n".join([m["content"] for m in self.state.messages])
         cos_res = await self._run_agent("clerk", f"Synthesize structural friction points into JSON:\n\n{history}", schema=ChiefOfStaffSynthesis)
@@ -200,6 +227,25 @@ class StateMachineOrchestrator:
                 self.state.munger_overrides[agent_key] = json.dumps(res)
 
     async def execute_chairman_arbitration(self) -> None:
+        summaries = self._vote_summaries()
+        vote_digest = format_vote_digest(summaries, portfolio_symbols=self._portfolio_symbols())
+        portfolio_symbols = self._portfolio_symbols()
+        watchlist_symbols = self._watchlist_symbols()
+
+        if not self.state.qa_feedback and can_bypass_chairman(summaries):
+            logger.info("Chairman Pro bypass — deterministic vote mandates (actionable unanimous / no tie-break).")
+            self.chairman_bypassed = True
+            res = build_chairman_skeleton(
+                self.raw_verdicts,
+                self.state.all_symbols,
+                portfolio_symbols=portfolio_symbols,
+                watchlist_symbols=watchlist_symbols,
+            )
+            res = self._finalize_chairman(res)
+            self.state.chairman_draft_json = json.dumps(res) if res else "{}"
+            return
+
+        self.chairman_bypassed = False
         history = "\n\n".join([m["content"] for m in self.state.messages])
         munger_warning = ""
         if self.state.munger_overrides:
@@ -207,18 +253,15 @@ class StateMachineOrchestrator:
             for agent, data in self.state.munger_overrides.items():
                 munger_warning += f"--- {agent.upper()} ---\n{data}\n"
         corrections = f"\n\n[QA AMENDMENT REQUIRED]:\n{self.state.qa_feedback}" if self.state.qa_feedback else ""
-        prompt = f"Review board arguments. Apply voting logic rules. Resolve contradictions.{munger_warning}{corrections}\n\n{history}"
+        prompt = (
+            f"{vote_digest}\n\n"
+            f"Review board arguments. Apply the pre-computed vote digest — do NOT re-count votes. "
+            f"Resolve contradictions and write narratives.{munger_warning}{corrections}\n\n{history}"
+        )
         res = await self._run_agent("chairman", prompt, schema=ChairmanMasterSynthesis)
 
         if res:
-            res = apply_chairman_guardrails(
-                res,
-                total_portfolio_value=self.state.total_portfolio_value,
-                portfolio_holdings=self.state.portfolio_holdings,
-                purchase_dates=self.state.purchase_dates,
-                raw_verdicts=self.raw_verdicts,
-                all_symbols=self.state.all_symbols,
-            )
+            res = self._finalize_chairman(res)
 
         self.state.chairman_draft_json = json.dumps(res) if res else "{}"
 
@@ -253,17 +296,26 @@ class StateMachineOrchestrator:
             portfolio_symbols=portfolio_symbols,
             watchlist_symbols=universe - portfolio_symbols,
         )
+        chairman = apply_conviction_scores(chairman, self.raw_verdicts)
         self.state.chairman_draft_json = json.dumps(chairman)
 
-        deterministic_violations = audit_chairman_compliance(chairman)
+        deterministic_violations = audit_chairman_compliance(
+            chairman,
+            self.raw_verdicts,
+            all_symbols=self.state.all_symbols,
+            portfolio_symbols=portfolio_symbols,
+        )
         debate_text = format_debate_for_compliance(self.state.messages)
         digest = format_compliance_digest(deterministic_violations)
 
         prompt = (
             f"{digest}\n\n"
-            f"RAW BOARD DEBATE LOG (Round 2 votes are ground truth for majority checks):\n"
+            f"{format_vote_digest(self._vote_summaries(), portfolio_symbols=portfolio_symbols)}\n\n"
+            f"Python already verified max buys, hedge, majority alignment, originator rule, and alpha pick — "
+            f"do NOT contradict a PASS on those items.\n\n"
+            f"RAW BOARD DEBATE LOG (Round 2 votes are ground truth for funding/deathmatch checks):\n"
             f"{debate_text}\n\n"
-            f"CHAIRMAN JSON OUTPUT (audit this against the debate):\n"
+            f"CHAIRMAN JSON OUTPUT (audit deathmatch / capital flow only):\n"
             f"{self.state.chairman_draft_json}"
         )
         res = await self._run_agent("compliance", prompt, schema=ComplianceReport)
@@ -337,7 +389,11 @@ class AppWrapper:
         if not orchestrator.oracle_valid: return
             
         yield {"full_board": {"messages": final_state.messages}}
-        yield {"synthesize": {"chief_of_staff_json": final_state.chief_of_staff_json, "unicorn_trades": final_state.unicorn_trades}}
+        yield {"synthesize": {
+            "chief_of_staff_json": final_state.chief_of_staff_json,
+            "unicorn_trades": final_state.unicorn_trades,
+            "raw_verdicts": final_state.raw_verdicts,
+        }}
         
         chair_data = json.loads(final_state.chairman_draft_json) if final_state.is_approved else {}
         red_data = json.loads(orchestrator.red_team_json) if final_state.is_approved else {}

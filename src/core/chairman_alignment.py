@@ -16,6 +16,7 @@ from src.core.guardrails import (
     _prepend_override,
     count_equity_buys,
 )
+from src.core.vote_engine import board_majority_buy_counts
 
 PANEL_MAJORITY_THRESHOLD = 3  # 3 of 5 panelists
 
@@ -85,24 +86,6 @@ def ensure_majority_symbol_rows(
         chairman.setdefault(section, []).append(row)
 
     return chairman
-
-
-def board_majority_buy_counts(raw_verdicts: dict[str, dict] | None) -> dict[str, int]:
-    """Round 2 panel votes: symbol -> count of Buy/Strong Buy."""
-    counts: dict[str, int] = {}
-    if not raw_verdicts:
-        return counts
-    for agent_data in raw_verdicts.values():
-        if not agent_data:
-            continue
-        for bucket in ("portfolio_verdicts", "watchlist_verdicts"):
-            for verdict in agent_data.get(bucket) or []:
-                sym = (verdict.get("symbol") or "").strip()
-                if not sym:
-                    continue
-                if _normalize_verdict(verdict.get("verdict", "")) in BUY_VERDICTS:
-                    counts[sym] = counts.get(sym, 0) + 1
-    return counts
 
 
 def _has_system_max_buy_override(synthesis: str) -> bool:
