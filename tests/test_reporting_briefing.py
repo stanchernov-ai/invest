@@ -43,11 +43,30 @@ class BriefingCopyTests(unittest.TestCase):
 
 
 class ChartColorTests(unittest.TestCase):
+    def _channel_max(self, hex_color: str) -> int:
+        h = hex_color.lstrip("#")
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        return max(r, g, b)
+
     def test_gradual_scale_spreads_similar_positive_returns(self):
         colors = reporting.colors_for_metric([5.0, 12.0, 28.0, 41.0])
         self.assertEqual(len(colors), 4)
         self.assertNotEqual(colors[0], colors[-1])
         self.assertNotEqual(colors[1], colors[2])
+
+    def test_positive_palette_uses_dark_greens_only(self):
+        colors = reporting.colors_for_metric([5.0, 12.0, 28.0, 41.0])
+        for c in colors:
+            h = c.lstrip("#")
+            r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+            self.assertGreater(g, r)
+            self.assertGreater(g, b)
+            self.assertLessEqual(max(r, g, b), 0x66)
+
+    def test_negative_palette_uses_dark_reds_only(self):
+        colors = reporting.colors_for_metric([-41.0, -12.0, -5.0])
+        for c in colors:
+            self.assertGreaterEqual(self._channel_max(c), 0x1c)
 
     def test_diverging_scale_crosses_zero(self):
         colors = reporting.colors_for_metric([-15.0, -3.0, 4.0, 20.0])
@@ -65,6 +84,17 @@ class ChartColorTests(unittest.TestCase):
         colors = mock_url.call_args[0][0]["data"]["datasets"][0]["backgroundColor"]
         self.assertEqual(len(colors), 3)
         self.assertNotEqual(colors[0], colors[-1])
+
+    def test_bar_chart_hides_legend_and_labels_y_axis(self):
+        ledger = [
+            ("AAPL", {"Personal_Return_Pct": 10.0}),
+            ("MSFT", {"Personal_Return_Pct": -5.0}),
+        ]
+        with patch.object(reporting, "get_quickchart_short_url", return_value="https://example.com/bar.png") as mock_url:
+            reporting.build_returns_bar_chart(ledger)
+        opts = mock_url.call_args[0][0]["options"]
+        self.assertFalse(opts["plugins"]["legend"]["display"])
+        self.assertEqual(opts["scales"]["y"]["title"]["text"], "Return (%)")
 
 
 class BriefingHtmlTests(unittest.TestCase):

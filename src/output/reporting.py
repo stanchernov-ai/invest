@@ -200,36 +200,49 @@ def _lerp_hex(color_low: str, color_high: str, t: float) -> str:
     )
 
 
+# Gain/loss chart palette — dark shades only (readable on white; no light green/red).
+GAIN_GREEN_HIGH = "#166534"  # lighter of the two greens (still dark)
+GAIN_GREEN_LOW = "#052e16"   # darker green
+LOSS_RED_HIGH = "#b91c1c"    # lighter of the two reds (still saturated)
+LOSS_RED_LOW = "#450a0a"     # darker red
+CHART_LABEL_ON_SLICE = "#ffffff"
+CHART_LABEL_ON_AXIS = "#111827"
+
+
 def colors_for_metric(values: list[float]) -> list[str]:
     """Gradual colors across the slice set — min→max spread shows disparity.
 
-    Uses a diverging ramp through neutral when the range crosses zero; otherwise
-    a single hue light→dark ramp (greens for non-negative, reds for non-positive).
+    Green-only ramp for gains, red-only ramp for losses (no light tints).
+    Diverging sets use the same dark green / dark red endpoints.
     """
     if not values:
         return []
     vals = [float(v) for v in values]
     vmin, vmax = min(vals), max(vals)
     if vmin == vmax:
-        mid = "#6b7280" if vmin == 0 else (_lerp_hex("#dcfce7", "#14532d", 0.5) if vmin > 0 else _lerp_hex("#fee2e2", "#7f1d1d", 0.5))
+        if vmin == 0:
+            mid = "#6b7280"
+        elif vmin > 0:
+            mid = _lerp_hex(GAIN_GREEN_HIGH, GAIN_GREEN_LOW, 0.5)
+        else:
+            mid = _lerp_hex(LOSS_RED_HIGH, LOSS_RED_LOW, 0.5)
         return [mid for _ in vals]
 
-    neutral = "#e5e7eb"
     if vmin < 0 < vmax:
         colors = []
         for v in vals:
             if v >= 0:
                 t = v / vmax if vmax else 0.0
-                colors.append(_lerp_hex(neutral, "#14532d", t))
+                colors.append(_lerp_hex(GAIN_GREEN_HIGH, GAIN_GREEN_LOW, t))
             else:
                 t = v / vmin if vmin else 0.0
-                colors.append(_lerp_hex(neutral, "#7f1d1d", t))
+                colors.append(_lerp_hex(LOSS_RED_HIGH, LOSS_RED_LOW, t))
         return colors
 
     if vmin >= 0:
-        low, high = "#dcfce7", "#14532d"
+        low, high = GAIN_GREEN_HIGH, GAIN_GREEN_LOW
     else:
-        low, high = "#fee2e2", "#7f1d1d"
+        low, high = LOSS_RED_HIGH, LOSS_RED_LOW
     span = vmax - vmin
     return [_lerp_hex(low, high, (v - vmin) / span) for v in vals]
 
@@ -269,7 +282,12 @@ def build_portfolio_pie_chart(sorted_ledger):
         "options": {
             "plugins": {
                 "legend": {"display": False},
-                "outlabels": {"text": "%l %p", "color": "white", "stretch": 35, "font": {"resizable": True, "minSize": 12, "maxSize": 18}}
+                "outlabels": {
+                    "text": "%l %p",
+                    "color": CHART_LABEL_ON_SLICE,
+                    "stretch": 35,
+                    "font": {"resizable": True, "minSize": 11, "maxSize": 16, "weight": "bold"},
+                }
             }
         }
     }
@@ -315,9 +333,9 @@ def build_account_allocation_pie(account_holdings, account_returns):
                 "legend": {"display": False},
                 "outlabels": {
                     "text": "%l %p",
-                    "color": "white",
+                    "color": CHART_LABEL_ON_SLICE,
                     "stretch": 35,
-                    "font": {"resizable": True, "minSize": 12, "maxSize": 18}
+                    "font": {"resizable": True, "minSize": 11, "maxSize": 16, "weight": "bold"},
                 }
             }
         }
@@ -366,16 +384,28 @@ def build_returns_bar_chart(sorted_ledger):
         "type": "bar",
         "data": {
             "labels": labels,
-            "datasets": [{"label": "Unrealized Return Percentage", "data": data, "backgroundColor": colors}]
+            "datasets": [{"label": "", "data": data, "backgroundColor": colors}]
         },
         "options": {
             "plugins": {
-                "datalabels": {"display": True, "align": "end", "anchor": "end", "color": "#374151"}
+                "legend": {"display": False},
+                "datalabels": {
+                    "display": True,
+                    "align": "end",
+                    "anchor": "end",
+                    "color": CHART_LABEL_ON_SLICE,
+                    "font": {"weight": "bold"},
+                },
             },
             "scales": {
-                "y": {"beginAtZero": True}
-            }
-        }
+                "y": {
+                    "beginAtZero": True,
+                    "title": {"display": True, "text": "Return (%)", "color": CHART_LABEL_ON_AXIS},
+                    "ticks": {"color": CHART_LABEL_ON_AXIS},
+                },
+                "x": {"ticks": {"color": CHART_LABEL_ON_AXIS}},
+            },
+        },
     }
     return get_quickchart_short_url(chart_config)
 
