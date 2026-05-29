@@ -2,7 +2,9 @@
 import unittest
 
 from src.core.chairman_alignment import (
+    apply_board_and_cap_coherence,
     board_majority_buy_counts,
+    ensure_majority_symbol_rows,
     fill_majority_buys_within_cap,
     reconcile_false_max_buy_narratives,
 )
@@ -137,6 +139,27 @@ class TestChairmanAlignment(unittest.TestCase):
         )
         filtered = filter_spurious_majority_violations([violation], chairman)
         self.assertEqual(filtered, [])
+
+    def test_missing_amzn_row_gets_promoted(self):
+        """Chairman JSON omitted AMZN entirely — still reconcile to Buy under cap."""
+        chairman = {
+            "capital_flow_audit": {"target_tickers": ["META", "MNDY"], "liquidated_tickers": []},
+            "portfolio_positions": [],
+            "watchlist_positions": [
+                _pos("META", "Buy", 30),
+                _pos("MNDY", "Buy", 25),
+            ],
+        }
+        raw = _round2_raw_verdicts(3)
+        apply_board_and_cap_coherence(
+            chairman,
+            raw,
+            portfolio_symbols=set(),
+            watchlist_symbols={"META", "MNDY", "AMZN"},
+        )
+        symbols = {p["symbol"]: p["final_verdict"] for p in chairman["watchlist_positions"]}
+        self.assertEqual(symbols["AMZN"], "Buy")
+        self.assertIn("AMZN", chairman["capital_flow_audit"]["target_tickers"])
 
     def test_merge_filters_when_chairman_passed(self):
         chairman = {

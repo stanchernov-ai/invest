@@ -217,6 +217,7 @@ class StateMachineOrchestrator:
                 portfolio_holdings=self.state.portfolio_holdings,
                 purchase_dates=self.state.purchase_dates,
                 raw_verdicts=self.raw_verdicts,
+                all_symbols=self.state.all_symbols,
             )
 
         self.state.chairman_draft_json = json.dumps(res) if res else "{}"
@@ -241,6 +242,18 @@ class StateMachineOrchestrator:
             self.state.is_approved = False
             self.state.qa_feedback = "Chairman output is not valid JSON."
             return
+
+        from src.core.chairman_alignment import apply_board_and_cap_coherence
+
+        portfolio_symbols = set((self.state.portfolio_holdings or {}).keys())
+        universe = set(self.state.all_symbols or []) | portfolio_symbols
+        apply_board_and_cap_coherence(
+            chairman,
+            self.raw_verdicts,
+            portfolio_symbols=portfolio_symbols,
+            watchlist_symbols=universe - portfolio_symbols,
+        )
+        self.state.chairman_draft_json = json.dumps(chairman)
 
         deterministic_violations = audit_chairman_compliance(chairman)
         debate_text = format_debate_for_compliance(self.state.messages)

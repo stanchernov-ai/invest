@@ -26,6 +26,67 @@ _FALSE_MAX_BUY_PATTERNS = re.compile(
 )
 
 
+def _symbol_in_chairman(chairman: dict, symbol: str) -> bool:
+    sym = (symbol or "").upper()
+    for section in ("portfolio_positions", "watchlist_positions"):
+        for pos in chairman.get(section) or []:
+            if (pos.get("symbol") or "").upper() == sym:
+                return True
+    return False
+
+
+def _minimal_watchlist_position(symbol: str) -> dict:
+    return {
+        "symbol": symbol,
+        "final_verdict": "Pass",
+        "synthesis": "Position row added for board-majority reconciliation.",
+        "narrative": {
+            "champion": "Board",
+            "champion_quote": "Majority Buy mandate from Round 2 panel votes.",
+            "dissenter": "None",
+            "dissenter_quote": "N/A",
+        },
+        "supporting_members": [],
+        "aggregate_conviction_score": 0,
+    }
+
+
+def ensure_majority_symbol_rows(
+    chairman: dict,
+    raw_verdicts: dict[str, dict] | None,
+    *,
+    portfolio_symbols: set[str] | None = None,
+    watchlist_symbols: set[str] | None = None,
+) -> dict:
+    """Ensure chairman JSON includes rows for board-majority symbols (chairman sometimes omits them)."""
+    if not raw_verdicts:
+        return chairman
+
+    portfolio_symbols = portfolio_symbols or set()
+    watchlist_symbols = watchlist_symbols or set()
+    majority_counts = board_majority_buy_counts(raw_verdicts)
+
+    for symbol, votes in majority_counts.items():
+        if votes < PANEL_MAJORITY_THRESHOLD or _symbol_in_chairman(chairman, symbol):
+            continue
+        if symbol in portfolio_symbols:
+            section = "portfolio_positions"
+            row = {
+                "symbol": symbol,
+                "final_verdict": "Hold",
+                "synthesis": "Position row added for board-majority reconciliation.",
+                "narrative": _minimal_watchlist_position(symbol)["narrative"],
+                "supporting_members": [],
+                "aggregate_conviction_score": 0,
+            }
+        else:
+            section = "watchlist_positions"
+            row = _minimal_watchlist_position(symbol)
+        chairman.setdefault(section, []).append(row)
+
+    return chairman
+
+
 def board_majority_buy_counts(raw_verdicts: dict[str, dict] | None) -> dict[str, int]:
     """Round 2 panel votes: symbol -> count of Buy/Strong Buy."""
     counts: dict[str, int] = {}
@@ -135,9 +196,18 @@ def fill_majority_buys_within_cap(chairman: dict, raw_verdicts: dict[str, dict] 
 def apply_board_and_cap_coherence(
     chairman: dict,
     raw_verdicts: dict[str, dict] | None = None,
+    *,
+    portfolio_symbols: set[str] | None = None,
+    watchlist_symbols: set[str] | None = None,
 ) -> dict:
     """Run after enforce_max_buys / before wash-sale and liquidation cap."""
     if raw_verdicts:
+        ensure_majority_symbol_rows(
+            chairman,
+            raw_verdicts,
+            portfolio_symbols=portfolio_symbols,
+            watchlist_symbols=watchlist_symbols,
+        )
         fill_majority_buys_within_cap(chairman, raw_verdicts)
     reconcile_false_max_buy_narratives(chairman)
     return chairman

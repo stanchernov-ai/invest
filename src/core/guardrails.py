@@ -224,13 +224,22 @@ def apply_chairman_guardrails(
     purchase_dates: dict[str, str] | None = None,
     ref: datetime | None = None,
     raw_verdicts: dict[str, dict] | None = None,
+    all_symbols: list[str] | None = None,
 ) -> dict:
     """Apply all P0 chairman guardrails in deterministic order."""
     from src.core.chairman_alignment import apply_board_and_cap_coherence
 
     result = deepcopy(chairman)
     enforce_max_buys(result)
-    apply_board_and_cap_coherence(result, raw_verdicts)
+    portfolio_symbols = set((portfolio_holdings or {}).keys())
+    universe = set(all_symbols or []) | portfolio_symbols
+    watchlist_symbols = universe - portfolio_symbols
+    apply_board_and_cap_coherence(
+        result,
+        raw_verdicts,
+        portfolio_symbols=portfolio_symbols,
+        watchlist_symbols=watchlist_symbols,
+    )
     enforce_wash_sale(result, purchase_dates or {}, ref=ref)
     enforce_liquidation_cap(
         result,
