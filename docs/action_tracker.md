@@ -29,6 +29,7 @@ This document tracks identified bugs, architectural improvements, and long-term 
 | Area | Detail |
 |------|--------|
 | **Commit** | `e39b337` — human QA review endpoint + deliver integration (deployed to Azure) |
+| **Docs** | `0e7a31e` — session handoff, playbook Azure gotchas, `agent_architecture` human-review config |
 | **Prior commits** | Oracle dedup + deterministic Python (`data_oracle.py`); visual/integrity golden fixtures; QA scorecard; `docs/agent_architecture.md` SSOT |
 | **Data Oracle** | 🟢 Python price gate in prepare only; debate reuses checkpoint (no duplicate LLM) |
 | **Visual QA** | `src/qa/visual_audit.py` + `tests/fixtures/visual_qa/` |
