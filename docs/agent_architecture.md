@@ -63,7 +63,7 @@ flowchart TB
         SUP --> STATE
     end
 
-    subgraph PROD["Production Plane — weekdays ~11:00 UTC"]
+    subgraph PROD["Production Plane — 6:00 AM WEBSITE_TIME_ZONE"]
         TIMER[Azure Timer]
         PREP[Job 1: PREPARE]
         DEB[Job 2: DEBATE]
@@ -74,7 +74,7 @@ flowchart TB
         PREP & DEB & DEL --> BLOB
     end
 
-    subgraph WEEKLY["Standing QA Plane — weekdays 11:30 UTC"]
+    subgraph WEEKLY["Standing QA Plane — 7:00 AM WEBSITE_TIME_ZONE"]
         QAR[qa_review.py — 7 roles + HR]
         QAR --> BLOB
     end
@@ -195,7 +195,7 @@ flowchart LR
 
 ### 3.4 Weekly standing QA (`src/qa_review.py`)
 
-Runs **30 min after** the daily pipeline (11:30 UTC weekdays). **7 LLM roles + HR:**
+Runs **1 hour after** the daily pipeline timer (`0 0 7 * * *` vs `0 0 6 * * *` in `WEBSITE_TIME_ZONE`, default `America/Los_Angeles`). **7 LLM roles + HR:**
 
 | Key | Role |
 |-----|------|

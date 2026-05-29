@@ -9,10 +9,8 @@ Whenever you start a new conversation or session, your VERY FIRST action should 
 
 For the full doc map (which file to read or update), see `docs/DOCUMENTATION.md`.
 
-This file acts as the central source of truth for the project, tracking:
-- Completed work
-- Ongoing bugs
-- High, Medium, and Low priority backlog items
-- Architectural decisions
+**Read only the top:** Session Handoff + Open items (~50 lines). Do not read the full file unless investigating history.
 
-By reading this file, you will seamlessly pick up the context from previous conversations and avoid losing progress.
+**When editing this file:** follow `docs/doc_hygiene.md` — one Session Handoff, no Phase 0–6 specs, no doc index tables, no long DONE narratives. Archive old handoffs to `docs/archive/`.
+
+This file tracks current pickup and prioritized backlog only. Historical detail: `docs/archive/implementation_log_2026-05.md`.

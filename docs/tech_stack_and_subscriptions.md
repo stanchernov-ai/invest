@@ -31,14 +31,14 @@
 ## Architecture map (what runs where)
 
 ```
-[Timer: weekdays 11:00 UTC]  Azure Function (Flex Consumption)
+[Timer: 6:00 AM daily in WEBSITE_TIME_ZONE]  Azure Function (Flex Consumption) — `function_app.py` `0 0 6 * * *`
     ├── Sync inputs/state from Blob (boardroom-inputs, boardroom-state)
     ├── FMP API ── prices, news, macro, momentum
     ├── Gemini API ── 15+ agents (board debate, chairman, QA, graphics, integrity…)
     ├── QuickChart ── briefing charts
     └── Blob reports + Gmail SMTP ── executive briefing + QA dashboard
 
-[Timer: weekdays 11:30 UTC]  QA & Cost Review Team (qa_review.py)
+[Timer: 7:00 AM daily in WEBSITE_TIME_ZONE]  QA & Cost Review Team (qa_review.py) — `0 0 7 * * *`
     └── Gemini API ── weekly-style digest reviewers + HR Efficiency (from telemetry)
 
 [GitHub Actions]  OIDC deploy → app-boardroom-prod on push to main

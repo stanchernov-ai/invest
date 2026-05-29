@@ -1,7 +1,7 @@
 # Documentation Index
 
 **Status:** Active  
-**Last updated:** May 29, 2026 (briefing charts handoff)  
+**Last updated:** May 29, 2026 (doc hygiene + archive)  
 **SSOT for:** which document to read or update — agents should start here when unsure where something lives.
 
 **Do not duplicate** content from the docs below into this file. Link only.
@@ -42,7 +42,9 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 
 | Document | SSOT for |
 |----------|----------|
-| [`action_tracker.md`](action_tracker.md) | Backlog, Session Handoff, shipped work |
+| [`action_tracker.md`](action_tracker.md) | **Live** backlog + Session Handoff only (≤ ~200 lines) |
+| [`doc_hygiene.md`](doc_hygiene.md) | How to trim tracker, archive handoffs, agent doc rules |
+| [`archive/`](archive/) | Read-only May 2026 implementation log + old handoffs |
 | [`post_deliver_checklist.md`](post_deliver_checklist.md) | After each deliver run — validation + backlog hygiene |
 | [`engineering_playbook.md`](engineering_playbook.md) | Rejected approaches and gotchas |
 
@@ -117,5 +119,6 @@ Persona rule files: `refactoring_agent.mdc`, `qa_validation_agent.mdc`, `api_opt
 | Pipeline phase or checkpoint shape | `agent_architecture.md`, `technical_solution.md` |
 | Vote engine / compliance Python checks | `technical_solution.md` §2.2, `agent_architecture.md` §6, `tests/test_vote_engine.py` |
 | Briefing charts / QuickChart config | [`briefing_charts_handoff.md`](briefing_charts_handoff.md) + `tests/test_reporting_briefing.py` |
-| New doc file | **This index** + `action_tracker.md` Documentation index |
-| Shipped work / new priority | `action_tracker.md` Session Handoff |
+| New doc file | **This index** only (do not add doc tables to action_tracker) |
+| Shipped work / new priority | `action_tracker.md` Session Handoff — per `doc_hygiene.md` |
+| Tracker exceeds ~200 lines | Archive to `docs/archive/` per `doc_hygiene.md` |

@@ -11,6 +11,7 @@
 4. When adding or removing agents, update `docs/agent_architecture.md`.
 5. Unsure which doc to read or update? See `docs/DOCUMENTATION.md` (master index).
 6. Production agent roster and QA diagrams: `docs/agent_architecture.md` — not duplicated here.
+7. Keep `docs/action_tracker.md` lean (~200 lines max): one Session Handoff, open backlog only — see `docs/doc_hygiene.md`. History → `docs/archive/`.
 **Do not** treat terminal scrollback as state. Log durable findings to the state files in Section 3.
 
 ## 0.5 Collaboration Protocol

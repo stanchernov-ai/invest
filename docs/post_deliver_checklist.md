@@ -110,12 +110,14 @@ Edit `docs/action_tracker.md` → **Session Handoff → Open items**:
 | **P1** | Short title — one-line fix scope. evidence: qa_reports_{run_id}.json |
 ```
 
-Rules:
+Rules (full hygiene: [`doc_hygiene.md`](doc_hygiene.md)):
 
+- **Replace** the single Session Handoff block — do not add a second handoff section
 - One item per distinct problem (dedupe the retrospective list)
-- Mark items **DONE** with commit hash when shipped
+- Mark shipped work in **Recently shipped** (one line); remove from Open items
+- **Do not** add Phase-style implementation specs or duplicate the doc index
+- Gotchas → [`engineering_playbook.md`](engineering_playbook.md); old handoffs → [`archive/`](archive/)
 - Add `regression_test:` or `fixture:` note when a golden test covers it
-- Move stale items to done or delete with reason
 
 ---
 

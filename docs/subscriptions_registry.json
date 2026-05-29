@@ -204,8 +204,8 @@
     }
   ],
   "run_cadence": {
-    "boardroom_pipeline": "Weekdays 11:00 UTC (Mon-Fri)",
-    "qa_review_team": "Weekdays 11:30 UTC (Mon-Fri)",
+    "boardroom_pipeline": "Daily 6:00 AM in WEBSITE_TIME_ZONE (function_app 0 0 6 * * *)",
+    "qa_review_team": "Daily 7:00 AM in WEBSITE_TIME_ZONE (function_app 0 0 7 * * *)",
     "estimated_runs_per_month": 22
   },
   "future_automation": [
