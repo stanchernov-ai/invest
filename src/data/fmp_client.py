@@ -79,6 +79,36 @@ async def fetch_momentum_trend(symbol: str, api_key: str, session: aiohttp.Clien
         }
     return trend
 
+async def fetch_3y_cagr(symbol: str, api_key: str, session: aiohttp.ClientSession, telemetry: dict = None) -> float:
+    end_date = datetime.datetime.today()
+    start_date = end_date - datetime.timedelta(days=1095)
+    start_str = start_date.strftime("%Y" + dash + "%m" + dash + "%d")
+    end_str = end_date.strftime("%Y" + dash + "%m" + dash + "%d")
+    url = f"https://financialmodelingprep.com/stable/historical-price-eod/light?symbol={symbol}&from={start_str}&to={end_str}&apikey={api_key}"
+
+    cagr = 'N/A'
+    try:
+        data = await fetch_json_endpoint(session, url)
+        prices = [d.get("price") for d in data if isinstance(d, dict) and d.get("price") is not None]
+        if len(prices) >= 2:
+            end_price = float(prices[0])
+            start_price = float(prices[~0])
+            if start_price > 0:
+                cagr_val = ((end_price / start_price) ** (1/3)) - 1
+                cagr = round(cagr_val * 100, 2)
+    except Exception:
+        logger.warning(f"FMP 3Y CAGR fetch failed for {symbol}")
+        cagr = 'N/A'
+
+    if telemetry is not None:
+        if symbol not in telemetry: telemetry[symbol] = {}
+        telemetry[symbol]["3y_cagr"] = {
+            "source": "fmp_stable_eod_light",
+            "url": url.replace(api_key, "REDACTED"),
+            "response": cagr,
+        }
+    return cagr
+
 async def fetch_price_series(symbol: str, api_key: str, session: aiohttp.ClientSession, start_str: str, end_str: str) -> dict:
     # Daily EOD closes for [start, end] from FMP's stable light endpoint (the same
     # feed used for momentum). Returns {"YYYY-MM-DD": close_price}. Empty on failure
@@ -142,7 +172,10 @@ async def get_fmp_advanced_metrics(symbol: str, api_key: str, session: aiohttp.C
         is_etf = yf_info.get("quoteType", "") == "ETF"
         beta = safe_float(yf_info.get('beta'))
 
-    trend_3m = await fetch_momentum_trend(symbol, api_key, session, telemetry_ledger)
+    trend_3m, cagr_3y = await asyncio.gather(
+        fetch_momentum_trend(symbol, api_key, session, telemetry_ledger),
+        fetch_3y_cagr(symbol, api_key, session, telemetry_ledger)
+    )
 
     if is_etf:
         quote_url = f"{base_url}/quote?symbol={symbol}&apikey={api_key}"
@@ -159,7 +192,7 @@ async def get_fmp_advanced_metrics(symbol: str, api_key: str, session: aiohttp.C
 
         return {
             "beta": beta, "peg": "N/A", "ps": "N/A", "de": "N/A", "fwd_pe": "N/A", 
-            "3m_trend": trend_3m, "3y_cagr": "N/A", "rev_growth": "N/A", "eps_growth": "N/A",
+            "3m_trend": trend_3m, "3y_cagr": cagr_3y, "rev_growth": "N/A", "eps_growth": "N/A",
             "current_price": current_price, "consensus": "N/A", "price_target": "N/A", 
             "next_earnings": "Unknown", "fcs_score": 0, "fcs_rationale": "ETF Structural Exemption."
         }
@@ -275,7 +308,7 @@ async def get_fmp_advanced_metrics(symbol: str, api_key: str, session: aiohttp.C
         
         return {
             "beta": beta, "peg": peg, "ps": ps, "de": de, "fwd_pe": fwd_pe, 
-            "3m_trend": trend_3m, "3y_cagr": "N/A", "rev_growth": rev_growth, "eps_growth": eps_growth,
+            "3m_trend": trend_3m, "3y_cagr": cagr_3y, "rev_growth": rev_growth, "eps_growth": eps_growth,
             "current_price": current_price, "consensus": consensus, "price_target": price_target, 
             "next_earnings": next_earnings, "fcs_score": fcs_score, "fcs_rationale": fcs_rationale
         }

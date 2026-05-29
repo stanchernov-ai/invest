@@ -278,7 +278,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             <div class="metric-box">
                 <strong>Portfolio Value:</strong> {{ total_val }}<br>
                 <strong>3M Trend — Portfolio:</strong> {{ portfolio_3m_trend }} &nbsp;|&nbsp; <strong>QQQ:</strong> {{ qqq_trend }}<br>
-                <strong>Investment Mandate:</strong> {{ mandate }}
+                <strong>Current CAGR:</strong> {{ cagr_text }} &nbsp;|&nbsp; <strong>Projected Balance (Age 65):</strong> {{ proj_text }}
             </div>
 
             {% if returns_rows %}
@@ -492,12 +492,18 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     
     hedge_action = chairman_data.get('capital_allocation_narrative', '') if 'hedge' in chairman_data.get('capital_allocation_narrative', '').lower() else ''
 
+    cagr_match = re.search(r"CAGR of ([\d\.]+ percent)", mandate)
+    proj_match = re.search(r"projected balance at age 65 is (\$[\d\.,]+)", mandate)
+    cagr_text = cagr_match.group(1) if cagr_match else "N/A"
+    proj_text = proj_match.group(1) if proj_match else "N/A"
+
     template = Template(html_template)
     rendered_html = template.render(
         total_val=fmt_dol(total_val),
         qqq_trend=fmt(qqq_trend),
         portfolio_3m_trend=fmt(portfolio_3m_trend),
-        mandate=mandate,
+        cagr_text=cagr_text,
+        proj_text=proj_text,
         sotu_quotes=sotu_quotes,
         brawl_text=brawl_text,
         unicorn_trades_grouped=unicorn_trades_grouped,

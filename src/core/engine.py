@@ -186,12 +186,20 @@ class StateMachineOrchestrator:
         roster = ["buffett", "huang", "lynch"]
         prompt = f"Concentration warning for: {self.state.heavy_tickers}. Validate structural health."
         tasks = [self._run_agent(a, prompt, schema=PanelistPortfolioVerdict) for a in roster]
-        await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks)
+        for agent_key, res in zip(roster, results):
+            if res:
+                self.state.munger_overrides[agent_key] = json.dumps(res)
 
     async def execute_chairman_arbitration(self) -> None:
         history = "\n\n".join([m["content"] for m in self.state.messages])
+        munger_warning = ""
+        if self.state.munger_overrides:
+            munger_warning = "\n\n[CRITICAL MUNGER AUDIT CONCENTRATION WARNINGS]:\n"
+            for agent, data in self.state.munger_overrides.items():
+                munger_warning += f"--- {agent.upper()} ---\n{data}\n"
         corrections = f"\n\n[QA AMENDMENT REQUIRED]:\n{self.state.qa_feedback}" if self.state.qa_feedback else ""
-        prompt = f"Review board arguments. Apply voting logic rules. Resolve contradictions.{corrections}\n\n{history}"
+        prompt = f"Review board arguments. Apply voting logic rules. Resolve contradictions.{munger_warning}{corrections}\n\n{history}"
         res = await self._run_agent("chairman", prompt, schema=ChairmanMasterSynthesis)
         self.state.chairman_draft_json = json.dumps(res) if res else "{}"
 

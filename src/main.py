@@ -365,6 +365,8 @@ async def main_batch():
         storage_client.save_report(f"raw_debate_log_{file_timestamp}.md", raw_log_combined)
         
         notifier.send_executive_briefing(html_payload)
+        notifier.send_qa_dashboard(qa_dashboard_html)
+        
         run_outcome = "success"
         run_status["briefing_blob"] = f"executive_briefing_{file_timestamp}.html"
         run_status["qa_blob"] = f"qa_dashboard_{file_timestamp}.html"
