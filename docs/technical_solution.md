@@ -1,7 +1,7 @@
 # SC Invest Boardroom — Technical Solution
 
-**Document version:** 1.1  
-**Last updated:** May 29, 2026  
+**Document version:** 1.2  
+**Last updated:** May 29, 2026 (vote_engine Phase A)  
 **Repository:** `sc-invest-boardroom`
 
 ---
@@ -80,6 +80,10 @@ flowchart TB
 | `src/verdict_memory.py` | Cross-run `board_verdicts.json` — Pass cooldown after compliant deliver |
 | `src/storage_client.py` | Azure Blob sync, checkpoints, report upload, 14-day retention |
 | `src/core/engine.py` | State-machine debate pipeline (`StateMachineOrchestrator`, `AppWrapper`) |
+| `src/core/vote_engine.py` | Round 2 vote SSOT, VOTE_DIGEST, chairman bypass, conviction scores |
+| `src/core/guardrails.py` | Chairman financial limits (max 3, 10% cap, wash-sale) |
+| `src/core/chairman_alignment.py` | Board ↔ chairman majority coherence |
+| `src/core/compliance_audit.py` | Deterministic in-loop compliance gate |
 | `src/core/agents.py` | Agent personas, Gemini client, async API wrapper with semaphore |
 | `src/core/schemas.py` | Pydantic contracts for structured agent I/O and dynamic mandate |
 | `src/config/settings.py` | Environment validation (FMP, Azure, email) |
@@ -215,16 +219,27 @@ flowchart TD
 | **Data Oracle** | Pre-Flight Data Oracle (Flash) | Sequential gate | `is_valid` — fails run only on **$0.00** current price |
 | **Round 1** | Buffett, Lynch, Livermore, Huang, Simons | `asyncio.gather` | Narrative messages appended to `state.messages` |
 | **Round 2** | Same five panelists | `asyncio.gather` | `raw_verdicts` + rebuttal messages; structured `PanelistPortfolioVerdict` |
-| **Synthesis** | Clerk (Dalio persona, Flash) | Sequential | `chief_of_staff_json`; detects **unicorn trades** (all 5 panelists identical verdict) and **sell candidates** |
+| **Synthesis** | Clerk (Dalio persona, Flash) + Python | Sequential | `chief_of_staff_json`; **unicorn/sell detection via `vote_engine`** |
 | **Munger audit** | Buffett, Huang, Lynch | `asyncio.gather` (optional) | Extra concentration review; results not merged into chairman state today |
-| **Chairman loop** | Chairman (Druckenmiller, Pro) | Up to 3 iterations with Compliance | `chairman_draft_json` (`ChairmanMasterSynthesis`) |
-| **Compliance** | Markopolos persona (Flash) | Per iteration | `is_approved`, `qa_feedback` for chairman retry |
+| **Chairman loop** | Chairman (Druckenmiller, Pro) **or Python bypass** | Up to 3 iterations with Compliance | `chairman_draft_json`; **`can_bypass_chairman()`** skips Pro on unanimous actionable days |
+| **Post-chairman Python** | `guardrails` + `chairman_alignment` + `vote_engine.apply_conviction_scores` | After each chairman call | Max 3, 10% cap, wash-sale, majority-buy promotion, conviction sums |
+| **Compliance** | Python pre-check + Markopolos (Pro) | Per iteration | Python: max buys, hedge, majority, originator, alpha; LLM: deathmatch/funding |
 | **Red Team** | Adversarial Red Teamer (Pro) | Only if approved | `bear_case_narrative` using live headlines |
 | **Post-flight QA** | Post Mortem, Systems Architect, Prompt Engineer | Outside engine, in `main_batch` | Markdown QA report (non-blocking for email) |
 
 **Chairman ↔ Compliance feedback loop**
 
-The chairman must satisfy procedural rules encoded in prompts and validated by compliance:
+Procedural rules are enforced **deterministically in Python first**, then narrated/audited by LLMs:
+
+| Rule | Enforced by |
+|------|-------------|
+| Vote tallies / majority / unanimous | `src/core/vote_engine.py` → `VOTE_DIGEST` in prompts |
+| Max 3 buys, 10% liquidation cap, wash-sale | `src/core/guardrails.py` |
+| Board majority buy promotion | `src/core/chairman_alignment.py` |
+| Majority alignment, originator, alpha pick, hedge in JSON | `src/core/compliance_audit.py` |
+| Deathmatch / funding coherence | Compliance LLM (Markopolos) — advisory merge |
+
+Chairman must still satisfy (via Python + optional LLM audit):
 
 - Democratic majority on executed buys (max 3).
 - 10% portfolio liquidation cap for funding purchases (fractional trims allowed).
@@ -233,7 +248,9 @@ The chairman must satisfy procedural rules encoded in prompts and validated by c
 - Wash-sale: no sell within 30 days of purchase date in context.
 - Alpha pick must have majority board support.
 
-If compliance fails, `qa_feedback` is injected into the next chairman prompt; after three attempts the pipeline ends without approval (no email briefing).
+If compliance fails, `qa_feedback` is injected into the next chairman prompt (with fresh `VOTE_DIGEST`); after three attempts the pipeline ends without approval (no email briefing).
+
+**Chairman bypass:** When `can_bypass_chairman()` is true (all symbols vote-deterministic; actionable Buy/Reduce are 5/5 unanimous), `build_chairman_skeleton()` replaces the Pro call. Template narratives only — rich prose requires a non-bypass day.
 
 **Streaming interface (`AppWrapper.astream`)**
 
@@ -241,7 +258,7 @@ Yields keyed stages for observability:
 
 1. `oracle` — validity + reason  
 2. `full_board` — accumulated debate messages (if oracle passed)  
-3. `synthesize` — clerk JSON + unicorn trades  
+3. `synthesize` — clerk JSON + unicorn trades + **`raw_verdicts`**
 4. `compliance` — approval flag, chairman JSON, red team JSON  
 
 `main_batch` consumes this stream to build the raw debate log and final artifacts.
@@ -256,9 +273,9 @@ Yields keyed stages for observability:
 | `huang` | Jensen Huang | Pro | Accelerated compute / full-stack moat lens |
 | `simons` | Jim Simons | Pro | Quant/Kelly sizing; refuses trade on null data |
 | `clerk` | Ray Dalio (Chief of Staff) | Flash | Debate synthesis, State of the Union quotes |
-| `chairman` | Stanley Druckenmiller | Pro | Final allocations, capital math scratchpad |
+| `chairman` | Stanley Druckenmiller | Pro | Final allocations; uses pre-computed **VOTE_DIGEST** (does not re-count votes) |
 | `data_oracle` | Pre-Flight Data Oracle | — (Python) | 🟢 Kill switch on zero prices — `src/core/data_oracle.py`; once in prepare, not LLM |
-| `compliance` | Harry Markopolos | Flash | Forensic audit of chairman vs board |
+| `compliance` | Harry Markopolos | Pro | Deathmatch/funding audit; Python pre-check is authoritative for vote alignment |
 | `red_teamer` | Adversarial Red Teamer | Pro | Bear case from headlines (isolated from debate) |
 | `post_mortem_qa` | Post Mortem QA Auditor | Pro | Post-run procedural audit |
 | `system_architect` | Systems Architect QA | Flash | Pipeline/JSON technical audit |
@@ -418,6 +435,7 @@ Email subject: `SC Invest: Executive Boardroom Briefing - {date}`.
 1. **Defense in depth against bad outputs**
    - Data Oracle ($0 price gate) before expensive debate.
    - FMP batch abort on any ticker failure.
+   - **`vote_engine`** — Round 2 vote SSOT; Python compliance before Markopolos LLM.
    - Compliance loop with explicit chairman feedback.
    - Red team isolated from panel echo chamber.
    - Post-flight QA trio for procedural, systems, and prompt drift review.
@@ -460,7 +478,8 @@ Email subject: `SC Invest: Executive Boardroom Briefing - {date}`.
 | **Hard-coded `/tmp` paths** | ~~Awkward for local Windows dev.~~ | **Done** — `BOARDROOM_DATA_DIR` / `BOARDROOM_OUTPUT_DIR` in `settings.py`. |
 | **Scout price placeholder** | Scout writes `price: 0.0`; FMP fills before oracle. | Fail fast in scout if FMP unavailable before oracle (optional). |
 | **No workflow framework** | Custom state machine is readable but lacks checkpoint/resume, visual debugging, or per-step metrics. | Acceptable at current scale; consider LangGraph or durable functions if steps multiply. |
-| **Chairman loop cost** | Up to 3× (chairman + compliance) full Pro/Flash calls on rejection. | Cache board verdicts; tighten compliance schema to reduce rework. |
+| **Chairman loop cost** | Up to 3× (chairman + compliance) on rejection; bypass skips Pro on unanimous actionable days. | Monitor `AGENT_ACTIVITY`; tune deathmatch Python ranking (Phase B). |
+| **Briefing chart readability** | Graphics QA CRITICAL on pie charts (`144833`) — green-on-green labels. | Fix QuickChart palette in `reporting.py`; golden fixture. |
 | **Email as sole alert channel** | No Slack/webhook on oracle abort or compliance failure. | Optional failure notification path. |
 | **10-minute function timeout** | Large portfolios × many FMP calls × multi-round Gemini may approach limit on bad network days. | Monitor telemetry duration; shard FMP or reduce watchlist size. |
 
@@ -495,6 +514,9 @@ The metaphor layer (Buffett, Livermore, etc.) is not decorative: prompts encode 
 ## Appendix C — Key File References
 
 - Orchestrator entry: `src/core/engine.py` — `StateMachineOrchestrator`, `AppWrapper`
+- Vote engine: `src/core/vote_engine.py` — `build_vote_summaries`, `format_vote_digest`, `can_bypass_chairman`
+- Chairman guardrails: `src/core/guardrails.py`, `src/core/chairman_alignment.py`
+- Compliance gate: `src/core/compliance_audit.py` — `audit_chairman_compliance`
 - Agent registry: `src/core/agents.py` — `agent_config`, `call_gemini_async`
 - Batch entry: `src/main.py` — `orchestrate.run_all()`; production: `function_app.py` queue chain
 - Post-flight QA: `src/qa_pipeline.py` + `src/jobs/deliver.py`

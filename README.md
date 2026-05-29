@@ -30,7 +30,7 @@ Secrets: copy `.env` from your vault (see `src/config/settings.py` for required 
 |------|------|
 | `function_app.py` | Azure timers + queue chain |
 | `src/jobs/` | `prepare` → `debate` → `deliver` |
-| `src/core/` | Engine, agents, schemas, guardrails |
+| `src/core/` | Engine, agents, schemas, **`vote_engine`**, guardrails, compliance |
 | `src/qa/` | Deterministic QA + human review UI |
 | `src/qa_pipeline.py` | Per-run LLM post-flight QA |
 | `docs/` | Human SSOT documentation |

@@ -1,6 +1,6 @@
 # QA Layers — Quick Map
 
-**Status:** Active · **Last updated:** May 29, 2026  
+**Status:** Active · **Last updated:** May 29, 2026 (vote_engine)  
 **SSOT for:** which QA module does what — **not** full layer diagrams (see [`agent_architecture.md`](agent_architecture.md) §6).
 
 ---
@@ -91,12 +91,17 @@ Overlap is intentional but confusing — consolidation is backlog (see `agent_ar
 
 ## Debate-phase audit (before deliver QA)
 
-| Agent | Module | When |
+| Layer | Module | When |
 |-------|--------|------|
-| **compliance** (Markopolos) | `src/core/engine.py` | During debate — chairman vs board |
-| **guardrails** | `src/core/guardrails.py` | 🟢 Python — max 3 buys, 10% cap, wash-sale |
+| **vote_engine** | `src/core/vote_engine.py` | After Round 2 — tallies, digest, optional chairman bypass |
+| **guardrails + alignment** | `guardrails.py`, `chairman_alignment.py` | After chairman — max 3, 10% cap, wash-sale, majority buys |
+| **compliance (Python)** | `compliance_audit.py` | Before Markopolos — majority, originator, alpha, hedge |
+| **compliance (LLM)** | Markopolos in `engine.py` | Deathmatch / funding — merged with Python violations |
+| **debate checkpoint** | `debate.json` | Includes `raw_verdicts` (structured Round 2 JSON) |
 
-Failed compliance → no chairman checkpoint → **deliver never runs** → no post-flight QA for that run.
+Failed compliance → no approved debate → **deliver never runs** → no post-flight QA for that run.
+
+**Symptom → start here:** chairman retry loop → check `VOTE_DIGEST` in raw log + `compliance_failure_{run_id}.json` in state container.
 
 ---
 

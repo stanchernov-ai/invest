@@ -1,79 +1,105 @@
 # SC Invest Boardroom — Action Tracker
 
 **Status:** Active  
-**Last Updated:** May 29, 2026  
+**Last Updated:** May 29, 2026 (EOD — vote_engine Phase A validated on `144833`)  
 
 This document tracks identified bugs, architectural improvements, and long-term backlog items for the SC Invest Boardroom pipeline. Items are broken down into manageable blocks with specific implementation details.
 
 ---
 
-## Session Handoff — May 29, 2026 (architecture cleanup — pick up here)
+## Session Handoff — May 29, 2026 (vote_engine Phase A — **pick up here**)
 
-> **Stan — start here next session.** Deploy double-run guard + verdict-memory implicit-Pass fix. Re-run deliver persistence validation on next compliant run (120049 missed Pass writes — chairman omits non-actionable rows).
+> **Next developer — start here.** Phase A shipped and validated on production run **`20260529_144833`**. Verdict memory, per-run status, and vote math decoupling are live on `main` (`6107539`).
 
-### Shipped (this session — pending deploy)
+### Shipped & validated (May 29, 2026)
 
-| Area | Detail |
-|------|--------|
-| **Double-run guard** | `boardroom_prepare_http` → 409 JSON `{run_id, phase}` when `is_run_in_flight()` |
-| **Per-run status** | `run_status_{run_id}.json` + `run_status_current.json` pointer; `mark_phase` no longer clobbers overlapping runs |
-| **Verdict memory fix** | Implicit Pass for watchlist symbols not assigned Buy/Strong Buy (120049 had 0 Pass rows in chairman JSON) |
+| Area | Commit / run | Detail |
+|------|----------------|--------|
+| **Phase A — `vote_engine`** | `6107539` | `src/core/vote_engine.py` — SSOT for Round 2 vote tallies, `VOTE_DIGEST`, chairman bypass on unanimous actionable Buy/Reduce, `apply_conviction_scores()` |
+| **Python compliance expansion** | `6107539` | `compliance_audit.py` — majority alignment, originator rule, alpha pick (checklist A/D/E) before Markopolos LLM |
+| **`raw_verdicts` in checkpoint** | `6107539` | `debate.json` persists structured panel JSON; deliver matrix uses JSON not markdown parse |
+| **Double-run guard** | prior | `boardroom_prepare_http` → 409 when `is_run_in_flight()` |
+| **Per-run status** | prior | `run_status_{run_id}.json` — phased prepare/debate/deliver (no `prepare: null` clobber) |
+| **Verdict memory (implicit Pass)** | prior + **`144833`** | 21 watchlist Pass rows written to Azure `board_verdicts.json` on compliant deliver |
+| **Chairman guardrails + alignment** | `01b5ed6` / `93df4ed` | Max 3 buys, 10% cap, wash-sale, majority-buy promotion (`guardrails.py`, `chairman_alignment.py`) |
 
-### Shipped (architecture thread)
-
-| Area | Detail |
-|------|--------|
-| **P0 — `3eda93d`** | Removed tracked run artifacts (~6.4k lines); `.gitignore` excludes generated outputs |
-| **P1 — `11ee4d9`** | `src/verdict_memory.py` — chairman **Pass** watchlist cooldown after compliance-approved deliver; removed dead `save_memory()` / `save_verdict_history()` |
-| **Scout fix** | `prepare.py` parses CSV before scout; `run_scout_pipeline(owned_tickers=…)` — dropped dead `ledger_state.json` read |
-| **Docs** | `agent_architecture.md` §3.6, `technical_solution.md` §1.3/§2.4, `engineering_playbook.md` verdict-memory entry |
-| **Post-deliver loop** | `docs/post_deliver_checklist.md` + `src/qa/retrospective.py` — auto after deliver; idempotent per run_id |
-
-### Verdict memory rules (SSOT behavior)
-
-1. **Write:** end of successful **deliver**, only when `debate.is_approved` (Markopolos compliance passed).
-2. **What:** watchlist **`Pass`** — explicit in chairman JSON **or implicit** (watchlist symbol not assigned Buy/Strong Buy) → append to `board_verdicts.json`.
-3. **Read:** scout at prepare start (after `sync_inputs_from_cloud`) — 7-day Pass cooldown (`unanimous_pass` reserved; always `false` for now).
-4. **Not gated on:** post-flight QA (graphics/integrity) — intentional simplicity; revisit if needed.
-
-### Post-deliver — run `20260529_120049` (canonical)
+### Canonical validation run — `20260529_144833`
 
 | Check | Result |
 |-------|--------|
-| Run finished | `success` — debate 214s, deliver 131s |
-| `prepare: null` in status | **Bug confirmed** — overlapping kick (115549 → 120049) overwrote phased status before per-run fix |
-| Human QA review | **Not submitted yet** — use QA email for **120049** (not 115549) |
-| Verdict memory | **Not validated** — Azure `board_verdicts.json` has no Pass / no `20260529` dates; root cause: chairman JSON only lists MNDY+LLY (Buy), omits implicit Pass (META etc.) — fixed in code, needs deploy + next deliver |
-| Briefing spot-check | Graphics QA CRITICAL: benchmark chart scale, Action Plan / TWR placement, debate wall-of-text — see `retrospective_20260529_120049.md` |
+| Deploy | `6107539` on `main` → GitHub Actions → `app-boardroom-prod` |
+| End-to-end | **success** — prepare 7.9s, debate 287s, deliver 112s |
+| Compliance | Approved after **1 chairman retry** (ASML 4/5 Hold, alpha pick corrected) |
+| `VOTE_DIGEST` | Chairman scratchpad references pre-computed digest — no false max-3 narratives |
+| `raw_verdicts` | 5 panelists in `debate.json` |
+| Chairman bypass | **Not triggered** (NVDA/VRT were 3/5 majority buys, not 5/5 unanimous) — expected |
+| Verdict memory | **21 Pass rows** dated `20260529` in Azure `board_verdicts.json` (explicit + implicit) |
+| Human QA review | **Submitted** — all 5 agents confirmed (`qa_human_review_20260529_144833.json`) |
+| Post-mortem / Prompt Engineer / Integrity | **PASS** |
+| Graphics Designer | **FAIL** — 2 CRITICAL (pie chart readability — green-on-green) |
+
+Pull artifacts: `.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id 20260529_144833`
+
+### Vote engine — developer quick reference
+
+| Module | Role |
+|--------|------|
+| `src/core/vote_engine.py` | Round 2 vote SSOT: tallies, `format_vote_digest()`, `can_bypass_chairman()`, `build_chairman_skeleton()` |
+| `src/core/guardrails.py` | Financial limits after chairman (max 3, 10% cap, wash-sale) |
+| `src/core/chairman_alignment.py` | Majority-buy promotion, false max-3 narrative cleanup |
+| `src/core/compliance_audit.py` | Deterministic in-loop gate + vote alignment |
+| `src/verdict_memory.py` | Pass cooldown writes at deliver (compliance-gated) |
+
+**Bypass rule:** Skip chairman Pro when every symbol is vote-deterministic and all actionable Buy/Reduce mandates are **5/5 unanimous**. Majority-only days (e.g. 3/5 buy) still invoke chairman.
+
+**Tests:** `tests/test_vote_engine.py`, `tests/test_chairman_alignment.py`, `tests/test_guardrails.py`, `tests/test_compliance_audit.py`
+
+### Verdict memory rules (SSOT — unchanged)
+
+1. **Write:** end of successful **deliver**, only when `debate.is_approved`.
+2. **What:** watchlist **Pass** — explicit in chairman JSON **or implicit** (watchlist symbol not Buy/Strong Buy).
+3. **Read:** scout at prepare — 7-day Pass cooldown (`unanimous_pass` reserved; always `false`).
+4. **Not gated on:** post-flight QA CRITICAL (by design).
+
+**Known minor issue:** `META` has duplicate Pass rows on `20260529` (earlier run + `144833`). Scout cooldown still works; dedupe is backlog P3.
 
 ### First steps next session
 
-1. **Deploy** double-run guard + verdict-memory + per-run status (this session's diff).
-2. **Human review** on QA dashboard for run `20260529_120049`.
-3. **Validate verdict memory** after next compliant deliver — expect log line `Persisted N watchlist Pass verdict(s)` and `20260529` Pass rows in Azure `board_verdicts.json`.
-4. **After each deliver:** follow [`post_deliver_checklist.md`](post_deliver_checklist.md).
+1. **P1 — Briefing layout:** Fix pie chart colors/contrast (`reporting.py` / QuickChart config); move State of the Union earlier — see Graphics CRITICALs on `144833`.
+2. **P1 — Round 2 debate quality:** Panelists copy Round 1 overview verbatim in Round 2 (Prompt Engineer WARNING on `144833`).
+3. **After each deliver:** [`post_deliver_checklist.md`](post_deliver_checklist.md).
+4. **Manual pipeline kickoff:** `POST https://<defaultHostName>/api/prepare?code=<function-key>` — resolve hostname via `engineering_playbook.md` §2.
 
-### Open items (ordered — see also full backlog below)
+### Open items (ordered)
 
 | Priority | Item |
 |----------|------|
-| ~~**P0**~~ | ~~**Commit + deploy P1**~~ **DONE** — `11ee4d9` pushed to `main`. |
-| ~~**P1**~~ | ~~**First human review on a real run**~~ **DONE (May 29)** — runs `20260529_092332`, `20260529_095341`; encoded review link + Azure blob + ledger OK. |
-| ~~**P1**~~ | ~~**State of the Union fix**~~ **DONE (May 29)** — deterministic `build_state_of_union_quotes()`; debate log includes Portfolio Overview lines. *(pending deploy validation)* |
-| **P1** | **Prompt Engineer QA scope** — audit each agent's config/prompt for sufficient context (Stan rejected PASS on `095341`; MNDY fabricated quote on `120049`). |
-| **P1** | **Briefing layout** — benchmark chart scale, Action Plan / TWR placement, debate scannability (Graphics QA CRITICAL on `120049`). |
-| **P2** | Split `reporting.py` + extract prompts from `agents.py` (AI context window) |
-| **P2** | Split `action_tracker.md` — handoff block vs archived sessions |
-| **P2** | Root `README.md` + `docs/qa_layers.md` one-pager |
-| **P2** | Wire post-job Cursor agents (`api_audit`, `data_insights`, `supervisor_summaries`) |
+| ~~**P0**~~ | ~~Deploy verdict memory + per-run status + double-run guard~~ **DONE** — validated `144833`. |
+| ~~**P1**~~ | ~~**Verdict memory validation**~~ **DONE** — 21 Pass rows on `144833`. |
+| ~~**P1**~~ | ~~**Phase A vote_engine**~~ **DONE** — `6107539`, validated `144833`. |
+| ~~**P1**~~ | ~~**State of the Union**~~ **DONE** — deterministic SoTU; validated `144833`. |
+| ~~**P1**~~ | ~~**Human QA on post-fix run**~~ **DONE** — `144833`, all agents confirmed. |
+| **P1** | **Briefing layout / charts** — pie chart CRITICALs, SoTU section order (`144833`; same thread as `120049`). |
+| **P1** | **Round 2 prompt quality** — enforce unique rebuttal text; reduce Pass spam in logs (Systems Architect WARNING). |
+| **P2** | Split `reporting.py` + extract prompts from `agents.py` |
 | **P2** | Relative strength + sector weights in prepare; Buffett PE/P/S caps in Python |
-| ~~**P3**~~ | ~~Consolidate `load_dotenv()` to `settings.py` only; rotate/gitignore `ecosystem_state.json` noise~~ **DONE (May 29)** — `.funcignore` expanded; `settings.py` SSOT; local ledger gitignored + example template |
-| **P3** | Optional: block verdict memory on post-flight QA CRITICAL; panel `unanimous_pass` for 14-day cooldown |
+| **P2** | Wire post-job Cursor agents (`api_audit`, `data_insights`, `supervisor_summaries`) |
+| **P3** | Dedupe same-day `board_verdicts` rows; optional verdict memory gated on graphics CRITICAL; `unanimous_pass` 14-day cooldown |
 
-### Not in repo (by design — gitignored)
+### Archived handoffs (historical — do not pick up)
 
-* Generated outputs under `src/output/*.md`, `qa_*_latest.*`, `logs/`, probe JSON
-* `.cursor/agent_state/ecosystem_state.json` (local pre-commit ledger noise)
+<details>
+<summary>May 29 architecture cleanup (pre–vote_engine deploy)</summary>
+
+- Run `20260529_120049`: verdict memory **not** validated (chairman omitted implicit Pass) — **fixed** in `144833`.
+- Overlapping kick caused `prepare: null` — **fixed** with per-run status files.
+</details>
+
+<details>
+<summary>May 29 agent/QA hardening (`e39b337`)</summary>
+
+Human QA review UI, visual/integrity golden fixtures, QA scorecard, deterministic data oracle. See section below.
+</details>
 
 ---
 

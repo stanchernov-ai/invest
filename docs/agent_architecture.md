@@ -1,7 +1,7 @@
 # SC Invest Boardroom — Agent Architecture
 
 **Status:** Active  
-**Last updated:** May 29, 2026  
+**Last updated:** May 29, 2026 (vote_engine Phase A)  
 **Owner:** Stan  
 **SSOT for:** agent inventory, interaction diagrams, QA validation layers, and when to update this doc  
 
@@ -291,6 +291,7 @@ flowchart TB
 |----------|------------|---------|
 | `runs/{id}/prepare.json` | prepare | debate |
 | `runs/{id}/debate.json` | debate | deliver |
+| `debate.json` → `raw_verdicts` | debate | deliver (vote matrix), debugging |
 | `api_telemetry_{id}_*.json` | each phase | HR, API Optimization, weekly QA |
 | `qa_dashboard_{id}.html` | deliver | email, integrity auditor |
 
@@ -327,8 +328,10 @@ flowchart TB
     end
 
     subgraph L2["Layer 2 — Decision audit"]
+        VE[vote_engine 🟢]
         COMP2[compliance LLM 🟡]
-        PYCHAIR[Python 10% cap in engine 🟢]
+        PYCHAIR[guardrails + chairman_alignment 🟢]
+        VE --> PYCHAIR --> COMP2
     end
 
     subgraph L3["Layer 3 — Post-flight QA"]
@@ -371,16 +374,21 @@ flowchart TB
 
 | Tag | Meaning | Examples |
 |-----|---------|----------|
-| 🟢 | Deterministic Python — authoritative | `data_oracle`, `reconcile_compliance`, `audit_chart_health`, `src/qa/visual_audit.py` |
-| 🟡 | LLM advisory — useful, not sole authority | panelists, post-flight trio, graphics multimodal, integrity auditor |
-| 🔴 | Known gap | tie-break prompt-only; no golden tests for integrity auditor |
+| 🟢 | Deterministic Python — authoritative | `data_oracle`, `vote_engine`, `guardrails`, `chairman_alignment`, `compliance_audit` (majority/originator/alpha), `reconcile_compliance`, `audit_chart_health`, `src/qa/visual_audit.py` |
+| 🟡 | LLM advisory — useful, not sole authority | panelists, chairman (when bypass=false), compliance (deathmatch/funding), post-flight trio, graphics multimodal, integrity auditor |
+| 🔴 | Known gap | no golden tests for LLM verdict-accuracy claims; Round 2 verbatim-copy procedural shortcut |
 
 ### Key deterministic guardrails
 
 | Function | Module | Effect |
 |----------|--------|--------|
 | `validate_price_feed()` | `src/core/data_oracle.py` | Abort on $0 price |
+| `build_vote_summaries()` / `format_vote_digest()` | `src/core/vote_engine.py` | Round 2 vote SSOT; inject digest into chairman/compliance prompts |
+| `can_bypass_chairman()` / `build_chairman_skeleton()` | `src/core/vote_engine.py` | Skip chairman Pro on unanimous actionable Buy/Reduce days |
+| `apply_conviction_scores()` | `src/core/vote_engine.py` | Recompute `aggregate_conviction_score` from panel JSON |
 | `apply_chairman_guardrails()` | `src/core/guardrails.py` | Max 3 buys, 10% liquidation cap, 30-day wash-sale |
+| `apply_board_and_cap_coherence()` | `src/core/chairman_alignment.py` | Majority-buy promotion, false max-3 cleanup |
+| `audit_chairman_compliance()` | `src/core/compliance_audit.py` | Max buys, hedge, majority alignment, originator, alpha pick |
 | `build_state_of_union_quotes()` | `src/core/state_of_union.py` | SoTU from panel `overall_portfolio_critique`, not per-ticker quotes |
 | `reconcile_compliance()` | `src/qa_pipeline.py` | CRITICAL finding → force `is_compliant=false` |
 | `audit_chart_health()` | `src/output/reporting.py` | HTTP probe each chart URL |
@@ -499,6 +507,9 @@ Areas with **multiple owners** — track reductions in `action_tracker.md`:
 
 | Date | Change |
 |------|--------|
+| May 29, 2026 | **`vote_engine` Phase A** (`6107539`) — vote SSOT, VOTE_DIGEST, chairman bypass, Python compliance A/D/E, `raw_verdicts` in debate checkpoint; validated run `20260529_144833` |
+| May 29, 2026 | Chairman guardrails + `chairman_alignment` — max-3 coherence, majority-buy promotion (`93df4ed`, `01b5ed6`) |
+| May 29, 2026 | Verdict memory implicit Pass + per-run status + double-run 409 guard |
 | May 29, 2026 | Deploy `e39b337`: `qa_human_review` live on Azure; collaboration protocol §0.5 in `.cursorrules` |
 | May 29, 2026 | Human-confirmed QA review UI — Azure `/api/qa-review` + dual blob/state storage |
 | May 29, 2026 | QA agent scorecard → `QA_SCORECARD` telemetry + `qa_scorecards[]` in ecosystem state |
