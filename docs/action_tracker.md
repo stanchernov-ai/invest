@@ -1,13 +1,49 @@
 # SC Invest Boardroom — Action Tracker
 
 **Status:** Active  
-**Last Updated:** May 28, 2026 (FMP data layer + P1 deploy)  
+**Last Updated:** May 28, 2026 (late night — resume in morning)  
 
 This document tracks identified bugs, architectural improvements, and long-term backlog items for the SC Invest Boardroom pipeline. Items are broken down into manageable blocks with specific implementation details.
 
 ---
 
-## Session Handoff — FMP / Market Data (pick up here)
+## Session Handoff — FMP / Market Data (pick up here — morning)
+
+> **Stan — start here when you’re back.** Super tired EOD; deploy is pushed, verification + P2 are next. Read this section + [`docs/fmp_data_dictionary.md`](fmp_data_dictionary.md).
+
+### Done tonight (committed & pushed)
+
+| Item | Detail |
+|------|--------|
+| **Commit** | `63730fe` on `main` → https://github.com/stanchernov-ai/invest |
+| **Azure** | GitHub Actions **Deploy #20** for that commit (~2 min; check green on [workflow runs](https://github.com/stanchernov-ai/invest/actions/workflows/deploy.yml)) |
+| **FMP fixes** | Dead URLs → `grades-consensus` + `earnings`; consensus/earnings/FCS live again |
+| **Prompts** | Richer `mega_prompt` (PEG, P/S, D/E, beta, ROE, FCF, sector, RS vs QQQ, macro TLT/VXX, regime block) |
+| **P1** | Shared `prefetch_eod_cache`; news headlines include `(YYYY-MM-DD)` |
+| **Docs** | `docs/fmp_data_dictionary.md`, probe `tools/validate_fmp_fields.py`, tests under `tests/` |
+| **Guardrails** | SSOT = **`.cursorrules`**; `docs/agent_guardrails.md` is pointer only |
+
+**Not committed (local only):** `test_chart.py`, `tools/fmp_field_probe_results.json`
+
+### First thing in the morning (15 min)
+
+1. Confirm **Actions run #20** = green for `63730fe`.
+2. Optional: trigger **prepare** once (or wait for weekday 11:00 UTC) and pull telemetry:
+   * `.venv\Scripts\python.exe tools\fetch_azure_reports.py --list` then `--run-id …`
+3. In `api_telemetry_*_prepare.json` confirm: `EOD_CACHE`, `grades_consensus` / `earn` not `[]`, headlines dated, FCS sometimes ≠ 0.
+
+### Then build (P2 — recommended order)
+
+1. **Relative strength + sector weights** in `prepare.py` / prompt (Livermore + Simons).
+2. **Buffett caps in code** — conviction ≤ 7 when PE > 40 or P/S > 10.
+3. **`generate_dynamic_mandate()`** — use real 3M/12M TWR from `account_returns`, not `0.15`.
+4. **Macro `batch-quote`** for TLT/VXX (verify Starter tier first).
+
+Full API reference + dead URLs: **`docs/fmp_data_dictionary.md`**. Guardrails: **`.cursorrules`**.
+
+---
+
+## Session Handoff — FMP / Market Data (reference detail)
 
 **Primary reference:** [`docs/fmp_data_dictionary.md`](fmp_data_dictionary.md) — endpoints, dead URLs, field names, excluded keys, validation commands, and the **action backlog**.
 
