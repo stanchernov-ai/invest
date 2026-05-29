@@ -85,7 +85,7 @@
 - **Queue-message encoding gotcha (verify on deploy)** — Python v2 queue output/trigger should round-trip the plain `run_id` string via `msg.get_body().decode("utf-8")`. If the debate/deliver phases see an empty run_id, the extension bundle is base64-wrapping messages — set the message encoding or switch to an explicit `QueueClient`. (2026-05-28)
 - **Session handoff lives at the top of `docs/action_tracker.md`** — read the **"Session Handoff"** section before starting work; it lists deploy state, tomorrow's verification checklist, TCO snapshot, and recommended next steps. (2026-05-28)
 - **Post-deliver retrospective loop** — after each successful `deliver`, `execute_retrospective()` runs automatically (idempotent per `run_id`). Follow `docs/post_deliver_checklist.md` to review `retrospective_{run_id}.md` in Azure and validate candidates before editing Session Handoff. Manual re-run: `/api/retrospective?run_id=…` or `tools/run_retrospective.py --force`. (2026-05-29)
-- **Latest deploy on `main`:** `6107539` (May 29, 2026) — `vote_engine` Phase A. Canonical validation run: `20260529_144833`. Prior: `e39b337` (human QA review UI). (2026-05-29)
+- **Latest deploy on `main`:** `b1707c7` (May 29, 2026) — briefing charts sprint (`ce577bf`–`3f66433`: gain/loss palettes, pie legend removal, SoTU order, dark line/bar canvas). Prior: `6107539` (`vote_engine` Phase A; canonical run `20260529_144833`). **Chart acceptance gate:** re-deliver `20260529_152151` (or fresh pipeline) and confirm Graphics QA PASS — see [`briefing_charts_handoff.md`](briefing_charts_handoff.md). (2026-05-29)
 
 ## 5. Standing Architectural Decisions
 

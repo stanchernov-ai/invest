@@ -202,22 +202,16 @@ def _lerp_hex(color_low: str, color_high: str, t: float) -> str:
     )
 
 
-# Gain/loss chart palette — dark shades on white canvas (pie charts in email body).
-GAIN_GREEN_HIGH = "#166534"
-GAIN_GREEN_LOW = "#052e16"
-LOSS_RED_HIGH = "#b91c1c"
-LOSS_RED_LOW = "#450a0a"
-# Lighter ramp for bar/line charts on dark canvas — readable against #111827.
-GAIN_GREEN_ON_DARK_HIGH = "#86efac"
-GAIN_GREEN_ON_DARK_LOW = "#22c55e"
-LOSS_RED_ON_DARK_HIGH = "#fca5a5"
-LOSS_RED_ON_DARK_LOW = "#ef4444"
-CHART_BG_DARK = "#111827"
-CHART_LABEL_ON_DARK = "#ecfdf5"
-CHART_AXIS_ON_DARK = "#9ca3af"
-CHART_GRID_ON_DARK = "rgba(255,255,255,0.12)"
-CHART_LABEL_ON_SLICE = "#ffffff"
-CHART_LABEL_ON_AXIS = "#111827"
+# Gain/loss chart palette — light canvas (all briefing charts); brand-aligned greens/reds.
+GAIN_GREEN_HIGH = "#16a34a"
+GAIN_GREEN_LOW = "#bbf7d0"
+LOSS_RED_HIGH = "#dc2626"
+LOSS_RED_LOW = "#fecaca"
+CHART_BG = "#ffffff"
+CHART_LABEL_COLOR = "#111827"
+CHART_AXIS_COLOR = "#374151"
+CHART_GRID_COLOR = "rgba(0,0,0,0.08)"
+CHART_LABEL_ON_SLICE = "#1f2937"
 PIE_CHART_WIDTH = 600
 PIE_CHART_HEIGHT = 420
 LINE_CHART_MAX_POINTS = 12
@@ -239,13 +233,13 @@ def _format_history_axis_labels(date_keys: list[str]) -> list[str]:
     return labels
 
 
-def _dark_chart_scales(*, y_title: str, y_begin_at_zero: bool = False) -> dict:
-    tick = {"color": CHART_AXIS_ON_DARK, "font": {"size": 10}}
-    grid = {"color": CHART_GRID_ON_DARK}
+def _light_chart_scales(*, y_title: str, y_begin_at_zero: bool = False) -> dict:
+    tick = {"color": CHART_AXIS_COLOR, "font": {"size": 10}}
+    grid = {"color": CHART_GRID_COLOR}
     return {
         "y": {
             "beginAtZero": y_begin_at_zero,
-            "title": {"display": True, "text": y_title, "color": "#e5e7eb", "font": {"size": 11}},
+            "title": {"display": True, "text": y_title, "color": CHART_AXIS_COLOR, "font": {"size": 11}},
             "ticks": tick,
             "grid": grid,
         },
@@ -292,20 +286,16 @@ def _render_outlabeled_pie_chart(labels, data, colors):
     return get_quickchart_short_url(chart_config, width=PIE_CHART_WIDTH, height=PIE_CHART_HEIGHT)
 
 
-def colors_for_metric(values: list[float], *, theme: str = "light") -> list[str]:
+def colors_for_metric(values: list[float]) -> list[str]:
     """Gradual colors across the slice set — min→max spread shows disparity.
 
-    Green-only ramp for gains, red-only ramp for losses (no light tints on white).
-    Use theme='dark' for bar charts on the dark canvas (lighter greens/reds).
+    Green ramp for gains, red ramp for losses; lighter tints at the low end
+    so pie slices stay distinguishable on a white canvas.
     """
-    if theme == "dark":
-        gain_high, gain_low = GAIN_GREEN_ON_DARK_HIGH, GAIN_GREEN_ON_DARK_LOW
-        loss_high, loss_low = LOSS_RED_ON_DARK_HIGH, LOSS_RED_ON_DARK_LOW
-    else:
-        gain_high, gain_low = GAIN_GREEN_HIGH, GAIN_GREEN_LOW
-        loss_high, loss_low = LOSS_RED_HIGH, LOSS_RED_LOW
     if not values:
         return []
+    gain_high, gain_low = GAIN_GREEN_HIGH, GAIN_GREEN_LOW
+    loss_high, loss_low = LOSS_RED_HIGH, LOSS_RED_LOW
     vals = [float(v) for v in values]
     vmin, vmax = min(vals), max(vals)
     if vmin == vmax:
@@ -417,6 +407,20 @@ def build_returns_rows(account_returns):
         })
     return rows
 
+
+def build_action_summary_rows(grouped_actions, hedge_action: str = "") -> list[dict]:
+    """At-a-glance symbol + action rows for the Action Plan header."""
+    rows = []
+    for category in ["STRONG BUY", "BUY", "HOLD", "TRIM", "SELL", "STRONG SELL"]:
+        for pos in grouped_actions.get(category, []) or []:
+            sym = pos.get("symbol")
+            if sym:
+                rows.append({"symbol": sym, "action": category})
+    if hedge_action:
+        rows.append({"symbol": "Portfolio", "action": "HEDGE"})
+    return rows
+
+
 def build_returns_bar_chart(sorted_ledger):
     labels = []
     data = []
@@ -431,7 +435,7 @@ def build_returns_bar_chart(sorted_ledger):
     if not data:
         return ""
 
-    colors = colors_for_metric(returns, theme="dark")
+    colors = colors_for_metric(returns)
 
     chart_config = {
         "type": "bar",
@@ -446,16 +450,16 @@ def build_returns_bar_chart(sorted_ledger):
                     "display": True,
                     "align": "end",
                     "anchor": "end",
-                    "color": CHART_LABEL_ON_DARK,
+                    "color": CHART_LABEL_COLOR,
                     "font": {"weight": "bold", "size": 12},
                     "formatter": BAR_DATALABEL_FORMATTER,
                 },
             },
-            "scales": _dark_chart_scales(y_title="Return (%)", y_begin_at_zero=True),
+            "scales": _light_chart_scales(y_title="Return (%)", y_begin_at_zero=True),
             "legend": {"display": False},
         },
     }
-    return get_quickchart_short_url(chart_config, background_color=CHART_BG_DARK)
+    return get_quickchart_short_url(chart_config, background_color=CHART_BG)
 
 def _downsample(labels, series_list, max_points=90):
     """Evenly subsample parallel label + series lists, always keeping the last point."""
@@ -628,17 +632,17 @@ def build_benchmark_line_chart(history_data):
                     "display": True,
                     "text": "Indexed performance (start = 100)",
                     "font": {"size": 12},
-                    "color": "#e5e7eb",
+                    "color": CHART_LABEL_COLOR,
                 },
                 "legend": {
                     "position": "bottom",
-                    "labels": {"color": "#e5e7eb", "font": {"size": 11}},
+                    "labels": {"color": CHART_AXIS_COLOR, "font": {"size": 11}},
                 },
             },
-            "scales": _dark_chart_scales(y_title="Index"),
+            "scales": _light_chart_scales(y_title="Index"),
         },
     }
-    return get_quickchart_short_url(chart_config, width=640, height=340, background_color=CHART_BG_DARK)
+    return get_quickchart_short_url(chart_config, width=640, height=340, background_color=CHART_BG)
 
 def build_briefing_charts(sorted_ledger, account_holdings, account_returns, history_data):
     """Build every briefing chart URL once so callers can both render and health-check
@@ -748,6 +752,85 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             </table>
             {% endif %}
 
+            {% if show_alpha_pick %}
+            <h2>🎯 The Alpha Pick</h2>
+            <div class="metric-box" style="border-left-color: #f59e0b;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
+                    <tr>
+                        {% if alpha_pick.image %}
+                        <td valign="top" width="63" style="padding-right: 15px;">
+                            <img src="{{ alpha_pick.image }}" alt="{{ alpha_pick.symbol }} logo" style="width: 48px; height: 48px; border-radius: 6px; display: block; max-width: 48px; background-color: #ffffff;">
+                        </td>
+                        {% endif %}
+                        <td valign="top">
+                            <p style="margin-top: 0; font-size: 1.1em;"><strong>{{ alpha_pick.symbol }}</strong>: "{{ alpha_pick.champion_quote }}"</p>
+                        </td>
+                    </tr>
+                </table>
+                
+                {% if red_team_case %}
+                <h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 1.05em; color: #991b1b; border-bottom: none;">⚠️ The Bear Case Rebuttal</h3>
+                <div class="red-team-box">
+                    {{ red_team_case }}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <h2>The Action Plan</h2>
+
+            {% if action_summary %}
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin-bottom: 20px; background-color: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px;">
+                <tr style="text-align: left; color: #6b7280; font-size: 13px;">
+                    <th style="padding: 8px 12px; border-bottom: 2px solid #e5e7eb;">Symbol</th>
+                    <th style="padding: 8px 12px; border-bottom: 2px solid #e5e7eb;">Action</th>
+                </tr>
+                {% for row in action_summary %}
+                <tr>
+                    <td style="padding: 8px 12px; border-bottom: 1px solid #eef2f6; font-weight: bold;">{{ row.symbol }}</td>
+                    <td style="padding: 8px 12px; border-bottom: 1px solid #eef2f6;">
+                        <span class="verdict-pill" style="{{ pill_styles[row.action] if row.action in pill_styles else 'background-color:#fffbeb; color:#92400e;' }} margin-bottom: 0;">{{ row.action }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% endif %}
+            
+            {% if hedge_action %}
+            <div class="hedge-box">
+                <strong>🛡️ Risk Management Mandate:</strong> {{ hedge_action }}
+            </div>
+            {% endif %}
+
+            {% set action_categories = ['STRONG BUY', 'BUY', 'HOLD', 'TRIM', 'SELL', 'STRONG SELL'] %}
+            {% for category in action_categories %}
+                {% if grouped_actions[category] %}
+                    {% for pos in grouped_actions[category] %}
+                        <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
+                                <tr>
+                                    {% if pos.image %}
+                                    <td valign="middle" style="padding-right: 12px;">
+                                        <img src="{{ pos.image }}" alt="{{ pos.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; display: block; max-width: 28px; background-color: #ffffff;">
+                                    </td>
+                                    {% endif %}
+                                    <td valign="middle">
+                                        <span class="verdict-pill" style="{{ pill_styles[category] }} margin-bottom: 0;">{{ category }} : {{ pos.symbol }}</span>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p><strong>Strategic Context:</strong> {{ pos.synthesis }}</p>
+                            {% if pos.narrative %}
+                                <p><span class="champion">The Champion ({{ pos.narrative.champion }}):</span> "{{ pos.narrative.champion_quote }}"</p>
+                                {% if pos.narrative.dissenter and pos.narrative.dissenter|upper != 'NONE' and pos.narrative.dissenter_quote|upper != 'N/A' %}
+                                <p><span class="dissenter">The Dissent ({{ pos.narrative.dissenter }}):</span> "{{ pos.narrative.dissenter_quote }}"</p>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endfor %}
+
             {% if pie_chart_url or account_pie_url %}
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 30px; border-collapse: separate; border-spacing: 0;">
                 <tr>
@@ -825,68 +908,6 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 </table>
             {% endfor %}
             {% endif %}
-
-            {% if show_alpha_pick %}
-            <h2>🎯 The Alpha Pick</h2>
-            <div class="metric-box" style="border-left-color: #f59e0b;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
-                    <tr>
-                        {% if alpha_pick.image %}
-                        <td valign="top" width="63" style="padding-right: 15px;">
-                            <img src="{{ alpha_pick.image }}" alt="{{ alpha_pick.symbol }} logo" style="width: 48px; height: 48px; border-radius: 6px; display: block; max-width: 48px; background-color: #ffffff;">
-                        </td>
-                        {% endif %}
-                        <td valign="top">
-                            <p style="margin-top: 0; font-size: 1.1em;"><strong>{{ alpha_pick.symbol }}</strong>: "{{ alpha_pick.champion_quote }}"</p>
-                        </td>
-                    </tr>
-                </table>
-                
-                {% if red_team_case %}
-                <h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 1.05em; color: #991b1b; border-bottom: none;">⚠️ The Bear Case Rebuttal</h3>
-                <div class="red-team-box">
-                    {{ red_team_case }}
-                </div>
-                {% endif %}
-            </div>
-            {% endif %}
-
-            <h2>The Action Plan</h2>
-            
-            {% if hedge_action %}
-            <div class="hedge-box">
-                <strong>🛡️ Risk Management Mandate:</strong> {{ hedge_action }}
-            </div>
-            {% endif %}
-
-            {% set action_categories = ['STRONG BUY', 'BUY', 'HOLD', 'TRIM', 'SELL', 'STRONG SELL'] %}
-            {% for category in action_categories %}
-                {% if grouped_actions[category] %}
-                    {% for pos in grouped_actions[category] %}
-                        <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
-                            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
-                                <tr>
-                                    {% if pos.image %}
-                                    <td valign="middle" style="padding-right: 12px;">
-                                        <img src="{{ pos.image }}" alt="{{ pos.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; display: block; max-width: 28px; background-color: #ffffff;">
-                                    </td>
-                                    {% endif %}
-                                    <td valign="middle">
-                                        <span class="verdict-pill" style="{{ pill_styles[category] }} margin-bottom: 0;">{{ category }} : {{ pos.symbol }}</span>
-                                    </td>
-                                </tr>
-                            </table>
-                            <p><strong>Strategic Context:</strong> {{ pos.synthesis }}</p>
-                            {% if pos.narrative %}
-                                <p><span class="champion">The Champion ({{ pos.narrative.champion }}):</span> "{{ pos.narrative.champion_quote }}"</p>
-                                {% if pos.narrative.dissenter and pos.narrative.dissenter|upper != 'NONE' and pos.narrative.dissenter_quote|upper != 'N/A' %}
-                                <p><span class="dissenter">The Dissent ({{ pos.narrative.dissenter }}):</span> "{{ pos.narrative.dissenter_quote }}"</p>
-                                {% endif %}
-                            {% endif %}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endfor %}
 
             {% if show_debate %}
             <h2>The Debate</h2>
@@ -995,6 +1016,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     
     hedge_action = chairman_data.get('capital_allocation_narrative', '') if 'hedge' in chairman_data.get('capital_allocation_narrative', '').lower() else ''
     hedge_action = _sanitize_briefing_text(hedge_action)
+    action_summary = build_action_summary_rows(grouped_actions, hedge_action)
 
     from src.config.settings import now_local
     briefing_date = now_local().strftime("%B %d, %Y")
@@ -1028,6 +1050,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         line_chart_url=line_chart_url,
         red_team_case=red_team_case,
         hedge_action=hedge_action,
+        action_summary=action_summary,
         chairman_remarks=chairman_remarks,
         qa_summary_text=qa_summary_text
     )

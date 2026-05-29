@@ -42,7 +42,7 @@ class BenchmarkChartTests(unittest.TestCase):
         self.assertLessEqual(len(labels), reporting.LINE_CHART_MAX_POINTS)
         self.assertRegex(labels[0], r"^[A-Z][a-z]{2} '\d{2}$")
         self.assertNotRegex(labels[0], r"^\d{8}$")
-        self.assertEqual(mock_url.call_args[1]["background_color"], reporting.CHART_BG_DARK)
+        self.assertEqual(mock_url.call_args[1]["background_color"], reporting.CHART_BG)
 
 
 class BriefingCopyTests(unittest.TestCase):
@@ -71,14 +71,14 @@ class ChartColorTests(unittest.TestCase):
         self.assertNotEqual(colors[0], colors[-1])
         self.assertNotEqual(colors[1], colors[2])
 
-    def test_positive_palette_uses_dark_greens_only(self):
+    def test_positive_palette_spreads_with_readable_light_tints(self):
         colors = reporting.colors_for_metric([5.0, 12.0, 28.0, 41.0])
         for c in colors:
             h = c.lstrip("#")
             r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
             self.assertGreater(g, r)
-            self.assertGreater(g, b)
-            self.assertLessEqual(max(r, g, b), 0x66)
+            self.assertGreaterEqual(max(r, g, b), 0x80)
+        self.assertNotEqual(colors[0], colors[-1])
 
     def test_negative_palette_uses_dark_reds_only(self):
         colors = reporting.colors_for_metric([-41.0, -12.0, -5.0])
@@ -127,9 +127,9 @@ class ChartColorTests(unittest.TestCase):
         datalabels = opts["plugins"]["datalabels"]
         self.assertIs(opts["plugins"]["legend"], False)
         self.assertEqual(opts["scales"]["y"]["title"]["text"], "Return (%)")
-        self.assertEqual(datalabels["color"], reporting.CHART_LABEL_ON_DARK)
+        self.assertEqual(datalabels["color"], reporting.CHART_LABEL_COLOR)
         self.assertIn("formatter", datalabels)
-        self.assertEqual(mock_url.call_args[1]["background_color"], reporting.CHART_BG_DARK)
+        self.assertEqual(mock_url.call_args[1]["background_color"], reporting.CHART_BG)
 
 
 class BriefingHtmlTests(unittest.TestCase):
@@ -140,7 +140,14 @@ class BriefingHtmlTests(unittest.TestCase):
             portfolio_3m_trend=3.0,
             mandate="CAGR of 12.00 percent projected balance at age 65 is $1,000,000.00",
             chairman_data={
-                "portfolio_positions": [],
+                "portfolio_positions": [
+                    {
+                        "symbol": "NVDA",
+                        "final_verdict": "Buy",
+                        "synthesis": "Strong momentum.",
+                        "narrative": {"champion": "Buffett", "champion_quote": "Buy.", "dissenter": "NONE", "dissenter_quote": "N/A"},
+                    }
+                ],
                 "watchlist_positions": [],
                 "alpha_pick": {"symbol": "NONE", "champion_quote": "As per the QA Amendment protocol, none."},
                 "upcoming_events": [],
@@ -158,13 +165,20 @@ class BriefingHtmlTests(unittest.TestCase):
                 "updated": "2026-05-29",
                 "returns": {"Total": {"ytd": 1.0, "12m": 2.0}},
             },
-            chart_urls={},
+            chart_urls={
+                "line_chart_url": "https://example.com/line.png",
+                "bar_chart_url": "https://example.com/bar.png",
+            },
         )
+        perf_pos = html.find("Performance vs. Benchmark")
+        action_pos = html.find("The Action Plan")
         twr_pos = html.find("Time-Weighted Returns")
         sotu_pos = html.find("The State of the Union")
-        action_pos = html.find("The Action Plan")
+        self.assertLess(perf_pos, action_pos)
+        self.assertLess(action_pos, twr_pos)
         self.assertLess(twr_pos, sotu_pos)
-        self.assertLess(sotu_pos, action_pos)
+        self.assertIn("Symbol", html)
+        self.assertIn("NVDA", html)
         self.assertIn("Invest AI Daily Briefing", html)
         self.assertNotIn("Generated autonomously", html)
         self.assertNotIn("The Alpha Pick", html)

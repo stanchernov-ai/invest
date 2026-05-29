@@ -1,9 +1,32 @@
 # SC Invest Boardroom — Action Tracker
 
 **Status:** Active  
-**Last Updated:** May 29, 2026 (EOD — briefing charts sprint; see [`briefing_charts_handoff.md`](briefing_charts_handoff.md))
+**Last Updated:** May 29, 2026 (EOD — consolidated handoff from vote_engine + briefing charts sprints)
 
 This document tracks identified bugs, architectural improvements, and long-term backlog items for the SC Invest Boardroom pipeline. Items are broken down into manageable blocks with specific implementation details.
+
+---
+
+## Consolidated May 29 handoff
+
+Two agent sessions, one sprint — **pick up in the Session Handoff section below.**
+
+| Chapter | Focus | Commit(s) | Canonical run | Status |
+|---------|--------|-----------|---------------|--------|
+| **1 — Vote engine** | Deterministic vote math, compliance, verdict memory, chairman guardrails | `6107539` | `20260529_144833` | **Done** — pipeline PASS; human QA submitted |
+| **2 — Briefing charts** | Palettes, pie legends, SoTU order, dark line/bar UX | `ce577bf` → `b1707c7` | `20260529_152151` | **Code done** — Graphics QA not yet re-run on prod |
+
+**Doc map**
+
+| Task | Read |
+|------|------|
+| Backlog + first steps | Session Handoff below |
+| Chart / QuickChart edits | [`briefing_charts_handoff.md`](briefing_charts_handoff.md) |
+| Vote engine / debate flow | Archived vote_engine handoff below + `technical_solution.md` §2.2 |
+| Guardrails + collaboration | [`.cursorrules`](../.cursorrules) |
+| Full index | [`DOCUMENTATION.md`](DOCUMENTATION.md) |
+
+**Immediate gate:** deploy `b1707c7` → `/api/deliver?run_id=20260529_152151` → Graphics QA PASS. Then P1 debate/integrity items on `152151`.
 
 ---
 
