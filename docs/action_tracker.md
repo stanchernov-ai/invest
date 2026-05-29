@@ -1,7 +1,7 @@
 # SC Invest Boardroom — Action Tracker
 
 **Status:** Active  
-**Last Updated:** May 28, 2026 (late night — resume in morning)  
+**Last Updated:** May 29, 2026  
 
 This document tracks identified bugs, architectural improvements, and long-term backlog items for the SC Invest Boardroom pipeline. Items are broken down into manageable blocks with specific implementation details.
 
@@ -15,16 +15,75 @@ This document tracks identified bugs, architectural improvements, and long-term 
 | [`technical_solution.md`](technical_solution.md) | System design, data layer, deploy |
 | [`engineering_playbook.md`](engineering_playbook.md) | Before retrying a rejected approach |
 | [`fmp_data_dictionary.md`](fmp_data_dictionary.md) | FMP endpoints and field map |
-| [`agent_architecture.md`](agent_architecture.md) | Agent diagrams, inventory, QA layers — **update when roster changes** |
 | [`.cursorrules`](../.cursorrules) §0.5 | **Collaboration protocol** — ask when unsure; MCQ recommended-first + free-text last |
+| [`.cursorrules`](../.cursorrules) §1 | Azure `QA_REVIEW_*` app settings + correct hostname |
 
 ---
 
-## Session Handoff — FMP / Market Data (pick up here — morning)
+## Session Handoff — May 29, 2026 (pick up here)
 
-> **Stan — start here when you’re back.** Super tired EOD; deploy is pushed, verification + P2 are next. Read this section + [`docs/fmp_data_dictionary.md`](fmp_data_dictionary.md).
+> **Stan — start here next session.** Agent/QA hardening + human review UI deployed. No pipeline was manually triggered during this session.
 
-### Done tonight (committed & pushed)
+### Shipped this session (on `main`)
+
+| Area | Detail |
+|------|--------|
+| **Commit** | `e39b337` — human QA review endpoint + deliver integration (deployed to Azure) |
+| **Prior commits** | Oracle dedup + deterministic Python (`data_oracle.py`); visual/integrity golden fixtures; QA scorecard; `docs/agent_architecture.md` SSOT |
+| **Data Oracle** | 🟢 Python price gate in prepare only; debate reuses checkpoint (no duplicate LLM) |
+| **Visual QA** | `src/qa/visual_audit.py` + `tests/fixtures/visual_qa/` |
+| **Integrity QA** | `src/qa/integrity_audit.py` + `tests/fixtures/integrity_qa/` |
+| **QA scorecard** | `QA_SCORECARD` in telemetry; `qa_scorecards[]` / `qa_human_reviews[]` in ecosystem state |
+| **Human review UI** | Azure `GET/POST /api/qa-review` (`qa_human_review` function); email button in QA dashboard |
+| **Azure app settings** | `QA_REVIEW_BASE_URL` + `QA_REVIEW_TOKEN` configured (see below) |
+| **Cursor** | §0.5 Collaboration Protocol; documentation habit in `.cursorrules` |
+
+### Azure config (confirmed)
+
+| Setting | Value |
+|---------|--------|
+| **Function App** | `app-boardroom-prod` · resource group `rg-boardroom-prod` |
+| **Default domain** | `app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewebsites.net` |
+| **`QA_REVIEW_BASE_URL`** | `https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewebsites.net` (no trailing `/api`) |
+| **`QA_REVIEW_TOKEN`** | Set in portal + `.env` (do not commit `.env`) |
+
+**Do not use** short hostname `app-boardroom-prod.azurewebsites.net` — DNS does not resolve for this Flex app.
+
+### First steps next session (15 min)
+
+1. Confirm GitHub Actions deploy green for `e39b337`: [workflow runs](https://github.com/stanchernov-ai/invest/actions/workflows/deploy.yml).
+2. After next **deliver** run: open QA email → tap **Review QA accuracy** → confirm/save per-agent reviews.
+3. Pull artifacts: `.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id <run_id>`.
+4. Check `qa_human_review_<run_id>.json` in state container and `ecosystem_state.json` → `qa_human_reviews`.
+
+### Open items (ordered)
+
+| Priority | Item |
+|----------|------|
+| **P1** | **URL-encode `token` in `build_review_url()`** — token contains `%`; may break query string if unencoded (probe saw 403). |
+| **P1** | **First human review on a real run** — validate email link + blob `qa_human_review_{run_id}.json`. |
+| **P2** | Wire post-job Cursor agents (`api_audit`, `data_insights`, `supervisor_summaries` still empty in ecosystem state). |
+| **P2** | Relative strength + sector weights in prepare (FMP thread). |
+| **P2** | Buffett PE/P/S caps in Python (`.cursorrules` P0). |
+| **P3** | Weekly scorecard digest email; per-finding human review; consolidate overlapping QA weekly roles. |
+| **P3** | Promote chairman financial limits to full Python validators. |
+
+### Not committed (local only)
+
+* `test_chart.py`, `tools/fmp_field_probe_results.json`
+* `.cursor/agent_state/ecosystem_state.json` (local pre-commit ledger noise)
+
+### Reference (FMP / market data — still active backlog)
+
+See **Session Handoff — FMP / Market Data (reference)** below and [`docs/fmp_data_dictionary.md`](fmp_data_dictionary.md).
+
+---
+
+## Session Handoff — FMP / Market Data (reference — not current pickup)
+
+> Historical context; P2 FMP work continues when agent/QA thread is stable.
+
+### Done (May 28 commit — FMP)
 
 | Item | Detail |
 |------|--------|
@@ -155,7 +214,7 @@ Full API reference + dead URLs: **`docs/fmp_data_dictionary.md`**. Guardrails: *
 * **Problem:** A single Azure Function ran data prep + board debate + all QA + email in one invocation. With the QA Integrity auditor on Pro reading the full debate log + dashboard, runs hit **~13 min locally and the hard 10:00 Azure ceiling**, getting killed mid-QA (run `20260528_231049`). One opaque log made it hard to tell *where* it broke.
 * **Decision (Stan, Option A):** Split into **three independent functions**, each with its own 10-minute budget, chained so one kicks off the next. Smaller files, and a failure localizes to a phase.
 * **Architecture:**
-  * **Job 1 `prepare`** (`src/jobs/prepare.py`) — sync inputs, parse ledger, FMP metrics/news/macro, TWR returns, build the board mega-prompt. **Prepare-phase QA gate = the Data Oracle** run up front; a corrupt feed fails Job 1 before any debate tokens are spent. Writes `runs/{run_id}/prepare.json` checkpoint.
+  * **Job 1 `prepare`** (`src/jobs/prepare.py`) — sync inputs, parse ledger, FMP metrics/news/macro, TWR returns, build the board mega-prompt. **Prepare-phase price gate** = deterministic Python (`src/core/data_oracle.py`); corrupt $0 prices fail Job 1 before debate tokens. Writes `runs/{run_id}/prepare.json` checkpoint (includes `oracle`, `price_feed`).
   * **Job 2 `debate`** (`src/jobs/debate.py`) — the board engine (`engine.app.astream`): panel, rebuttal, synthesis, Munger, chairman + deterministic 10% cap, **compliance gate**. Writes `runs/{run_id}/debate.json`. No rendering/email.
   * **Job 3 `deliver`** (`src/jobs/deliver.py`) — render briefing + QA dashboard, **post-work QA**, email both, merge telemetry. 
 * **QA trims (first cuts, per Stan "non-crucial QA like graph first"):**

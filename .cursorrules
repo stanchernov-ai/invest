@@ -75,7 +75,7 @@ Set on the Function App (and local `.env` for testing):
 
 | Variable | Example | Purpose |
 |----------|---------|---------|
-| `QA_REVIEW_BASE_URL` | `https://app-boardroom-prod.azurewebsites.net/api` | Base URL for the review link in the QA email |
+| `QA_REVIEW_BASE_URL` | `https://<defaultHostName>` e.g. `https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewebsites.net` — **host only, no `/api`** | Base URL for the review link in the QA email |
 | `QA_REVIEW_TOKEN` | *(long random secret)* | Required query param `token=` on `/api/qa-review` |
 
 Without both, deliver still runs but the email omits the review button.

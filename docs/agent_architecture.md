@@ -389,6 +389,11 @@ After each deliver run, `build_qa_scorecard()` records per QA agent:
 
 After the QA dashboard email, open the **Review QA accuracy** link (requires `QA_REVIEW_BASE_URL` + `QA_REVIEW_TOKEN` on the Function App).
 
+| Setting | Example (production) |
+|---------|----------------------|
+| `QA_REVIEW_BASE_URL` | `https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewebsites.net` |
+| `QA_REVIEW_TOKEN` | Long random secret (App settings + local `.env` only) |
+
 | Storage | Path |
 |---------|------|
 | Per-run | `boardroom-state` / `qa_human_review_{run_id}.json` |
@@ -396,7 +401,7 @@ After the QA dashboard email, open the **Review QA accuracy** link (requires `QA
 | Local Cursor | `ecosystem_state.json` → `qa_human_reviews[]` (when writable) |
 | Reports | `qa_reports_{run_id}.json` (full findings for the form) |
 
-**Endpoint:** `GET/POST /api/qa-review?run_id=…&token=…`
+**Endpoint:** `GET/POST /api/qa-review?run_id=…&token=…` — deployed as `qa_human_review` (commit `e39b337`).
 
 **Fetch for offline review:** `tools/fetch_azure_reports.py` pulls `qa_human_review_*` and `qa_reports_*`.
 
@@ -474,6 +479,7 @@ Areas with **multiple owners** — track reductions in `action_tracker.md`:
 
 | Date | Change |
 |------|--------|
+| May 29, 2026 | Deploy `e39b337`: `qa_human_review` live on Azure; collaboration protocol §0.5 in `.cursorrules` |
 | May 29, 2026 | Human-confirmed QA review UI — Azure `/api/qa-review` + dual blob/state storage |
 | May 29, 2026 | QA agent scorecard → `QA_SCORECARD` telemetry + `qa_scorecards[]` in ecosystem state |
 | May 29, 2026 | `data_oracle` → deterministic Python; debate skips duplicate run |
