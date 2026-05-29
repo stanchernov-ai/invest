@@ -31,6 +31,7 @@ class StateMachineOrchestrator:
         self.oracle_valid = False
         self.oracle_reason = "Default security stance. Awaiting Oracle clearance."
         self.red_team_json = "{}"
+        self.compliance_attempts: list[dict] = []
 
     async def _ensure_oracle_cleared(self) -> None:
         """Use prepare-phase oracle when present; otherwise run the LLM gate (legacy)."""
@@ -228,6 +229,7 @@ class StateMachineOrchestrator:
         from src.core.compliance_audit import (
             audit_chairman_compliance,
             format_compliance_digest,
+            format_compliance_failure_summary,
             format_debate_for_compliance,
             merge_compliance_reports,
         )
@@ -252,8 +254,47 @@ class StateMachineOrchestrator:
         )
         res = await self._run_agent("compliance", prompt, schema=ComplianceReport)
         merged = merge_compliance_reports(deterministic_violations, res)
+        self.compliance_attempts.append({
+            "attempt": len(self.compliance_attempts) + 1,
+            "is_compliant": merged.get("is_compliant", False),
+            "violations": merged.get("violations") or [],
+            "feedback_to_chairman": merged.get("feedback_to_chairman", ""),
+        })
         self.state.is_approved = merged.get("is_compliant", False)
         self.state.qa_feedback = merged.get("feedback_to_chairman", "Compliance rejection triggered.")
+        if not self.state.is_approved:
+            summary = format_compliance_failure_summary(
+                violations=merged.get("violations") or [],
+                feedback=merged.get("feedback_to_chairman", ""),
+                attempts=len(self.compliance_attempts),
+            )
+            logger.error("[COMPLIANCE] Attempt %s rejected:\n%s", len(self.compliance_attempts), summary)
+
+    def build_compliance_failure_detail(self) -> dict:
+        """Structured failure payload for debate phase logging and persistence."""
+        from src.core.compliance_audit import format_compliance_failure_summary
+
+        last = self.compliance_attempts[-1] if self.compliance_attempts else {}
+        violations = last.get("violations") or []
+        feedback = last.get("feedback_to_chairman") or self.state.qa_feedback or ""
+        chairman_empty = (
+            not self.state.chairman_draft_json
+            or self.state.chairman_draft_json == "{}"
+        )
+        summary = format_compliance_failure_summary(
+            violations=violations,
+            feedback=feedback,
+            attempts=len(self.compliance_attempts) or self.max_qa_retries,
+            chairman_empty=chairman_empty,
+        )
+        return {
+            "gate": "compliance",
+            "attempts": self.compliance_attempts,
+            "violations": violations,
+            "feedback_to_chairman": feedback,
+            "summary": summary,
+            "chairman_draft_present": not chairman_empty,
+        }
 
     async def execute_red_team(self) -> None:
         unicorns = json.dumps(self.state.unicorn_trades or [])
@@ -286,6 +327,13 @@ class AppWrapper:
         
         chair_data = json.loads(final_state.chairman_draft_json) if final_state.is_approved else {}
         red_data = json.loads(orchestrator.red_team_json) if final_state.is_approved else {}
-        yield {"compliance": {"is_approved": final_state.is_approved, "chairman_data": chair_data, "red_team_data": red_data}}
+        compliance_payload = {
+            "is_approved": final_state.is_approved,
+            "chairman_data": chair_data,
+            "red_team_data": red_data,
+        }
+        if not final_state.is_approved:
+            compliance_payload["failure_detail"] = orchestrator.build_compliance_failure_detail()
+        yield {"compliance": compliance_payload}
 
 app = AppWrapper()

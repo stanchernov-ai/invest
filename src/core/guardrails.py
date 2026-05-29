@@ -15,6 +15,7 @@ WASH_SALE_DAYS = 30
 
 BUY_VERDICTS = frozenset({"BUY", "STRONG BUY"})
 SELL_VERDICTS = frozenset({"SELL", "TRIM"})
+HEDGE_SYMBOLS = frozenset({"TLT", "VXX"})
 
 _DATE_FORMATS = (
     "%m/%d/%Y",
@@ -57,12 +58,23 @@ def _prepend_override(pos: dict, message: str) -> None:
     pos["synthesis"] = f"{message} {pos.get('synthesis', '')}"
 
 
+def _is_hedge_symbol(symbol: str) -> bool:
+    return str(symbol or "").upper() in HEDGE_SYMBOLS
+
+
 def enforce_max_buys(chairman: dict, *, max_buys: int = MAX_DAILY_BUYS) -> dict:
-    """Keep at most ``max_buys`` Buy/Strong Buy verdicts; demote the rest by conviction."""
+    """Keep at most ``max_buys`` equity Buy/Strong Buy verdicts; demote the rest by conviction.
+
+    Mandatory hedge symbols (TLT/VXX) are exempt from the buy cap and are always
+    preserved in ``capital_flow_audit.target_tickers`` so the compliance gate can
+    verify hedge execution."""
     ranked: list[tuple[int, str, int, dict]] = []
     for section_key in ("portfolio_positions", "watchlist_positions"):
         for idx, pos in enumerate(chairman.get(section_key, [])):
+            sym = pos.get("symbol", "")
             if _normalize_verdict(pos.get("final_verdict", "")) in BUY_VERDICTS:
+                if _is_hedge_symbol(sym):
+                    continue
                 ranked.append((
                     int(pos.get("aggregate_conviction_score") or 0),
                     section_key,
@@ -84,7 +96,8 @@ def enforce_max_buys(chairman: dict, *, max_buys: int = MAX_DAILY_BUYS) -> dict:
     audit = chairman.get("capital_flow_audit")
     if audit and "target_tickers" in audit:
         audit["target_tickers"] = [
-            sym for sym in audit.get("target_tickers", []) if sym in kept_symbols
+            sym for sym in audit.get("target_tickers", [])
+            if sym in kept_symbols or _is_hedge_symbol(sym)
         ]
 
     return chairman

@@ -4,6 +4,7 @@ import unittest
 from src.core.compliance_audit import (
     audit_chairman_compliance,
     count_buy_verdicts,
+    format_compliance_failure_summary,
     format_debate_for_compliance,
     merge_compliance_reports,
 )
@@ -79,6 +80,16 @@ class TestComplianceAudit(unittest.TestCase):
         text = format_debate_for_compliance(messages)
         self.assertIn("ROUND 2", text)
         self.assertNotIn("noise", text)
+
+    def test_failure_summary_includes_violations(self):
+        summary = format_compliance_failure_summary(
+            violations=["HEDGE MANDATE: TLT missing"],
+            feedback="Add TLT to target_tickers.",
+            attempts=3,
+        )
+        self.assertIn("HEDGE MANDATE", summary)
+        self.assertIn("Add TLT", summary)
+        self.assertIn("3", summary)
 
 
 if __name__ == "__main__":

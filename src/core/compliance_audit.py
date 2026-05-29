@@ -5,9 +5,7 @@ Compliance LLM focuses on debate-log alignment and funding logic.
 """
 from __future__ import annotations
 
-from src.core.guardrails import BUY_VERDICTS, MAX_DAILY_BUYS, _normalize_verdict
-
-HEDGE_SYMBOLS = frozenset({"TLT", "VXX"})
+from src.core.guardrails import BUY_VERDICTS, HEDGE_SYMBOLS, MAX_DAILY_BUYS, _normalize_verdict
 
 
 def count_buy_verdicts(chairman: dict) -> int:
@@ -105,6 +103,28 @@ def format_compliance_digest(violations: list[str]) -> str:
     lines = ["DETERMINISTIC COMPLIANCE PRE-CHECK: FAIL — fix these before resubmitting:"]
     for v in violations:
         lines.append(f"  - {v}")
+    return "\n".join(lines)
+
+
+def format_compliance_failure_summary(
+    *,
+    violations: list[str],
+    feedback: str = "",
+    attempts: int = 0,
+    chairman_empty: bool = False,
+) -> str:
+    """Human-readable summary for logs, run_status, and failure emails."""
+    lines = ["Compliance gate rejected chairman output after debate."]
+    if attempts:
+        lines.append(f"Retry attempts exhausted: {attempts}.")
+    if chairman_empty:
+        lines.append("Chairman produced no approved allocation JSON.")
+    if violations:
+        lines.append("Violations:")
+        lines.extend(f"  - {v}" for v in violations)
+    feedback = (feedback or "").strip()
+    if feedback:
+        lines.append(f"Feedback to chairman:\n{feedback}")
     return "\n".join(lines)
 
 

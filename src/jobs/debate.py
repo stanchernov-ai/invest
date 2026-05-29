@@ -61,6 +61,7 @@ async def run_debate(run_id: str) -> dict:
         raw_board_messages = []
         unicorn_trades = []
         is_approved_flag = False
+        compliance_failure_detail = None
 
         async for output in app.astream(initial_state):
             for key, value in output.items():
@@ -90,14 +91,42 @@ async def run_debate(run_id: str) -> dict:
                     if is_approved_flag:
                         c_data = value.get("chairman_data", {})
                         red_team_data = value.get("red_team_data", {})
+                    else:
+                        compliance_failure_detail = value.get("failure_detail") or {}
 
         if not is_approved_flag or not c_data:
-            error_msg = "Compliance processing failed completely."
-            logger.error(error_msg)
-            notifier.send_error_alert(error_msg)
-            storage_client.mark_phase(run_id, "debate", "failed",
-                                      finished_at=now_local().isoformat(),
-                                      error="compliance processing failed")
+            detail = compliance_failure_detail or {}
+            error_summary = detail.get("summary") or "Compliance processing failed completely."
+            logger.error("[DEBATE] Compliance gate failed for run %s:\n%s", run_id, error_summary)
+
+            failure_blob = {
+                "run_id": run_id,
+                "phase": "debate",
+                "gate": "compliance",
+                "error": error_summary,
+                **detail,
+            }
+            try:
+                storage_client.save_state_blob(
+                    f"compliance_failure_{run_id}.json",
+                    failure_blob,
+                )
+                storage_client.save_report(
+                    f"api_telemetry_{run_id}_debate.json",
+                    json.dumps({"AGENT_ACTIVITY": agent_activity.snapshot(), "COMPLIANCE_FAILURE": failure_blob}, indent=4),
+                )
+            except Exception as persist_exc:
+                logger.warning("[DEBATE] Could not persist compliance failure artifact: %s", persist_exc)
+
+            notifier.send_error_alert(error_summary)
+            storage_client.mark_phase(
+                run_id,
+                "debate",
+                "failed",
+                finished_at=now_local().isoformat(),
+                error=error_summary[:2000],
+                compliance_violations=detail.get("violations") or [],
+            )
             return {"run_id": run_id, "status": "failed", "is_approved": False}
 
         raw_log_combined = "".join(raw_log_lines)

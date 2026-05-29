@@ -48,6 +48,47 @@ class TestMaxBuys(unittest.TestCase):
         self.assertIn("Maximum 3 Buys", result["watchlist_positions"][3]["synthesis"])
         self.assertEqual(result["capital_flow_audit"]["target_tickers"], ["A", "B", "C"])
 
+    def test_preserves_mandatory_hedge_in_target_tickers(self):
+        """TLT/VXX hedge targets must survive max-buys filtering (compliance gate)."""
+        chairman = {
+            "capital_flow_audit": {
+                "target_tickers": ["META", "MNDY", "AMZN", "TLT"],
+                "liquidated_tickers": [],
+            },
+            "portfolio_positions": [],
+            "watchlist_positions": [
+                _pos("META", "Buy", 30),
+                _pos("MNDY", "Buy", 25),
+                _pos("AMZN", "Buy", 20),
+                _pos("VRT", "Buy", 15),
+            ],
+        }
+        result = enforce_max_buys(chairman)
+        targets = result["capital_flow_audit"]["target_tickers"]
+        self.assertIn("TLT", targets)
+        self.assertNotIn("VRT", targets)
+        self.assertEqual(
+            [p["final_verdict"] for p in result["watchlist_positions"] if p["symbol"] == "VRT"][0],
+            "Pass",
+        )
+
+    def test_hedge_buy_verdict_not_demoted_by_cap(self):
+        chairman = {
+            "capital_flow_audit": {"target_tickers": ["A", "B", "C", "TLT"], "liquidated_tickers": []},
+            "portfolio_positions": [],
+            "watchlist_positions": [
+                _pos("A", "Buy", 40),
+                _pos("B", "Buy", 35),
+                _pos("C", "Buy", 30),
+                _pos("D", "Buy", 25),
+                _pos("TLT", "Buy", 5),
+            ],
+        }
+        result = enforce_max_buys(chairman)
+        tlt = next(p for p in result["watchlist_positions"] if p["symbol"] == "TLT")
+        self.assertEqual(tlt["final_verdict"], "Buy")
+        self.assertIn("TLT", result["capital_flow_audit"]["target_tickers"])
+
     def test_portfolio_buys_demoted_to_hold(self):
         chairman = {
             "capital_flow_audit": {"target_tickers": [], "liquidated_tickers": []},
