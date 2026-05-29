@@ -572,7 +572,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 <table width="100%" cellpadding="0" cellspacing="0" style="margin: 10px 0; border-left: 4px solid {{ border_color }}; background-color: {{ box_color }}; border-radius: 4px;">
                     <tr>
                         <td width="65" valign="top" style="padding: 15px 0 15px 15px;">
-                            <img src="{{ quote.avatar_url }}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; display: block;" alt="Avatar">
+                            <img src="{{ quote.avatar_url }}" style="width: 50px; height: 50px; border-radius: 50%; display: block; max-width: 50px;" alt="{{ quote.board_member }} avatar">
                         </td>
                         <td valign="middle" style="padding: 15px; font-style: italic;">
                             <strong>{{ quote.board_member }}:</strong> "{{ quote.quote }}"
@@ -584,12 +584,18 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {% if alpha_pick %}
             <h2>🎯 The Alpha Pick</h2>
             <div class="metric-box" style="border-left-color: #f59e0b;">
-                <div style="display: flex; align-items: flex-start; margin-bottom: 10px;">
-                    {% if alpha_pick.image %}
-                    <img src="{{ alpha_pick.image }}" alt="{{ alpha_pick.symbol }} logo" style="width: 48px; height: 48px; border-radius: 6px; margin-right: 15px; object-fit: contain; background-color: #ffffff; flex-shrink: 0;">
-                    {% endif %}
-                    <p style="margin-top: 0; font-size: 1.1em;"><strong>{{ alpha_pick.symbol }}</strong>: "{{ alpha_pick.champion_quote }}"</p>
-                </div>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
+                    <tr>
+                        {% if alpha_pick.image %}
+                        <td valign="top" width="63" style="padding-right: 15px;">
+                            <img src="{{ alpha_pick.image }}" alt="{{ alpha_pick.symbol }} logo" style="width: 48px; height: 48px; border-radius: 6px; display: block; max-width: 48px; background-color: #ffffff;">
+                        </td>
+                        {% endif %}
+                        <td valign="top">
+                            <p style="margin-top: 0; font-size: 1.1em;"><strong>{{ alpha_pick.symbol }}</strong>: "{{ alpha_pick.champion_quote }}"</p>
+                        </td>
+                    </tr>
+                </table>
                 
                 {% if red_team_case %}
                 <h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 1.05em; color: #991b1b; border-bottom: none;">⚠️ The Bear Case Rebuttal</h3>
@@ -616,7 +622,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                         <tr>
                             {% if item.image %}
                             <td valign="middle" style="padding-right: 12px;">
-                                <img src="{{ item.image }}" alt="{{ item.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; display: block; max-width: 28px; height: auto;">
+                                <img src="{{ item.image }}" alt="{{ item.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; display: block; max-width: 28px; background-color: #ffffff;">
                             </td>
                             {% endif %}
                             <td valign="middle">
@@ -651,12 +657,18 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 {% if grouped_actions[category] %}
                     {% for pos in grouped_actions[category] %}
                         <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
-                            <div style="display: flex; align-items: center; margin-bottom: 12px;">
-                                {% if pos.image %}
-                                <img src="{{ pos.image }}" alt="{{ pos.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; margin-right: 12px; object-fit: contain; background-color: #ffffff;">
-                                {% endif %}
-                                <span class="verdict-pill" style="{{ pill_styles[category] }} margin-bottom: 0;">{{ category }} : {{ pos.symbol }}</span>
-                            </div>
+                            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
+                                <tr>
+                                    {% if pos.image %}
+                                    <td valign="middle" style="padding-right: 12px;">
+                                        <img src="{{ pos.image }}" alt="{{ pos.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; display: block; max-width: 28px; background-color: #ffffff;">
+                                    </td>
+                                    {% endif %}
+                                    <td valign="middle">
+                                        <span class="verdict-pill" style="{{ pill_styles[category] }} margin-bottom: 0;">{{ category }} : {{ pos.symbol }}</span>
+                                    </td>
+                                </tr>
+                            </table>
                             <p><strong>Strategic Context:</strong> {{ pos.synthesis }}</p>
                             {% if pos.narrative %}
                                 <p><span class="champion">The Champion ({{ pos.narrative.champion }}):</span> "{{ pos.narrative.champion_quote }}"</p>
