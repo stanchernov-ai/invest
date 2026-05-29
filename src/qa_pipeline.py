@@ -52,23 +52,33 @@ def reconcile_compliance(report: dict) -> dict:
 
 def parse_board_matrix(raw_messages, all_tickers):
     matrix = {ticker: {"buffett": "", "lynch": "", "livermore": "", "huang": "", "simons": ""} for ticker in all_tickers}
+    agent_names = {
+        "buffett": "Warren Buffett",
+        "lynch": "Peter Lynch",
+        "livermore": "Jesse Livermore",
+        "huang": "Jensen Huang",
+        "simons": "Jim Simons",
+    }
     for msg in raw_messages:
         content = msg.get("content", "")
         agent = None
-        if "**Warren Buffett**" in content: agent = "buffett"
-        elif "**Peter Lynch**" in content: agent = "lynch"
-        elif "**Jesse Livermore**" in content: agent = "livermore"
-        elif "**Jensen Huang**" in content: agent = "huang"
-        elif "**Jim Simons**" in content: agent = "simons"
-        if not agent: continue
+        for key, name in agent_names.items():
+            # Match both legacy `**Warren Buffett**` and debate headers `**[ROUND N] Warren Buffett**`.
+            if name in content and (f"**{name}**" in content or f"] {name}**" in content):
+                agent = key
+                break
+        if not agent:
+            continue
         for line in content.split("\n"):
             if line.startswith("* **"):
                 parts = line.split("**: ")
                 if len(parts) > 1:
                     ticker = parts[0].replace("* **", "").strip()
                     verdict_full = parts[1].split(" ")[0].replace("*", "")
-                    if "Strong" in parts[1]: verdict_full = "Strong Buy"
-                    if ticker in matrix: matrix[ticker][agent] = verdict_full
+                    if "Strong" in parts[1]:
+                        verdict_full = "Strong Buy"
+                    if ticker in matrix:
+                        matrix[ticker][agent] = verdict_full
     return matrix
 
 
@@ -94,14 +104,20 @@ def _execution_error_report(role: str, exc: Exception) -> dict:
     }
 
 
-async def run_post_flight_qa(raw_log: str, chairman_json: str):
+async def run_post_flight_qa(
+    raw_log: str,
+    chairman_json: str,
+    *,
+    raw_board_messages: list[dict] | None = None,
+    all_symbols: list[str] | None = None,
+):
     logger.info("Initiating Post Flight QA Audit.")
-    qa_prompt = f"RAW DEBATE LOG:\n{raw_log}\n\nFINAL CHAIRMAN ALLOCATION:\n{chairman_json}"
-    contents = [types.Content(role="user", parts=[types.Part.from_text(text=qa_prompt)])]
+    base_prompt = f"RAW DEBATE LOG:\n{raw_log}\n\nFINAL CHAIRMAN ALLOCATION:\n{chairman_json}"
+    contents = [types.Content(role="user", parts=[types.Part.from_text(text=base_prompt)])]
 
+    parallel_keys = ["post_mortem_qa", "system_architect"]
     tasks = []
-    agent_keys = ["post_mortem_qa", "system_architect", "prompt_engineer"]
-    for key in agent_keys:
+    for key in parallel_keys:
         info = agent_config["board_members"][key]
         config_params = {
             "system_instruction": info["system_instruction"],
@@ -113,34 +129,94 @@ async def run_post_flight_qa(raw_log: str, chairman_json: str):
             config_params["max_output_tokens"] = FLASH_TOKEN_LIMIT
         tasks.append(call_gemini_async(info["model"], contents, types.GenerateContentConfig(**config_params), agent_name=key))
 
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    parallel_results = await asyncio.gather(*tasks, return_exceptions=True)
 
     qa_reports = []
-    for key, res in zip(agent_keys, results):
+    for key, res in zip(parallel_keys, parallel_results):
         role_name = agent_config["board_members"][key]["role"]
-        if isinstance(res, Exception):
-            logger.error(f"QA execution failed for {role_name}: {res}")
-            qa_reports.append(_execution_error_report(role_name, res))
-        else:
-            try:
-                parsed_res = json.loads(res.text)
-                parsed_res["agent_role"] = role_name
-                qa_reports.append(reconcile_compliance(parsed_res))
-            except Exception as e:
-                logger.error(f"Failed to parse QA report for {role_name}: {e}")
-                qa_reports.append({
-                    "agent_role": role_name,
-                    "is_compliant": False,
-                    "findings": [{
-                        "severity": "CRITICAL",
-                        "category": "Parsing Error",
-                        "description": "Agent returned malformed JSON.",
-                        "recommendation": "Review raw agent output for syntax errors.",
-                    }],
-                    "summary": "Failed to parse agent JSON output.",
-                })
+        qa_reports.append(_parse_qa_result(role_name, res))
+
+    prompt_engineer_report = await run_prompt_engineer_qa(
+        raw_log,
+        chairman_json,
+        raw_board_messages or [],
+        all_symbols or [],
+    )
+    qa_reports.append(prompt_engineer_report)
 
     return qa_reports
+
+
+def _parse_qa_result(role_name: str, res) -> dict:
+    if isinstance(res, Exception):
+        logger.error(f"QA execution failed for {role_name}: {res}")
+        return _execution_error_report(role_name, res)
+    try:
+        parsed_res = json.loads(res.text)
+        parsed_res["agent_role"] = role_name
+        return reconcile_compliance(parsed_res)
+    except Exception as e:
+        logger.error(f"Failed to parse QA report for {role_name}: {e}")
+        return {
+            "agent_role": role_name,
+            "is_compliant": False,
+            "findings": [{
+                "severity": "CRITICAL",
+                "category": "Parsing Error",
+                "description": "Agent returned malformed JSON.",
+                "recommendation": "Review raw agent output for syntax errors.",
+            }],
+            "summary": "Failed to parse agent JSON output.",
+        }
+
+
+async def run_prompt_engineer_qa(
+    raw_log: str,
+    chairman_json: str,
+    raw_board_messages: list[dict],
+    all_symbols: list[str],
+) -> dict:
+    """Persona audit: deterministic pre-check + contrarian LLM pass."""
+    from src.qa.persona_audit import (
+        audit_debate_persona,
+        format_persona_digest,
+        merge_persona_reports,
+        sanitize_rubber_stamp_pass,
+    )
+
+    role_name = agent_config["board_members"]["prompt_engineer"]["role"]
+    violations, stats = audit_debate_persona(raw_board_messages, all_symbols)
+    digest = format_persona_digest(violations, stats)
+    prompt_text = (
+        f"{digest}\n\nRAW DEBATE LOG:\n{raw_log}\n\nFINAL CHAIRMAN ALLOCATION:\n{chairman_json}"
+    )
+    contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt_text)])]
+    info = agent_config["board_members"]["prompt_engineer"]
+    config_params = {
+        "system_instruction": info["system_instruction"],
+        "temperature": 0.15,
+        "response_mime_type": "application/json",
+        "response_schema": QAAgentReport,
+    }
+
+    try:
+        res = await call_gemini_async(
+            info["model"],
+            contents,
+            types.GenerateContentConfig(**config_params),
+            agent_name="prompt_engineer",
+        )
+        parsed = json.loads(res.text)
+        parsed["agent_role"] = role_name
+        merged = merge_persona_reports(violations, parsed)
+        return sanitize_rubber_stamp_pass(reconcile_compliance(merged))
+    except Exception as exc:
+        logger.error(f"QA execution failed for {role_name}: {exc}")
+        if violations:
+            merged = merge_persona_reports(violations, None)
+            merged["agent_role"] = role_name
+            return reconcile_compliance(merged)
+        return _execution_error_report(role_name, exc)
 
 
 def build_graphics_report(chart_health: list[dict]) -> dict:

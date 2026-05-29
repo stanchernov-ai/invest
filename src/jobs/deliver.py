@@ -97,7 +97,12 @@ async def run_deliver(run_id: str) -> dict:
         matrix_md = qa_pipeline.generate_matrix_markdown(board_matrix)
 
         # --- Post-work QA ---
-        qa_reports = await qa_pipeline.run_post_flight_qa(raw_log_combined, json.dumps(c_data))
+        qa_reports = await qa_pipeline.run_post_flight_qa(
+            raw_log_combined,
+            json.dumps(c_data),
+            raw_board_messages=raw_board_messages,
+            all_symbols=all_symbols,
+        )
 
         # Build every chart once; reuse for render + the deterministic health probe.
         chart_urls = reporting.build_briefing_charts(sorted_ledger, account_holdings, account_returns, history_data)
