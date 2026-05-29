@@ -67,7 +67,7 @@ This document tracks identified bugs, architectural improvements, and long-term 
 | **P2** | Relative strength + sector weights in prepare (FMP thread). |
 | **P2** | Buffett PE/P/S caps in Python (`.cursorrules` P0). |
 | **P3** | Weekly scorecard digest email; per-finding human review; consolidate overlapping QA weekly roles. |
-| **P3** | Promote chairman financial limits to full Python validators. |
+| ~~**P3**~~ | ~~Promote chairman financial limits to full Python validators.~~ **DONE (May 29, 2026)** — `src/core/guardrails.py`: max 3 buys, 10% cap, wash-sale. |
 
 ### Not committed (local only)
 

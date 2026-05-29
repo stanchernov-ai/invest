@@ -363,6 +363,7 @@ flowchart TB
 | Function | Module | Effect |
 |----------|--------|--------|
 | `validate_price_feed()` | `src/core/data_oracle.py` | Abort on $0 price |
+| `apply_chairman_guardrails()` | `src/core/guardrails.py` | Max 3 buys, 10% liquidation cap, 30-day wash-sale |
 | `reconcile_compliance()` | `src/qa_pipeline.py` | CRITICAL finding → force `is_compliant=false` |
 | `audit_chart_health()` | `src/output/reporting.py` | HTTP probe each chart URL |
 | `audit_briefing_html()` | `src/qa/visual_audit.py` | Email-unsafe CSS, missing alt, empty chart src |

@@ -50,6 +50,7 @@ async def run_debate(run_id: str) -> dict:
             "all_symbols": prep["all_symbols"],
             "total_portfolio_value": prep["total_portfolio_value"],
             "portfolio_holdings": prep["portfolio_holdings"],
+            "purchase_dates": prep.get("purchase_dates", {}),
             "oracle_valid": prep_oracle.get("is_valid") if prep_oracle else None,
             "oracle_reason": prep_oracle.get("reason", ""),
             "oracle_prices": prep.get("price_feed") or {},

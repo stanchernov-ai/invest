@@ -111,6 +111,7 @@ class BoardroomState(BaseModel):
     sell_candidates: list[str] = []
     total_portfolio_value: float = 0.0
     portfolio_holdings: dict = {}
+    purchase_dates: dict[str, str] = {}
     # When set by prepare checkpoint, debate skips re-running the price gate.
     oracle_valid: bool | None = None
     oracle_reason: str = ""

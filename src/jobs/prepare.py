@@ -324,6 +324,7 @@ async def run_prepare(run_id: str = None) -> dict:
             "all_symbols": clean_symbols,
             "total_portfolio_value": total_portfolio_value,
             "portfolio_holdings": {sym: data["Total"] for sym, data in master_ledger.items()},
+            "purchase_dates": {sym: data.get("Purchase_Date", "Unknown") for sym, data in master_ledger.items()},
             "sorted_ledger": sorted_ledger,
             "account_holdings": account_holdings,
             "account_returns": account_returns,
