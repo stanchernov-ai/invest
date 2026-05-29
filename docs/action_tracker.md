@@ -39,7 +39,7 @@ This document tracks identified bugs, architectural improvements, and long-term 
 |----------|------|
 | ~~**P0**~~ | ~~**Commit + deploy P1**~~ **DONE** — `11ee4d9` pushed to `main`. |
 | ~~**P1**~~ | ~~**First human review on a real run**~~ **DONE (May 29)** — runs `20260529_092332`, `20260529_095341`; encoded review link + Azure blob + ledger OK. |
-| **P1** | ~~**State of the Union fix**~~ **DONE (May 29)** — deterministic `build_state_of_union_quotes()` from `overall_portfolio_critique`; debate log includes Portfolio Overview lines. |
+| ~~**P1**~~ | ~~**State of the Union fix**~~ **DONE (May 29)** — deterministic `build_state_of_union_quotes()`; debate log includes Portfolio Overview lines. *(pending deploy validation)* |
 | **P1** | **Prompt Engineer QA scope** — audit each agent's config/prompt for sufficient context (Stan rejected PASS on `095341`). |
 | **P2** | Split `reporting.py` + extract prompts from `agents.py` (AI context window) |
 | **P2** | Split `action_tracker.md` — handoff block vs archived sessions |

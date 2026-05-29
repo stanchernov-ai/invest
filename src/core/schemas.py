@@ -25,12 +25,15 @@ class PanelistPortfolioVerdict(BaseModel):
     watchlist_verdicts: list[WatchlistAssetVerdict] = Field(description="Verdicts for EVERY ticker provided in the APPROVED WATCHLIST TARGETS list.")
 
 class StateOfTheUnionQuote(BaseModel):
-    board_member: str = Field(description="The name of the board member.")
-    quote: str = Field(description="Their specific 'OVERALL CRITIQUE' extracted exactly as they said it.")
+    board_member: str = Field(description="Panelist display name with star rating and stance, e.g. 'Warren Buffett (⭐⭐⭐ Bullish)'.")
+    quote: str = Field(description="The panelist's overall_portfolio_critique — a 2-sentence portfolio-level view. MUST NOT be a per-ticker stock analysis.")
 
 class ChiefOfStaffSynthesis(BaseModel):
     boardroom_brawl: str = Field(description="A dramatic narrative of today's debate, formatted as EXACTLY 3 paragraphs separated by newline characters (\\n\\n between paragraphs). Each paragraph must be 3-4 sentences. Pit specific members against each other by name and describe how they attacked each other's premises in the rebuttal round. Do NOT return a single run-on block.")
-    state_of_the_union_quotes: list[StateOfTheUnionQuote] = Field(description="Extract the overall critique from every single board member.")
+    state_of_the_union_quotes: list[StateOfTheUnionQuote] = Field(
+        default_factory=list,
+        description="Populated deterministically by the engine from panel overall_portfolio_critique fields; leave empty.",
+    )
 
 class TradeNarrative(BaseModel):
     champion: str = Field(description="The name of the specific board member who argued FOR this action.")

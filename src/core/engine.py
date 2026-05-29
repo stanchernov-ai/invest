@@ -12,6 +12,7 @@ from src.core.schemas import (
 )
 from src.core.data_oracle import validate_price_feed
 from src.core.guardrails import apply_chairman_guardrails
+from src.core.state_of_union import build_state_of_union_quotes
 from src.core.agents import call_gemini_async, agent_config, FAST_MODEL, FLASH_TOKEN_LIMIT
 
 logger = logging.getLogger(__name__)
@@ -130,6 +131,8 @@ class StateMachineOrchestrator:
         for agent_key, res in zip(agents, results):
             role_name = agent_config["board_members"][agent_key]["role"]
             msg = f"**[ROUND 1] {role_name}**:\n"
+            if res and res.get("overall_portfolio_critique"):
+                msg += f"* **Portfolio Overview**: {res['overall_portfolio_critique']}\n"
             if res and res.get('portfolio_verdicts'):
                 for v in res['portfolio_verdicts']:
                     v_sym = v.get("symbol", "Unknown")
@@ -149,6 +152,8 @@ class StateMachineOrchestrator:
             role_name = agent_config["board_members"][agent_key]["role"]
             msg = f"**[ROUND 2 REBUTTAL] {role_name}**:\n"
             if res:
+                if res.get("overall_portfolio_critique"):
+                    msg += f"* **Portfolio Overview**: {res['overall_portfolio_critique']}\n"
                 for v in res.get('portfolio_verdicts', []):
                     v_sym = v.get("symbol", "Unknown")
                     v_erd = v.get("verdict", "Hold")
@@ -180,6 +185,8 @@ class StateMachineOrchestrator:
         
         history = "\n\n".join([m["content"] for m in self.state.messages])
         cos_res = await self._run_agent("clerk", f"Synthesize structural friction points into JSON:\n\n{history}", schema=ChiefOfStaffSynthesis)
+        if cos_res:
+            cos_res["state_of_the_union_quotes"] = build_state_of_union_quotes(self.raw_verdicts)
         self.state.chief_of_staff_json = json.dumps(cos_res) if cos_res else "{}"
 
     async def execute_munger_audit(self) -> None:
