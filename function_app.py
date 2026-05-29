@@ -132,9 +132,24 @@ def boardroom_prepare(myTimer: func.TimerRequest, debateOut: func.Out[str]) -> N
 @app.route(route="prepare", auth_level=func.AuthLevel.FUNCTION)
 @app.queue_output(arg_name="debateOut", queue_name=DEBATE_QUEUE, connection="AzureWebJobsStorage")
 def boardroom_prepare_http(req: func.HttpRequest, debateOut: func.Out[str]) -> func.HttpResponse:
-    """Manual kickoff of the full chain (no lock, so forced re-runs are allowed)."""
-    from src.jobs.prepare import run_prepare
+    """Manual kickoff of the full chain. Rejects concurrent runs (409); re-runs after terminal states OK."""
+    from src import storage_client
+
+    in_flight = storage_client.is_run_in_flight()
+    if in_flight:
+        body = json.dumps({
+            "run_id": in_flight.get("run_id"),
+            "phase": in_flight.get("phase"),
+            "message": "A pipeline run is already in progress.",
+        })
+        logging.warning(
+            "Prepare HTTP rejected — run %s still %s in phase %s.",
+            in_flight.get("run_id"), in_flight.get("status"), in_flight.get("phase"),
+        )
+        return func.HttpResponse(body, status_code=409, mimetype="application/json")
+
     run_id = _new_run_id()
+    from src.jobs.prepare import run_prepare
     ok = _run_phase(run_prepare(run_id=run_id), run_id, "prepare")
     if ok:
         debateOut.set(run_id)

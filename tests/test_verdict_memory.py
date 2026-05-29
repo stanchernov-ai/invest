@@ -50,6 +50,30 @@ class VerdictMemoryTests(unittest.TestCase):
         mock_save.assert_not_called()
         mock_load.assert_not_called()
 
+    @patch("src.verdict_memory.save_board_verdicts")
+    @patch("src.verdict_memory.load_board_verdicts")
+    def test_implicit_pass_from_watchlist_symbols(self, mock_load, mock_save):
+        mock_load.return_value = {}
+        chairman = {
+            "watchlist_positions": [
+                {"symbol": "MNDY", "final_verdict": "Buy"},
+                {"symbol": "LLY", "final_verdict": "Strong Buy"},
+            ]
+        }
+        count = verdict_memory.persist_chairman_watchlist_passes(
+            chairman,
+            "20260529_120049",
+            is_approved=True,
+            watchlist_symbols=["MNDY", "LLY", "META", "PLTR"],
+        )
+        self.assertEqual(count, 2)
+        saved = mock_save.call_args[0][0]
+        self.assertIn("META", saved)
+        self.assertIn("PLTR", saved)
+        self.assertNotIn("MNDY", saved)
+        self.assertNotIn("LLY", saved)
+        self.assertEqual(saved["META"][0]["date"], "20260529")
+
     @patch("src.verdict_memory.get_blob_service_client", return_value=None)
     def test_save_and_load_round_trip(self, _mock_client):
         with patch.object(verdict_memory, "DATA_DIR", self.data_dir):

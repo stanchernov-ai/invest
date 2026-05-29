@@ -12,6 +12,15 @@ INPUT_CONTAINER = f"boardroom{dash}inputs"
 STATE_CONTAINER = f"boardroom{dash}state"
 REPORT_CONTAINER = f"boardroom{dash}reports"
 RUN_STATUS_BLOB = "run_status.json"
+RUN_STATUS_CURRENT_BLOB = "run_status_current.json"
+
+
+def _run_status_blob_for_run(run_id: str) -> str:
+    return f"run_status_{run_id}.json"
+
+
+def _run_status_local_path(filename: str) -> str:
+    return os.path.join(DATA_DIR, filename)
 
 # Phases of the split pipeline (prepare -> debate -> deliver). Each runs as its
 # own Azure Function invocation with its own 10-minute ceiling.
@@ -29,42 +38,84 @@ STATE_SYNC_ALLOWLIST = (
 )
 
 
-def save_run_status(payload: dict) -> None:
-    """Publish latest pipeline run status to state blob (completion signal for monitors)."""
-    client = get_blob_service_client()
-    json_str = json.dumps(payload, indent=2)
-
-    filepath = os.path.join(DATA_DIR, RUN_STATUS_BLOB)
+def _write_run_status_local(filename: str, json_str: str) -> None:
+    filepath = _run_status_local_path(filename)
     os.makedirs(os.path.dirname(filepath) or DATA_DIR, exist_ok=True)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(json_str)
 
-    if client:
-        try:
-            blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=RUN_STATUS_BLOB)
-            blob_client.upload_blob(json_str, overwrite=True)
-        except Exception:
-            logger.error("Failed to publish run_status.json to Azure.")
+
+def _upload_run_status_blob(client, blob_name: str, json_str: str) -> None:
+    try:
+        blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=blob_name)
+        blob_client.upload_blob(json_str, overwrite=True)
+    except Exception:
+        logger.error("Failed to publish %s to Azure.", blob_name)
 
 
-def load_run_status() -> dict | None:
-    """Load run_status.json from Azure state container, falling back to local copy."""
+def _load_run_status_blob(blob_name: str) -> dict | None:
     client = get_blob_service_client()
     if client:
         try:
-            blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=RUN_STATUS_BLOB)
+            blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=blob_name)
             if blob_client.exists():
                 return json.loads(blob_client.download_blob().readall())
         except Exception:
-            logger.warning("Could not load run_status.json from Azure.")
+            logger.warning("Could not load %s from Azure.", blob_name)
 
-    filepath = os.path.join(DATA_DIR, RUN_STATUS_BLOB)
+    filepath = _run_status_local_path(blob_name)
     if os.path.exists(filepath):
         try:
             with open(filepath, encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             pass
+    return None
+
+
+def save_run_status_for_run(run_id: str, payload: dict) -> None:
+    """Persist phased status for one run_id (survives overlapping kicks)."""
+    json_str = json.dumps(payload, indent=2)
+    per_run_blob = _run_status_blob_for_run(run_id)
+    _write_run_status_local(per_run_blob, json_str)
+
+    client = get_blob_service_client()
+    if client:
+        _upload_run_status_blob(client, per_run_blob, json_str)
+
+
+def save_run_status(payload: dict) -> None:
+    """Publish the current-run pointer (monitors + HTTP guards read this)."""
+    client = get_blob_service_client()
+    json_str = json.dumps(payload, indent=2)
+
+    for filename in (RUN_STATUS_BLOB, RUN_STATUS_CURRENT_BLOB):
+        _write_run_status_local(filename, json_str)
+
+    run_id = payload.get("run_id")
+    if run_id:
+        save_run_status_for_run(run_id, payload)
+
+    if client:
+        for blob_name in (RUN_STATUS_BLOB, RUN_STATUS_CURRENT_BLOB):
+            _upload_run_status_blob(client, blob_name, json_str)
+
+
+def load_run_status() -> dict | None:
+    """Load the current pipeline pointer (run_status_current.json, then run_status.json)."""
+    return _load_run_status_blob(RUN_STATUS_CURRENT_BLOB) or _load_run_status_blob(RUN_STATUS_BLOB)
+
+
+def load_run_status_for_run(run_id: str) -> dict | None:
+    """Load phased status for a specific run_id."""
+    return _load_run_status_blob(_run_status_blob_for_run(run_id))
+
+
+def is_run_in_flight() -> dict | None:
+    """Return current status dict when overall status is 'running', else None."""
+    status = load_run_status()
+    if status and status.get("status") == "running":
+        return status
     return None
 
 def get_blob_service_client():
@@ -186,6 +237,7 @@ def _base_run_status(run_id: str, started_at: str) -> dict:
 def begin_run_status(run_id: str, started_at: str) -> dict:
     """Initialize (or reset) the phased run status blob at the start of a run."""
     status = _base_run_status(run_id, started_at)
+    save_run_status_for_run(run_id, status)
     save_run_status(status)
     return status
 
@@ -199,7 +251,7 @@ def mark_phase(run_id: str, phase: str, phase_status: str, *,
     Overall `status` becomes 'failed' if any phase fails, and 'success' only when
     the deliver phase succeeds. Intermediate phase success keeps overall 'running'
     so existing monitors (wait_for_run.py) wait for the full run."""
-    status = load_run_status() or {}
+    status = load_run_status_for_run(run_id) or {}
     if status.get("run_id") != run_id:
         status = _base_run_status(run_id, started_at or finished_at or "")
 
@@ -227,7 +279,10 @@ def mark_phase(run_id: str, phase: str, phase_status: str, *,
     else:
         status["status"] = "running"
 
-    save_run_status(status)
+    save_run_status_for_run(run_id, status)
+    current = load_run_status()
+    if not current or current.get("run_id") == run_id:
+        save_run_status(status)
     return status
 
 
@@ -320,6 +375,8 @@ def execute_retention_policy(days_to_keep=14):
                     "board_verdicts.json",
                     "portfolio_history.json",
                     "qa_human_reviews_ledger.json",
+                    RUN_STATUS_BLOB,
+                    RUN_STATUS_CURRENT_BLOB,
                 ]:
                     continue
 

@@ -50,38 +50,62 @@ def save_board_verdicts(history: dict) -> None:
         logger.error("Failed to upload board_verdicts.json to Azure.")
 
 
-def extract_watchlist_pass_entries(chairman_data: dict, run_id: str) -> dict[str, list[dict]]:
-    """Build append-only Pass records from chairman watchlist positions."""
-    if not chairman_data:
+def extract_watchlist_pass_entries(
+    chairman_data: dict,
+    run_id: str,
+    *,
+    watchlist_symbols: list[str] | None = None,
+) -> dict[str, list[dict]]:
+    """Build append-only Pass records from chairman watchlist positions.
+
+    The chairman JSON often omits non-actionable Pass rows; when ``watchlist_symbols``
+    is supplied, symbols not assigned Buy/Strong Buy are treated as implicit Pass."""
+    if not chairman_data and not watchlist_symbols:
         return {}
 
     date_str = run_id[:8] if len(run_id) >= 8 and run_id[:8].isdigit() else now_local().strftime("%Y%m%d")
     entries: dict[str, list[dict]] = {}
+    actionable: set[str] = set()
 
     for pos in chairman_data.get("watchlist_positions") or []:
         sym = (pos.get("symbol") or "").strip().upper()
         if not sym:
             continue
         verdict = (pos.get("final_verdict") or "").strip()
-        if verdict.upper() != "PASS":
-            continue
-        entries.setdefault(sym, []).append(
-            {
-                "verdict": "Pass",
-                "date": date_str,
-                "unanimous_pass": False,
-            }
-        )
+        if verdict.upper() == "PASS":
+            entries.setdefault(sym, []).append(
+                {"verdict": "Pass", "date": date_str, "unanimous_pass": False}
+            )
+        elif verdict.upper() in ("BUY", "STRONG BUY"):
+            actionable.add(sym)
+
+    if watchlist_symbols:
+        for sym in watchlist_symbols:
+            sym = (sym or "").strip().upper()
+            if not sym or sym in actionable or sym in entries:
+                continue
+            entries.setdefault(sym, []).append(
+                {"verdict": "Pass", "date": date_str, "unanimous_pass": False}
+            )
+
     return entries
 
 
-def persist_chairman_watchlist_passes(chairman_data: dict, run_id: str, *, is_approved: bool) -> int:
+def persist_chairman_watchlist_passes(
+    chairman_data: dict,
+    run_id: str,
+    *,
+    is_approved: bool,
+    watchlist_symbols: list[str] | None = None,
+) -> int:
     """Append Pass cooldown entries after a compliant debate. Returns symbols updated."""
     if not is_approved:
         logger.info("Skipping verdict memory — debate not compliance-approved.")
         return 0
 
-    new_entries = extract_watchlist_pass_entries(chairman_data, run_id)
+    new_entries = extract_watchlist_pass_entries(
+        chairman_data, run_id, watchlist_symbols=watchlist_symbols
+    )
     if not new_entries:
         return 0
 

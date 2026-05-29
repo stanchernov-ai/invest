@@ -182,18 +182,27 @@ async def run_deliver(run_id: str) -> dict:
                                   briefing_blob=f"executive_briefing_{run_id}.html",
                                   qa_blob=f"qa_dashboard_{run_id}.html")
         # Mirror briefing/qa blob names to the top level for existing monitors.
-        status = storage_client.load_run_status() or {}
+        status = storage_client.load_run_status_for_run(run_id) or {}
         status["briefing_blob"] = f"executive_briefing_{run_id}.html"
         status["qa_blob"] = f"qa_dashboard_{run_id}.html"
-        storage_client.save_run_status(status)
+        storage_client.save_run_status_for_run(run_id, status)
+        current = storage_client.load_run_status()
+        if not current or current.get("run_id") == run_id:
+            storage_client.save_run_status(status)
 
         storage_client.execute_retention_policy(14)
 
+        portfolio_syms = set(prep.get("portfolio_holdings") or {})
+        watchlist_symbols = [
+            sym for sym in (prep.get("all_symbols") or [])
+            if sym not in portfolio_syms
+        ]
         # Watchlist Pass cooldown — only after compliance-approved debate (Markopolos gate).
         verdict_memory.persist_chairman_watchlist_passes(
             c_data,
             run_id,
             is_approved=bool(debate.get("is_approved")),
+            watchlist_symbols=watchlist_symbols,
         )
 
         # Post-deliver retrospective (idempotent per run_id; non-blocking).

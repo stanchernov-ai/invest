@@ -20,7 +20,7 @@ sys.path.insert(0, ROOT)
 
 import src.config.settings  # noqa: F401 — loads .env via settings SSOT
 
-from src.storage_client import load_run_status
+from src.storage_client import load_run_status, load_run_status_for_run
 
 TERMINAL = frozenset({"success", "failed", "aborted"})
 
@@ -60,14 +60,17 @@ def main() -> None:
     print(f"Monitoring run_status.json for {label} (timeout {args.timeout}s)...")
 
     while time.time() < deadline:
-        status = load_run_status()
+        if args.run_id:
+            status = load_run_status_for_run(args.run_id) or load_run_status()
+        else:
+            status = load_run_status()
         if status:
             run_id = status.get("run_id")
             state = status.get("status")
 
             if args.run_id and run_id != args.run_id:
                 if last_printed != "waiting_for_run":
-                    print(f"  … stale status for run_id={run_id}; waiting for {args.run_id}")
+                    print(f"  … no status yet for {args.run_id} (pointer shows {run_id})")
                     last_printed = "waiting_for_run"
             else:
                 snapshot = f"{run_id}:{state}"

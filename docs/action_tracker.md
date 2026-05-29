@@ -9,7 +9,15 @@ This document tracks identified bugs, architectural improvements, and long-term 
 
 ## Session Handoff — May 29, 2026 (architecture cleanup — pick up here)
 
-> **Stan — start here next session.** P1 verdict memory + scout fix on `main` (`11ee4d9`). Validate `board_verdicts.json` after next deliver run.
+> **Stan — start here next session.** Deploy double-run guard + verdict-memory implicit-Pass fix. Re-run deliver persistence validation on next compliant run (120049 missed Pass writes — chairman omits non-actionable rows).
+
+### Shipped (this session — pending deploy)
+
+| Area | Detail |
+|------|--------|
+| **Double-run guard** | `boardroom_prepare_http` → 409 JSON `{run_id, phase}` when `is_run_in_flight()` |
+| **Per-run status** | `run_status_{run_id}.json` + `run_status_current.json` pointer; `mark_phase` no longer clobbers overlapping runs |
+| **Verdict memory fix** | Implicit Pass for watchlist symbols not assigned Buy/Strong Buy (120049 had 0 Pass rows in chairman JSON) |
 
 ### Shipped (architecture thread)
 
@@ -24,16 +32,26 @@ This document tracks identified bugs, architectural improvements, and long-term 
 ### Verdict memory rules (SSOT behavior)
 
 1. **Write:** end of successful **deliver**, only when `debate.is_approved` (Markopolos compliance passed).
-2. **What:** chairman watchlist **`Pass`** only → append to `board_verdicts.json` (local `DATA_DIR` + Azure `boardroom-state`).
+2. **What:** watchlist **`Pass`** — explicit in chairman JSON **or implicit** (watchlist symbol not assigned Buy/Strong Buy) → append to `board_verdicts.json`.
 3. **Read:** scout at prepare start (after `sync_inputs_from_cloud`) — 7-day Pass cooldown (`unanimous_pass` reserved; always `false` for now).
 4. **Not gated on:** post-flight QA (graphics/integrity) — intentional simplicity; revisit if needed.
 
+### Post-deliver — run `20260529_120049` (canonical)
+
+| Check | Result |
+|-------|--------|
+| Run finished | `success` — debate 214s, deliver 131s |
+| `prepare: null` in status | **Bug confirmed** — overlapping kick (115549 → 120049) overwrote phased status before per-run fix |
+| Human QA review | **Not submitted yet** — use QA email for **120049** (not 115549) |
+| Verdict memory | **Not validated** — Azure `board_verdicts.json` has no Pass / no `20260529` dates; root cause: chairman JSON only lists MNDY+LLY (Buy), omits implicit Pass (META etc.) — fixed in code, needs deploy + next deliver |
+| Briefing spot-check | Graphics QA CRITICAL: benchmark chart scale, Action Plan / TWR placement, debate wall-of-text — see `retrospective_20260529_120049.md` |
+
 ### First steps next session
 
-1. ~~**Commit + push P1**~~ **DONE** — `11ee4d9` on `main`; GitHub Actions deploy on push.
-2. **Validate on a real run:** after deliver, confirm `board_verdicts.json` in Azure state container updates with Pass entries.
-3. ~~**First human review** on a live run~~ **DONE** — run `20260529_095341`; blob + ledger confirmed.
-4. **After each deliver:** follow [`post_deliver_checklist.md`](post_deliver_checklist.md) — retrospective runs automatically; review `retrospective_{run_id}.md` in Azure.
+1. **Deploy** double-run guard + verdict-memory + per-run status (this session's diff).
+2. **Human review** on QA dashboard for run `20260529_120049`.
+3. **Validate verdict memory** after next compliant deliver — expect log line `Persisted N watchlist Pass verdict(s)` and `20260529` Pass rows in Azure `board_verdicts.json`.
+4. **After each deliver:** follow [`post_deliver_checklist.md`](post_deliver_checklist.md).
 
 ### Open items (ordered — see also full backlog below)
 
@@ -42,7 +60,8 @@ This document tracks identified bugs, architectural improvements, and long-term 
 | ~~**P0**~~ | ~~**Commit + deploy P1**~~ **DONE** — `11ee4d9` pushed to `main`. |
 | ~~**P1**~~ | ~~**First human review on a real run**~~ **DONE (May 29)** — runs `20260529_092332`, `20260529_095341`; encoded review link + Azure blob + ledger OK. |
 | ~~**P1**~~ | ~~**State of the Union fix**~~ **DONE (May 29)** — deterministic `build_state_of_union_quotes()`; debate log includes Portfolio Overview lines. *(pending deploy validation)* |
-| **P1** | **Prompt Engineer QA scope** — audit each agent's config/prompt for sufficient context (Stan rejected PASS on `095341`). |
+| **P1** | **Prompt Engineer QA scope** — audit each agent's config/prompt for sufficient context (Stan rejected PASS on `095341`; MNDY fabricated quote on `120049`). |
+| **P1** | **Briefing layout** — benchmark chart scale, Action Plan / TWR placement, debate scannability (Graphics QA CRITICAL on `120049`). |
 | **P2** | Split `reporting.py` + extract prompts from `agents.py` (AI context window) |
 | **P2** | Split `action_tracker.md` — handoff block vs archived sessions |
 | **P2** | Root `README.md` + `docs/qa_layers.md` one-pager |
