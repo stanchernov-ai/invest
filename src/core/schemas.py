@@ -98,6 +98,8 @@ class BoardroomState(BaseModel):
     munger_overrides: dict[str, str] = {}
     unicorn_trades: list[dict] = []
     sell_candidates: list[str] = []
+    total_portfolio_value: float = 0.0
+    portfolio_holdings: dict = {}
     
 DATA_SCHEMA_BINDING = "You are bound by a strict data schema. You must format your final output precisely according to the requested JSON structure. Do not output raw text."
 
@@ -135,7 +137,8 @@ def generate_dynamic_mandate(current_portfolio_value: float, weighted_cagr: floa
         f"The objective is to aggressively outperform the NASDAQ by at least 5 percent annually. "
         f"Current portfolio value is ${current_portfolio_value:,.2f} with an estimated weighted historical CAGR of {r*100:.2f} percent. "
         f"If this rate of return is maintained, the projected balance at age 65 is ${future_value:,.2f}. "
-        f"Demand excellence, alpha, and aggressive outperformance to push this projection higher."
+        f"Demand excellence, alpha, and aggressive outperformance to push this projection higher. "
+        f"[STRICT 10 PERCENT LIQUIDATION CAP = ${current_portfolio_value * 0.10:,.2f}]. You are mathematically forbidden from selling or trimming more than this total dollar amount today."
     )
     return mandate
 

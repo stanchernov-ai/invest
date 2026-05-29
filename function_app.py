@@ -47,13 +47,14 @@ def boardroom_daily_run(myTimer: func.TimerRequest) -> None:
 
         lease_client = BlobLeaseClient(blob_client)
         
-        lease_client.acquire(lease_duration=60)
-        logging.info("Distributed lock acquired. Guaranteeing idempotent execution.")
+        lease_client.acquire(lease_duration=-1)
+        logging.info("Distributed lock acquired (infinite lease). Guaranteeing idempotent execution.")
         
-        asyncio.run(main_batch())
-        
-        lease_client.release()
-        logging.info("Pipeline execution complete. Lock released successfully.")
+        try:
+            asyncio.run(main_batch())
+        finally:
+            lease_client.release()
+            logging.info("Pipeline execution complete. Lock released successfully.")
         
     except ResourceModifiedError:
         logging.warning("Lock acquisition failed. Another container is processing this window. Terminating safely.")

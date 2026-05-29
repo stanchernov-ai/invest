@@ -9,19 +9,24 @@ This document tracks identified bugs, architectural improvements, and long-term 
 
 ## Phase 1: Immediate Bug Fixes & Hygiene
 
-### 1.1 Azure Blob Lease Duration (Concurrency Fix)
+### 1.1 Azure Blob Lease Duration (Concurrency Fix) — DONE (May 28, 2026)
 * **Description:** The current blob lease duration is 60 seconds, but the pipeline takes longer. This risks a second instance acquiring the lock and running concurrently.
 * **Implementation Details:** 
   * Update `function_app.py` to acquire the lease for the maximum allowed time or a duration that covers the Azure Function timeout (10 minutes for Consumption plan). 
   * *Note:* Azure Blob Storage leases can be set to 15-60 seconds, or infinite (`-1`). We will set it to `-1` (infinite) upon acquisition.
   * Wrap the `main_batch()` execution in a strict `try/finally` block to ensure `lease_client.release()` is *always* called, even if the pipeline crashes, so the lock isn't permanently stuck.
+* **Resolution:**
+  * Updated `function_app.py` to use `lease_duration=-1` and added a `try...finally` block.
 
-### 1.2 Munger Audit Results Discarded
+### 1.2 Munger Audit Results Discarded — DONE (May 28, 2026)
 * **Description:** `execute_munger_audit()` runs but its output is never passed to the Chairman, wasting tokens and losing valuable concentration risk analysis.
 * **Implementation Details:**
   * In `src/core/engine.py`, capture the output of the `asyncio.gather(*tasks)` for the Munger audit.
   * Format the results into a string (e.g., `"MUNGER AUDIT WARNINGS: ..."`).
   * Inject this string dynamically into the `chairman` prompt during `execute_chairman_arbitration()`.
+* **Resolution:** 
+  * Updated `execute_munger_audit` to save results to `self.state.munger_overrides`.
+  * Updated `execute_chairman_arbitration` to inject `[CRITICAL MUNGER AUDIT CONCENTRATION WARNINGS]` if present.
 
 ### 1.3 Hardcoded Temporary Paths — DONE (May 28, 2026)
 * **Description:** The codebase uses `/tmp/data` and `/tmp/output`, which causes issues on Windows development environments.
@@ -45,7 +50,7 @@ This document tracks identified bugs, architectural improvements, and long-term 
 
 ## Phase 2: Architectural Improvements
 
-### 2.1 Move 10% Liquidation Cap Math to Python
+### 2.1 Move 10% Liquidation Cap Math to Python — DONE (May 28, 2026)
 * **Description:** The Chairman LLM is currently asked to calculate exactly 10% of the portfolio and execute fractional trims. LLMs struggle with deterministic math, risking compliance failures.
 * **Implementation Details:**
   * Update the Chairman's prompt to remove the strict math requirement. Instead, ask the Chairman to *rank* his preferred sell/trim candidates and specify the new assets he wants to buy.
@@ -53,13 +58,19 @@ This document tracks identified bugs, architectural improvements, and long-term 
   * Use Python to calculate exactly 10% of `total_portfolio_value`.
   * Iterate through the Chairman's ranked sell list, trimming positions programmatically until the 10% cap is reached or the buys are funded.
   * Pass this mathematically validated execution plan to the Compliance agent.
+* **Resolution:** 
+  * Updated Chairman's system prompt.
+  * Enforced mathematical validation inside `execute_chairman_arbitration` in `src/core/engine.py`.
 
-### 2.2 Global Error Notifications (Silent Failures)
+### 2.2 Global Error Notifications (Silent Failures) — DONE (May 28, 2026)
 * **Description:** If the pipeline aborts (e.g., Data Oracle fails, FMP crashes), it exits silently without notifying the user.
 * **Implementation Details:**
   * Add a `send_error_alert(error_message: str)` function to `src/output/notifier.py`.
   * In `src/main.py`, wrap the core logic of `main_batch()` in a global `try/except`.
   * On caught exceptions (or explicit `FatalDataError`), trigger the error alert email so the user is immediately aware of the failure.
+* **Resolution:**
+  * Added `send_error_alert` to `notifier.py`.
+  * Handled `DATA ORACLE`, `Compliance`, `Advanced metrics`, and generic fatal exceptions in `src/main.py` via `notifier.send_error_alert`.
 
 ### 2.3 Replace yfinance 3M Momentum with FMP — DONE (May 28, 2026)
 * **Description:** `yfinance` was used for the 3M trend but is prone to rate-limiting and scraping blocks. FMP is preferred but has tier limits and deprecated endpoints.

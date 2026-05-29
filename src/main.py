@@ -152,7 +152,7 @@ async def main_batch():
         except Exception: 
             watchlist_data = {}
 
-        master_ledger, total_portfolio_value, dummy_trend, dummy_trades, historical_verdicts, sector_weights = pipeline.process_portfolios()
+        master_ledger, total_portfolio_value = pipeline.process_portfolios()
         account_holdings = pipeline.build_account_holdings()
         
         keys_to_delete = [sym for sym, data in master_ledger.items() if data["Total"] < 50.0]
@@ -178,7 +178,9 @@ async def main_batch():
             advanced_data = {}
             for sym, res in zip(clean_symbols, results_list):
                 if isinstance(res, Exception):
-                    logger.error("FATAL ABORT: Advanced metrics corrupted. Killing pipeline to prevent AI hallucination.")
+                    error_msg = f"FATAL ABORT: Advanced metrics corrupted for {sym}. Killing pipeline to prevent AI hallucination."
+                    logger.error(error_msg)
+                    notifier.send_error_alert(error_msg)
                     return
                 advanced_data[sym] = res
 
@@ -299,7 +301,14 @@ async def main_batch():
             f"=== APPROVED WATCHLIST TARGETS ===\n{watchlist_str}\n"
         )
 
-        initial_state = {"base_data_prompt": mega_prompt, "live_mandate": live_mandate, "heavy_tickers": heavy_tickers, "all_symbols": clean_symbols}
+        initial_state = {
+            "base_data_prompt": mega_prompt, 
+            "live_mandate": live_mandate, 
+            "heavy_tickers": heavy_tickers, 
+            "all_symbols": clean_symbols,
+            "total_portfolio_value": total_portfolio_value,
+            "portfolio_holdings": {sym: data["Total"] for sym, data in master_ledger.items()}
+        }
         
         raw_log_lines = [
             f"# RAW DEBATE LOG BACKGROUND AUDIT\n\n"
@@ -317,7 +326,9 @@ async def main_batch():
         async for output in app.astream(initial_state):
             for key, value in output.items():
                 if key == "oracle" and not value["is_valid"]:
-                    logger.error("DATA ORACLE SECURITY ABORT TRIGGERED. EXITING.")
+                    error_msg = f"DATA ORACLE SECURITY ABORT TRIGGERED. EXITING. Reason: {value.get('reason', 'Unknown')}"
+                    logger.error(error_msg)
+                    notifier.send_error_alert(error_msg)
                     run_error = "data oracle validation failed"
                     return
                 if "messages" in value:
@@ -336,7 +347,9 @@ async def main_batch():
                         red_team_data = value.get("red_team_data", {})
         
         if not is_approved_flag or not c_data: 
-            logger.error("Compliance processing failed completely.")
+            error_msg = "Compliance processing failed completely."
+            logger.error(error_msg)
+            notifier.send_error_alert(error_msg)
             run_error = "compliance processing failed"
             return
 
@@ -374,7 +387,8 @@ async def main_batch():
 
     except Exception as e:
         run_error = str(e)
-        logger.error("Pipeline execution halted due to fatal exception.")
+        logger.error(f"Pipeline execution halted due to fatal exception: {e}")
+        notifier.send_error_alert(str(e))
     finally:
         finished = now_local()
         run_status.update({

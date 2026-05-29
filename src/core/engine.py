@@ -201,6 +201,48 @@ class StateMachineOrchestrator:
         corrections = f"\n\n[QA AMENDMENT REQUIRED]:\n{self.state.qa_feedback}" if self.state.qa_feedback else ""
         prompt = f"Review board arguments. Apply voting logic rules. Resolve contradictions.{munger_warning}{corrections}\n\n{history}"
         res = await self._run_agent("chairman", prompt, schema=ChairmanMasterSynthesis)
+        
+        if res and "capital_flow_audit" in res:
+            cap_remaining = self.state.total_portfolio_value * 0.10
+            liquidations = res["capital_flow_audit"].get("liquidated_tickers", [])
+            pos_dict = {p["symbol"]: p for p in res.get("portfolio_positions", [])}
+            valid_liquidations = []
+            
+            for sym in liquidations:
+                if sym not in pos_dict: continue
+                pos = pos_dict[sym]
+                verdict = pos["final_verdict"].upper()
+                if verdict not in ["SELL", "TRIM"]: continue
+                
+                holding_value = self.state.portfolio_holdings.get(sym, 0.0)
+                if holding_value <= 0: continue
+                
+                if cap_remaining <= 0:
+                    pos["final_verdict"] = "HOLD"
+                    pos["synthesis"] = "[SYSTEM OVERRIDE: 10% Liquidation Cap Reached. Hold enforced.] " + pos["synthesis"]
+                    continue
+                    
+                if verdict == "SELL" and holding_value > cap_remaining:
+                    pos["final_verdict"] = "TRIM"
+                    pos["synthesis"] = f"[SYSTEM OVERRIDE: Sell mathematically capped at ${cap_remaining:,.2f} to respect 10% limit. Converted to fractional trim.] " + pos["synthesis"]
+                    cap_remaining = 0
+                    valid_liquidations.append(sym)
+                else:
+                    deduction = holding_value if verdict == "SELL" else (holding_value / 2.0)
+                    if deduction > cap_remaining:
+                        pos["synthesis"] = f"[SYSTEM OVERRIDE: Trim mathematically capped at ${cap_remaining:,.2f} to respect 10% limit.] " + pos["synthesis"]
+                        cap_remaining = 0
+                    else:
+                        cap_remaining -= deduction
+                    valid_liquidations.append(sym)
+            
+            for sym, pos in pos_dict.items():
+                if pos["final_verdict"].upper() in ["SELL", "TRIM"] and sym not in valid_liquidations:
+                    pos["final_verdict"] = "HOLD"
+                    pos["synthesis"] = "[SYSTEM OVERRIDE: 10% Liquidation Cap Reached. Action canceled.] " + pos["synthesis"]
+                    
+            res["capital_flow_audit"]["liquidated_tickers"] = valid_liquidations
+
         self.state.chairman_draft_json = json.dumps(res) if res else "{}"
 
     async def execute_compliance_audit(self) -> None:
