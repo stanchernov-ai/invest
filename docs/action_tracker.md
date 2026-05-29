@@ -1,9 +1,98 @@
 # SC Invest Boardroom — Action Tracker
 
 **Status:** Active  
-**Last Updated:** May 28, 2026 (22:10)  
+**Last Updated:** May 28, 2026 (EOD handoff)  
 
 This document tracks identified bugs, architectural improvements, and long-term backlog items for the SC Invest Boardroom pipeline. Items are broken down into manageable blocks with specific implementation details.
+
+---
+
+## Session Handoff — May 28, 2026 EOD
+
+**Start here tomorrow.** Stan is waiting on the next pipeline run results to confirm everything works — no manual trigger was fired at end of session (another agent was still catching up).
+
+### Deployed tonight
+* **Git commits on `origin/main`:** `4dc0b2e` (governance tooling — charts/QA/HR/finance/Azure fetch) then **`29b4101`** (benchmark scrub utility `tools/scrub_benchmarks.py`). Both trigger **Deploy to Azure Functions** on push. We did **not** manually invoke the boardroom function at EOD.
+* **Local WIP not committed:** `test_chart.py` (chart testing). **`tools/scrub_benchmarks.py` is now on main** (was parallel-agent WIP at handoff time).
+* **Doc updates (this EOD handoff):** `docs/action_tracker.md`, `docs/engineering_playbook.md`, `docs/tech_stack_and_subscriptions.md`, `.cursor/rules/action_tracker.mdc` — modified locally; commit when ready.
+
+### Tomorrow morning — verify these first
+> **NOTE:** A major refactor landed late this session — the pipeline is now **split into 3 chained Azure Functions** (prepare → debate → deliver). See **Phase 0.1**. This is **not yet committed/deployed** — review the diff and deploy first.
+
+1. **GitHub Actions deploy** finished green (check Actions tab on `stanchernov-ai/invest` — `gh` CLI not available in local shell).
+2. **Next weekday run** — the **11:00 UTC** timer now starts only the **`prepare`** phase, which queue-chains to `debate` then `deliver`. Verify:
+   * Each phase finishes **under 10 min** (check `run_status.json` → `phase` + per-phase durations).
+   * Queue messages flow: `boardroom-debate-queue` then `boardroom-deliver-queue` get a `run_id` (Azure portal → Storage → Queues).
+   * Executive briefing email: charts render (headers **above** charts), line chart not broken, returns table at **bottom ~half width**, compact QA footer (agent + ✅/❌ only).
+   * **QA dashboard email** arrives from the `deliver` phase. Graphics QA row now reads "(deterministic)"; Integrity row may show a WARNING if it timed out (non-blocking).
+   * `api_telemetry_{run_id}.json` (merged) contains **`AGENT_ACTIVITY`** from all phases.
+3. **If a phase fails:** re-run just that phase via HTTP — `/api/debate?run_id=...` or `/api/deliver?run_id=...` (FUNCTION key) — no need to re-debate. Local full run: `python -m src.main`.
+3. **Optional local checks:**
+   * `.venv\Scripts\python.exe tools/fetch_azure_reports.py --list` then `--run-id YYYYMMDD_HHMMSS` for aligned artifacts.
+   * `.venv\Scripts\python.exe -m src.finance_oversight --fetch-latest` for subscription/plan-fit report.
+   * `.venv\Scripts\python.exe -m src.hr_review .cache\state\api_telemetry_*.json` once AGENT_ACTIVITY exists.
+
+### Confirmed monthly TCO (~$285/mo)
+| Service | $/mo | Source |
+|---------|-----:|--------|
+| Google AI Ultra (incl. API assumed bundled) | $199.99 | Stan |
+| FMP Starter | $29.00 | Stan |
+| Azure (pay-as-you-go + free credits) | ~$8.06 | Portal |
+| Cursor Pro+ | $48.00 | Stan ($576/yr) |
+| GitHub, QuickChart, Gmail, Polygon | $0 | Confirmed / assumed |
+
+**Still unvalidated:** Gemini API truly included in Ultra (check Google invoices). Finance Oversight agent hunts hidden costs — see `docs/subscriptions_registry.json` → `possible_hidden_costs`.
+
+### Key docs & entry points (built today)
+| Doc / module | Purpose |
+|--------------|---------|
+| `docs/subscriptions_registry.json` | Machine-readable SaaS cost registry — **update when prices change** |
+| `docs/tech_stack_and_subscriptions.md` | Human-readable stack map + TCO |
+| `src/finance_oversight.py` | Standalone subscription/plan-fit consultant (`python -m src.finance_oversight`) |
+| `src/hr_review.py` | Agent roster utilization (`python -m src.hr_review <telemetry>`) |
+| `tools/fetch_azure_reports.py` | Pull Azure artifacts to `.cache/` |
+| `docs/engineering_playbook.md` §4b | Chart/email/QA/compliance gotchas |
+
+### Recommended next backlog (when results look good)
+1. **Validate 6.1** — benchmark runtime + token cost on first post-deploy run; dial thinking budgets if needed.
+2. **5.2 Opportunity Audit** — coverage matrix of paid FMP fields vs. what agents consume.
+3. **3.2 Cursor rules** — `.cursor/rules/architecture_validator.mdc` for PR/architecture review.
+4. **5.3 Storage housekeeping** — configurable retention, telemetry blob cost.
+5. **Finance automation** — Azure Cost Management API pull into registry (moving costs).
+6. **Merge/commit local WIP** — `test_chart.py` if still relevant; commit EOD doc updates.
+
+### Known open issues to watch
+* Some historical runs have **no `qa_dashboard_*` blob** (pipeline may abort before QA HTML step) — confirm fixed on next success run.
+* **`reconcile_compliance()`** now forces ❌ if any CRITICAL finding exists — Graphics Designer may correctly fail until layout issues are resolved.
+* Azure **free trial credits** will eventually expire — watch Cost Management forecast.
+
+---
+
+## Phase 0: Runtime Architecture — Three-Phase Split
+
+### 0.1 Split monolithic run into prepare → debate → deliver — DONE (code complete, May 28, 2026)
+* **Problem:** A single Azure Function ran data prep + board debate + all QA + email in one invocation. With the QA Integrity auditor on Pro reading the full debate log + dashboard, runs hit **~13 min locally and the hard 10:00 Azure ceiling**, getting killed mid-QA (run `20260528_231049`). One opaque log made it hard to tell *where* it broke.
+* **Decision (Stan, Option A):** Split into **three independent functions**, each with its own 10-minute budget, chained so one kicks off the next. Smaller files, and a failure localizes to a phase.
+* **Architecture:**
+  * **Job 1 `prepare`** (`src/jobs/prepare.py`) — sync inputs, parse ledger, FMP metrics/news/macro, TWR returns, build the board mega-prompt. **Prepare-phase QA gate = the Data Oracle** run up front; a corrupt feed fails Job 1 before any debate tokens are spent. Writes `runs/{run_id}/prepare.json` checkpoint.
+  * **Job 2 `debate`** (`src/jobs/debate.py`) — the board engine (`engine.app.astream`): panel, rebuttal, synthesis, Munger, chairman + deterministic 10% cap, **compliance gate**. Writes `runs/{run_id}/debate.json`. No rendering/email.
+  * **Job 3 `deliver`** (`src/jobs/deliver.py`) — render briefing + QA dashboard, **post-work QA**, email both, merge telemetry. 
+* **QA trims (first cuts, per Stan "non-crucial QA like graph first"):**
+  * **Graphics QA is now deterministic** (`qa_pipeline.build_graphics_report`) — built straight from the chart-health HTTP probe, **no LLM**. (The LLM reviewer never actually saw images.)
+  * **QA Integrity auditor → Flash + hard 90s timeout** (`qa_pipeline.run_qa_integrity_audit`). On timeout it emits a non-blocking WARNING instead of killing the run or false-failing QA.
+  * Post-flight trio (post-mortem / systems architect / prompt engineer) unchanged, still parallel.
+* **Chaining:** **Azure Storage Queues** (non-blocking). `prepare` → `boardroom-debate-queue` → `debate` → `boardroom-deliver-queue` → `deliver`. Each queue message carries the `run_id`. Queues auto-created by the output binding. Timer (11:00 UTC weekdays) starts `prepare` only.
+* **Manual/recovery entrypoints:** HTTP routes `/api/prepare`, `/api/debate?run_id=...`, `/api/deliver?run_id=...` (FUNCTION auth) to force a run or **re-run a single phase** after a fix without re-debating. Local end-to-end: `python -m src.main` (runs all three in-process via `src/jobs/orchestrate.py`).
+* **run_status is now phased:** single `run_status.json` with `phase` + per-phase `{status, started_at, finished_at, duration_seconds, error}` sub-objects. Overall `status` stays `running` until `deliver` succeeds (so `wait_for_run.py` still works) and flips to `failed` on any phase failure. Each phase also self-aborts at a **540s soft timeout** so a host kill records `failed` instead of a stale `running`.
+* **Sync fix:** `sync_inputs_from_cloud()` now pulls only a curated state allowlist (`board_verdicts`, `portfolio_history`, `portfolio_returns`, `run_status`) instead of **every** historical `api_telemetry_*.json` — removes tens of seconds + cold-start FMP rate-limit pressure.
+* **Telemetry:** each phase writes `api_telemetry_{run_id}_{phase}.json`; `deliver` merges all three (summing per-agent activity) into the canonical `api_telemetry_{run_id}.json` so HR/finance consumers keep working.
+* **NEW shared modules:** `src/qa_pipeline.py` (moved QA + matrix helpers out of `main.py`), `src/logging_setup.py`, `src/jobs/` package. `main.py` is now a thin local wrapper.
+* **Verify on deploy (TODO):**
+  1. Add app setting **function/host key** is not required for queue chaining, but confirm `AzureWebJobsStorage` is set (it is — app already runs).
+  2. First run: `prepare` completes (~1–2 min), debate queue message appears, `debate` runs (~5 min), deliver queue message, `deliver` emails briefing + QA dashboard. Watch each phase < 10 min.
+  3. Confirm queue messages decode as plain `run_id` (extension-bundle base64 behavior) — if `debate`/`deliver` see empty run_id, set the queue message encoding or switch to explicit `QueueClient`.
+  4. `api_telemetry_{run_id}.json` contains merged `AGENT_ACTIVITY` from all phases.
+* **Not yet committed/deployed** as of this writing — review diff first.
 
 ---
 
@@ -202,24 +291,22 @@ Reference briefing: `executive_briefing_20260528_204417.html` (Azure `boardroom-
 * `storage_client.execute_retention_policy(days_to_keep=14)` already purges blobs older than 14 days from the state/report containers (protecting `daily_execution.lock`, `board_verdicts.json`, `portfolio_history.json`).
 * Phase 3.2 (Cursor Architecture & QA Agents) is the natural home for implementing these as Cursor subagents/rules on a weekly cadence.
 
-### 5.1 Specialized QA Review Team — PLANNED
-A team of focused reviewers, each producing a short scored report + prioritized recommendations. Proposed as **Cursor subagents/skills** run on a weekly cadence (reading the repo + the latest Azure logs/telemetry via the Phase 3.1 fetch script), with outputs consolidated into a single weekly digest.
+### 5.1 Specialized QA Review Team — PARTIAL (May 28, 2026)
+A team of focused reviewers, each producing a short scored report + prioritized recommendations. Originally proposed as Cursor subagents on a weekly cadence; **partially implemented as an Azure timer job.**
 
-| Reviewer | Focus | Primary inputs |
-|----------|-------|----------------|
-| **Data Flow** | Ingestion → ledger → prompt → report integrity; null/zero handling; double-counting; data quality | `pipeline.py`, telemetry JSON, raw debate log |
-| **Prompt Engineering** | Persona drift, sycophancy, prompt/schema conflicts, instruction adherence | `agents.py`, `schemas.py`, debate logs |
-| **APIs** | Endpoint health, deprecations, 4xx/429 rates, fallback usage, redundant calls | telemetry JSON (per-endpoint URLs + responses) |
-| **Tech Stack & Orchestration** | Pipeline structure, concurrency, retries, error handling, deploy/runtime health | `engine.py`, `main.py`, `function_app.py`, Actions logs |
-| **Finance / Cost** | Full monthly cost (Gemini tokens, FMP tier, Azure Functions + Storage + App Insights, email); identify cheaper alternatives **without losing functionality** | telemetry, Azure billing, model/plan choices |
-| **Opportunity / Value Extraction** | Are we extracting maximum value from each agent + each paid API call? Identify unused data fields, underused agents, "gold on the ground" | full agent roster, prompts, raw data vs what's actually used |
-| **HR Efficiency Consultant** | Right-size the agent roster: track every agent's activity/utilization, flag redundant, idle, or low-impact agents, surface gaps where a missing role would add value | agent roster, per-run debate logs, telemetry (which agents fired + token spend) |
-| **Graphics Designer** | Final report visual polish — layout, typography, color, chart quality/legibility, responsive/email rendering — so the briefing looks "amazing" | `reporting.py` template, rendered HTML briefing, chart outputs |
+| Reviewer | Focus | Status |
+|----------|-------|--------|
+| **Data Flow** | Ingestion → ledger → report integrity | In `src/qa_review.py` QA_TEAM_CONFIG |
+| **Prompt Engineering** | Persona drift, sycophancy | In QA_TEAM_CONFIG |
+| **APIs** | Endpoint health, 429s | In QA_TEAM_CONFIG |
+| **Tech Stack** | Pipeline structure, deploy health | In QA_TEAM_CONFIG |
+| **Finance / Cost** | Per-run duration optimization | In QA_TEAM_CONFIG (distinct from 5.7 subscription oversight) |
+| **Opportunity Audit** | Unused data fields | In QA_TEAM_CONFIG |
+| **Graphics Designer** | Briefing visual polish | In QA_TEAM_CONFIG + in-pipeline `graphics_designer_qa` (5.5) |
+| **HR Efficiency** | Agent roster right-sizing | **5.4** — wired into digest via `hr_review.py` |
 
-* **Implementation notes:**
-  * Each reviewer = a Cursor subagent with a tight system prompt + a scoring rubric (e.g., 1-5 per area + top 3 actions).
-  * Orchestrate via a "QA Lead" prompt/skill that runs all reviewers and merges into a ranked weekly recommendation list appended to a `docs/qa_reviews/` log.
-  * **Open questions for Stan:** (a) Cursor subagents vs adding more in-pipeline LLM agents? (b) Weekly cadence acceptable? (c) Should the weekly digest be emailed like the briefing?
+* **What runs today:** `function_app.py` timer **11:30 UTC weekdays** → `run_qa_review_team()` → emails QA digest. Fetches latest blobs from Azure; includes HR section when `AGENT_ACTIVITY` present in telemetry.
+* **Still open:** Cursor subagent/rules wrapper (3.2), weekly digest log in `docs/qa_reviews/`, orchestrating as a "QA Lead" skill.
 
 ### 5.2 Opportunity Audit — Value per API Call — PLANNED
 * **Description:** Stan's concern: "leaving gold on the ground." Audit each agent and each paid data field to ensure we're using what we pay for.
@@ -274,13 +361,13 @@ A team of focused reviewers, each producing a short scored report + prioritized 
 * **Roster note (feeds 5.4):** this adds two more agents (`graphics_designer_qa` already existed; `qa_integrity_auditor` is new). The growing QA roster makes the HR Efficiency Consultant (5.4) more relevant.
 
 ### 5.7 Finance & Subscription Oversight — DONE (May 28, 2026)
-* **Description:** Stan wants subscription/plan-fit governance across the whole project — not just per-run token usage (HR) or per-run duration (qa_review finance_cost), but "are we on the right plan, right tool, spending wisely?" including dev tooling (Cursor) and moving cloud/API bills.
+* **Description:** Stan wants subscription/plan-fit governance across the whole project — not just per-run token usage (HR) or per-run duration (qa_review finance_cost), but "are we on the right plan, right tool, spending wisely?" including dev tooling (Cursor) and moving cloud/API bills. Agent must **find missing invoices, ask Stan for gaps, and surface possible hidden costs** from the tech stack.
 * **Resolution (2026-05-28):**
-  * **`docs/subscriptions_registry.json`** — machine-readable registry (Stan-provided: Google AI Ultra $199.99/mo, Azure ~$8.06 forecast ~$8.95, Cursor Pro+ $48/mo; plus code-inventoried FMP, QuickChart, Gmail, GitHub, unused Polygon free).
-  * **`docs/tech_stack_and_subscriptions.md`** — human narrative + architecture map + **Gemini Ultra vs API key billing overlap** callout (critical open question).
-  * **`src/finance_oversight.py`** — standalone on-demand consultant: reads registry, optional latest `api_telemetry` (`--telemetry` or `--fetch-latest`), LLM produces RIGHT_PLAN/UPGRADE/DOWNGRADE/CUT/WATCH/FILL_IN_DATA per service; writes `docs/finance_oversight/oversight_*.html/json`; optional `--email`.
-  * **Future automation** documented in registry: Azure Cost Management API, Google API billing reconciliation, FMP dashboard.
-* **Open validation:** Gemini Ultra/API bundling (Google invoices). Agent hunts hidden costs from `possible_hidden_costs` list.
+  * **`docs/subscriptions_registry.json`** — machine-readable registry with confirmed costs: Ultra $199.99, FMP $29, Azure ~$8.06, Cursor $48/mo, GitHub $0 free, Polygon $0 unused. Gemini API recorded as **bundled in Ultra** (Stan assumption — `validation_status: unvalidated`). Includes `possible_hidden_costs` hunt list (Workspace, Azure post-credit, QuickChart paid, App Insights overages, stale Azure app-setting keys, etc.).
+  * **`docs/tech_stack_and_subscriptions.md`** — human narrative + architecture map.
+  * **`src/finance_oversight.py`** — standalone on-demand consultant: deterministic validation audit (missing data, unvalidated assumptions, hidden-cost list) + LLM plan-fit verdicts; outputs `docs/finance_oversight/oversight_*.html/json`; flags include `questions_for_stan`, `validation_actions`; optional `--fetch-latest` / `--email`.
+  * **Future automation** documented in registry: Azure Cost Management API, Google invoice reconciliation.
+* **Open validation:** Confirm Gemini API has no separate Google AI Studio invoice. Run finance oversight after updating registry when bills change.
 
 ---
 

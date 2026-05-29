@@ -5,7 +5,7 @@ globs: *
 
 # Action Tracker and Context Rule
 
-Whenever you start a new conversation or session, your VERY FIRST action should be to read the `docs/action_tracker.md` file. 
+Whenever you start a new conversation or session, your VERY FIRST action should be to read the `docs/action_tracker.md` file — especially the **"Session Handoff"** section at the top if present (current pickup point for in-progress work).
 
 This file acts as the central source of truth for the project, tracking:
 - Completed work

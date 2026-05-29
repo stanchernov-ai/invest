@@ -1,0 +1,177 @@
+"""Job 3 - DELIVER.
+
+Render the executive briefing + QA dashboard, run the post-work QA, and email
+both. Consumes the prepare and debate checkpoints. This is where all post-flight
+QA lives:
+  - Post-flight trio (post-mortem / systems architect / prompt engineer) - parallel
+  - Graphics QA - DETERMINISTIC chart-health report (no LLM)
+  - QA Integrity (QA-of-the-QA) - Flash model + hard timeout
+Merges all three phases' telemetry into one api_telemetry_{run_id}.json.
+"""
+import json
+import asyncio
+import logging
+
+from src import storage_client
+from src.output import reporting
+from src.output import notifier
+from src.core import agent_activity
+from src.config.settings import now_local
+from src.logging_setup import configure_logging
+from src import qa_pipeline
+
+logger = configure_logging()
+
+
+def _merge_agent_activity(*snapshots) -> dict:
+    """Combine per-phase agent_activity ledgers. Same agent across phases (e.g. the
+    data oracle in prepare and the engine's secondary oracle in debate) has its
+    counts summed so HR utilization reflects the whole run."""
+    merged = {}
+    numeric = ("invocations", "errors", "prompt_tokens", "output_tokens", "thinking_tokens", "total_tokens")
+    for snap in snapshots:
+        for agent, entry in (snap or {}).items():
+            if agent not in merged:
+                merged[agent] = dict(entry)
+                continue
+            for field in numeric:
+                merged[agent][field] = merged[agent].get(field, 0) + entry.get(field, 0)
+            merged[agent]["model"] = entry.get("model", merged[agent].get("model"))
+    return merged
+
+
+def _merge_telemetry(prep_tel: dict, debate_tel: dict, deliver_activity: dict) -> dict:
+    merged = dict(prep_tel or {})
+    merged.update({k: v for k, v in (debate_tel or {}).items() if k != "AGENT_ACTIVITY"})
+    merged["AGENT_ACTIVITY"] = _merge_agent_activity(
+        (prep_tel or {}).get("AGENT_ACTIVITY"),
+        (debate_tel or {}).get("AGENT_ACTIVITY"),
+        deliver_activity,
+    )
+    return merged
+
+
+async def run_deliver(run_id: str) -> dict:
+    """Render + post-work QA + email for an existing debate checkpoint.
+
+    Returns {'run_id', 'status'}. Marks the overall run 'success' on completion."""
+    configure_logging()
+    logger.info(f"[DELIVER] Starting render + post-QA for run {run_id}.")
+    started = now_local()
+    agent_activity.reset()
+
+    prep = storage_client.load_checkpoint(run_id, "prepare")
+    debate = storage_client.load_checkpoint(run_id, "debate")
+    if not prep or not debate:
+        missing = "prepare" if not prep else "debate"
+        msg = f"Deliver phase could not load {missing} checkpoint for run {run_id}."
+        logger.error(msg)
+        notifier.send_error_alert(msg)
+        storage_client.mark_phase(run_id, "deliver", "failed",
+                                  finished_at=now_local().isoformat(), error=f"missing {missing} checkpoint")
+        return {"run_id": run_id, "status": "failed"}
+
+    storage_client.mark_phase(run_id, "deliver", "running", started_at=started.isoformat())
+
+    try:
+        # Unpack prepared + debate state.
+        total_portfolio_value = prep["total_portfolio_value"]
+        live_qqq_trend = prep["live_qqq_trend"]
+        portfolio_3m_trend = prep["portfolio_3m_trend"]
+        live_mandate = prep["live_mandate"]
+        sorted_ledger = prep["sorted_ledger"]
+        account_holdings = prep["account_holdings"]
+        account_returns = prep["account_returns"]
+        history_data = prep["history_data"]
+        advanced_data = prep["advanced_data"]
+        all_symbols = prep["all_symbols"]
+
+        c_data = debate["chairman_data"]
+        cos_data = debate["cos_data"]
+        red_team_data = debate["red_team_data"]
+        raw_board_messages = debate["raw_board_messages"]
+        raw_log_combined = debate["raw_log_combined"]
+        unicorn_trades = debate["unicorn_trades"]
+
+        board_matrix = qa_pipeline.parse_board_matrix(raw_board_messages, all_symbols)
+        matrix_md = qa_pipeline.generate_matrix_markdown(board_matrix)
+
+        # --- Post-work QA ---
+        qa_reports = await qa_pipeline.run_post_flight_qa(raw_log_combined, json.dumps(c_data))
+
+        # Build every chart once; reuse for render + the deterministic health probe.
+        chart_urls = reporting.build_briefing_charts(sorted_ledger, account_holdings, account_returns, history_data)
+        chart_health = reporting.audit_chart_health(chart_urls)
+        broken_charts = [h["name"] for h in chart_health if not h["ok"]]
+        if broken_charts:
+            logger.warning(f"Broken/missing briefing charts detected: {', '.join(broken_charts)}")
+
+        # Graphics QA is deterministic now (no LLM) - straight from chart health.
+        qa_reports.append(qa_pipeline.build_graphics_report(chart_health))
+
+        # QA-the-QA on Flash + hard timeout so it can't blow the ceiling.
+        interim_qa_dashboard_html = reporting.generate_qa_dashboard_html(qa_reports, run_id)
+        integrity_report = await qa_pipeline.run_qa_integrity_audit(
+            qa_reports, raw_log_combined, json.dumps(c_data), interim_qa_dashboard_html
+        )
+        qa_reports.append(integrity_report)
+
+        final_qa_summary_text = "<br>".join([
+            f"<strong>{r['agent_role']}</strong> {'&#9989;' if r['is_compliant'] else '&#10060;'}"
+            for r in qa_reports
+        ])
+
+        html_payload = reporting.generate_html_briefing(
+            total_val=total_portfolio_value, qqq_trend=live_qqq_trend,
+            portfolio_3m_trend=portfolio_3m_trend, mandate=live_mandate,
+            chairman_data=c_data, cos_data=cos_data, matrix_md=matrix_md, unicorn_trades=unicorn_trades,
+            sorted_ledger=sorted_ledger, red_team_data=red_team_data, history_data=history_data,
+            qa_summary_text=final_qa_summary_text, account_holdings=account_holdings, account_returns=account_returns,
+            advanced_data=advanced_data, chart_urls=chart_urls
+        )
+        qa_dashboard_html = reporting.generate_qa_dashboard_html(qa_reports, run_id)
+
+        storage_client.save_report(f"qa_dashboard_{run_id}.html", qa_dashboard_html)
+        storage_client.save_report(f"executive_briefing_{run_id}.html", html_payload)
+        storage_client.save_report(f"raw_debate_log_{run_id}.md", raw_log_combined)
+
+        notifier.send_executive_briefing(html_payload)
+        notifier.send_qa_dashboard(qa_dashboard_html)
+
+        # Merge telemetry from all three phases into the canonical run file.
+        merged_telemetry = _merge_telemetry(
+            prep.get("telemetry"), debate.get("telemetry"), agent_activity.snapshot()
+        )
+        storage_client.save_report(f"api_telemetry_{run_id}.json", json.dumps(merged_telemetry, indent=4))
+
+        finished = now_local()
+        storage_client.mark_phase(run_id, "deliver", "success",
+                                  started_at=started.isoformat(),
+                                  finished_at=finished.isoformat(),
+                                  duration_seconds=round((finished - started).total_seconds(), 1),
+                                  briefing_blob=f"executive_briefing_{run_id}.html",
+                                  qa_blob=f"qa_dashboard_{run_id}.html")
+        # Mirror briefing/qa blob names to the top level for existing monitors.
+        status = storage_client.load_run_status() or {}
+        status["briefing_blob"] = f"executive_briefing_{run_id}.html"
+        status["qa_blob"] = f"qa_dashboard_{run_id}.html"
+        storage_client.save_run_status(status)
+
+        storage_client.execute_retention_policy(14)
+        logger.info(f"[DELIVER] Completed for run {run_id} in {round((finished - started).total_seconds(), 1)}s.")
+        return {"run_id": run_id, "status": "success"}
+
+    except Exception as e:
+        logger.error(f"[DELIVER] Fatal exception: {e}")
+        notifier.send_error_alert(f"Deliver phase failed: {e}")
+        storage_client.mark_phase(run_id, "deliver", "failed",
+                                  finished_at=now_local().isoformat(), error=str(e))
+        return {"run_id": run_id, "status": "failed"}
+
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) < 2:
+        print("Usage: python -m src.jobs.deliver <run_id>", file=sys.stderr)
+        sys.exit(2)
+    asyncio.run(run_deliver(sys.argv[1]))

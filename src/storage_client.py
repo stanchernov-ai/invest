@@ -17,6 +17,21 @@ STATE_CONTAINER = f"boardroom{dash}state"
 REPORT_CONTAINER = f"boardroom{dash}reports"
 RUN_STATUS_BLOB = "run_status.json"
 
+# Phases of the split pipeline (prepare -> debate -> deliver). Each runs as its
+# own Azure Function invocation with its own 10-minute ceiling.
+PHASES = ("prepare", "debate", "deliver")
+
+# Only these state singletons are pulled on a sync. Historical run artifacts
+# (api_telemetry_*.json, qa_dashboard_*, raw_debate_log_*, and the runs/ phase
+# checkpoints) are intentionally excluded — downloading every past telemetry
+# blob on each run was wasting time and tripping rate limits on cold start.
+STATE_SYNC_ALLOWLIST = (
+    "board_verdicts.json",
+    "portfolio_history.json",
+    "portfolio_returns.json",
+    RUN_STATUS_BLOB,
+)
+
 
 def save_run_status(payload: dict) -> None:
     """Publish latest pipeline run status to state blob (completion signal for monitors)."""
@@ -65,35 +80,159 @@ def get_blob_service_client():
         logger.error("Failed to connect to Azure.")
         return None
 
-def sync_inputs_from_cloud():
+def sync_inputs_from_cloud(state_allowlist=None):
+    """Pull brokerage/watchlist inputs and a curated set of state singletons.
+
+    `state_allowlist` defaults to STATE_SYNC_ALLOWLIST; pass an explicit list to
+    override. Historical artifacts (telemetry, dashboards, run checkpoints) are
+    never pulled here — they are not needed to run a fresh pipeline."""
     client = get_blob_service_client()
     if not client:
         logger.info("No Azure connection string found. Relying on local data files.")
-        return 
-    
+        return
+
+    allowlist = set(STATE_SYNC_ALLOWLIST if state_allowlist is None else state_allowlist)
+
     try:
         data_dir = DATA_DIR
         os.makedirs(data_dir, exist_ok=True)
-        
+
         input_client = client.get_container_client(INPUT_CONTAINER)
         if input_client.exists():
             for blob in input_client.list_blobs():
                 file_path = os.path.join(data_dir, blob.name)
                 with open(file_path, "wb") as f:
                     f.write(input_client.download_blob(blob.name).readall())
-        
+
         state_client = client.get_container_client(STATE_CONTAINER)
         if state_client.exists():
             for blob in state_client.list_blobs():
-                if blob.name.endswith(".json"):
+                if blob.name in allowlist:
                     file_path = os.path.join(data_dir, blob.name)
+                    os.makedirs(os.path.dirname(file_path) or data_dir, exist_ok=True)
                     with open(file_path, "wb") as f:
                         f.write(state_client.download_blob(blob.name).readall())
-                        
-        logger.info("Successfully synced all inputs and state from Azure.")
-            
+
+        logger.info("Successfully synced inputs and curated state from Azure.")
+
     except Exception:
         logger.warning("Failed to sync inputs from Azure. Falling back to local files.")
+
+
+def _checkpoint_blob_name(run_id: str, phase: str) -> str:
+    return f"runs/{run_id}/{phase}.json"
+
+
+def save_checkpoint(run_id: str, phase: str, payload: dict) -> None:
+    """Persist a phase's hand-off payload so the next job can resume the run.
+
+    Written to STATE_CONTAINER under runs/{run_id}/{phase}.json (and cached
+    locally for dev). This is the contract between prepare -> debate -> deliver."""
+    data = json.dumps(payload, default=str)
+
+    local = os.path.join(DATA_DIR, "runs", run_id, f"{phase}.json")
+    os.makedirs(os.path.dirname(local), exist_ok=True)
+    with open(local, "w", encoding="utf-8") as f:
+        f.write(data)
+
+    client = get_blob_service_client()
+    if client:
+        try:
+            blob_client = client.get_blob_client(
+                container=STATE_CONTAINER, blob=_checkpoint_blob_name(run_id, phase)
+            )
+            blob_client.upload_blob(data, overwrite=True)
+            logger.info(f"Checkpoint '{phase}' for run {run_id} persisted to Azure.")
+        except Exception:
+            logger.error(f"Failed to persist '{phase}' checkpoint for run {run_id} to Azure.")
+
+
+def load_checkpoint(run_id: str, phase: str) -> dict | None:
+    """Load a phase hand-off payload written by save_checkpoint (Azure first,
+    local cache as fallback)."""
+    client = get_blob_service_client()
+    if client:
+        try:
+            blob_client = client.get_blob_client(
+                container=STATE_CONTAINER, blob=_checkpoint_blob_name(run_id, phase)
+            )
+            if blob_client.exists():
+                return json.loads(blob_client.download_blob().readall())
+        except Exception:
+            logger.warning(f"Could not load '{phase}' checkpoint for run {run_id} from Azure.")
+
+    local = os.path.join(DATA_DIR, "runs", run_id, f"{phase}.json")
+    if os.path.exists(local):
+        try:
+            with open(local, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
+
+
+def _base_run_status(run_id: str, started_at: str) -> dict:
+    return {
+        "run_id": run_id,
+        "phase": "prepare",
+        "status": "running",          # overall; only 'success' once deliver finishes
+        "started_at": started_at,
+        "finished_at": None,
+        "error": None,
+        "briefing_blob": None,
+        "qa_blob": None,
+        "prepare": None,
+        "debate": None,
+        "deliver": None,
+    }
+
+
+def begin_run_status(run_id: str, started_at: str) -> dict:
+    """Initialize (or reset) the phased run status blob at the start of a run."""
+    status = _base_run_status(run_id, started_at)
+    save_run_status(status)
+    return status
+
+
+def mark_phase(run_id: str, phase: str, phase_status: str, *,
+               started_at: str = None, finished_at: str = None,
+               duration_seconds: float = None, error: str = None,
+               **extra) -> dict:
+    """Update one phase's sub-status and the overall run status in one place.
+
+    Overall `status` becomes 'failed' if any phase fails, and 'success' only when
+    the deliver phase succeeds. Intermediate phase success keeps overall 'running'
+    so existing monitors (wait_for_run.py) wait for the full run."""
+    status = load_run_status() or {}
+    if status.get("run_id") != run_id:
+        status = _base_run_status(run_id, started_at or finished_at or "")
+
+    entry = status.get(phase) or {}
+    entry["status"] = phase_status
+    if started_at is not None:
+        entry["started_at"] = started_at
+    if finished_at is not None:
+        entry["finished_at"] = finished_at
+    if duration_seconds is not None:
+        entry["duration_seconds"] = duration_seconds
+    if error is not None:
+        entry["error"] = error
+    entry.update(extra)
+    status[phase] = entry
+
+    status["phase"] = phase
+    if phase_status == "failed":
+        status["status"] = "failed"
+        status["error"] = error
+        status["finished_at"] = finished_at
+    elif phase == "deliver" and phase_status == "success":
+        status["status"] = "success"
+        status["finished_at"] = finished_at
+    else:
+        status["status"] = "running"
+
+    save_run_status(status)
+    return status
 
 def save_memory(data):
     client = get_blob_service_client()

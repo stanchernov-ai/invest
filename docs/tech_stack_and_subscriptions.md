@@ -75,7 +75,7 @@ Run on demand (standalone):
 ```
 
 It reads the registry and **deterministically** flags:
-- Missing cost data (e.g. GitHub plan unknown)
+- Missing cost data (update registry when a plan is confirmed)
 - Unvalidated assumptions (Ultra includes API, QuickChart free, Gmail free)
 - **Possible hidden costs** inferred from the tech stack (Workspace, Azure post-credit, App Insights overages, stale paid keys in Azure settings, etc.)
 
@@ -115,6 +115,7 @@ Outputs: `docs/finance_oversight/oversight_*.html` + JSON.
 
 | Date | Change |
 |------|--------|
+| 2026-05-28 | EOD handoff section added to `docs/action_tracker.md`; deploy commits `4dc0b2e` + `29b4101` on main |
 | 2026-05-28 | GitHub confirmed free tier |
 | 2026-05-28 | Gemini API recorded as bundled in Ultra (Stan assumption — unvalidated); agent hunts hidden costs |
 | 2026-05-28 | FMP Starter confirmed at $29/mo |
