@@ -9,14 +9,14 @@ This document tracks identified bugs, architectural improvements, and long-term 
 
 ## Session Handoff — May 29, 2026 (architecture cleanup — pick up here)
 
-> **Stan — start here next session.** Repo hygiene + cross-run verdict memory restored. P1 code is implemented locally; commit + deploy when ready.
+> **Stan — start here next session.** P1 verdict memory + scout fix on `main` (`11ee4d9`). Validate `board_verdicts.json` after next deliver run.
 
 ### Shipped (architecture thread)
 
 | Area | Detail |
 |------|--------|
-| **P0 — committed `3eda93d`** | Removed tracked run artifacts (~6.4k lines); `.gitignore` now excludes `logs/`, `src/output/*.md`, `qa_*_latest.*`, probe JSON, scratch files |
-| **P1 — local (not yet committed)** | `src/verdict_memory.py` — chairman **Pass** watchlist cooldown after compliance-approved deliver; removed dead `save_memory()` / `save_verdict_history()` |
+| **P0 — `3eda93d`** | Removed tracked run artifacts (~6.4k lines); `.gitignore` excludes generated outputs |
+| **P1 — `11ee4d9`** | `src/verdict_memory.py` — chairman **Pass** watchlist cooldown after compliance-approved deliver; removed dead `save_memory()` / `save_verdict_history()` |
 | **Scout fix** | `prepare.py` parses CSV before scout; `run_scout_pipeline(owned_tickers=…)` — dropped dead `ledger_state.json` read |
 | **Docs** | `agent_architecture.md` §3.6, `technical_solution.md` §1.3/§2.4, `engineering_playbook.md` verdict-memory entry |
 
@@ -29,16 +29,18 @@ This document tracks identified bugs, architectural improvements, and long-term 
 
 ### First steps next session
 
-1. **Commit + push P1** (`verdict_memory`, scout/prepare/deliver, tests) → GitHub Actions deploy.
+1. ~~**Commit + push P1**~~ **DONE** — `11ee4d9` on `main`; GitHub Actions deploy on push.
 2. **Validate on a real run:** after deliver, confirm `board_verdicts.json` in Azure state container updates with Pass entries.
-3. **First human review** on a live run (still open — see below).
+3. ~~**First human review** on a live run~~ **DONE** — run `20260529_095341`; blob + ledger confirmed.
 
 ### Open items (ordered — see also full backlog below)
 
 | Priority | Item |
 |----------|------|
-| **P0** | **Commit + deploy P1** verdict memory + scout fix |
-| **P1** | **First human review on a real run** — email link + `qa_human_review_{run_id}.json` |
+| ~~**P0**~~ | ~~**Commit + deploy P1**~~ **DONE** — `11ee4d9` pushed to `main`. |
+| ~~**P1**~~ | ~~**First human review on a real run**~~ **DONE (May 29)** — runs `20260529_092332`, `20260529_095341`; encoded review link + Azure blob + ledger OK. |
+| **P1** | ~~**State of the Union fix**~~ **DONE (May 29)** — deterministic `build_state_of_union_quotes()` from `overall_portfolio_critique`; debate log includes Portfolio Overview lines. |
+| **P1** | **Prompt Engineer QA scope** — audit each agent's config/prompt for sufficient context (Stan rejected PASS on `095341`). |
 | **P2** | Split `reporting.py` + extract prompts from `agents.py` (AI context window) |
 | **P2** | Split `action_tracker.md` — handoff block vs archived sessions |
 | **P2** | Root `README.md` + `docs/qa_layers.md` one-pager |
@@ -109,7 +111,7 @@ This document tracks identified bugs, architectural improvements, and long-term 
 | Priority | Item |
 |----------|------|
 | ~~**P1**~~ | ~~**URL-encode `token` in `build_review_url()`**~~ **DONE (May 29, 2026)** — `urlencode()` in `src/qa/human_review.py`. |
-| **P1** | **First human review on a real run** — validate email link + blob `qa_human_review_{run_id}.json`. |
+| ~~**P1**~~ | ~~**First human review on a real run**~~ **DONE (May 29)** — see Session Handoff + `qa_human_review_20260529_095341.json`. |
 | **P2** | Wire post-job Cursor agents (`api_audit`, `data_insights`, `supervisor_summaries` still empty in ecosystem state). |
 | **P2** | Relative strength + sector weights in prepare (FMP thread). |
 | **P2** | Buffett PE/P/S caps in Python (`.cursorrules` P0). |
