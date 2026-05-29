@@ -27,6 +27,7 @@ ARRAY_KEYS = (
     "data_insights",
     "supervisor_summaries",
     "qa_scorecards",
+    "qa_human_reviews",
 )
 MAX_ENTRIES = 50
 

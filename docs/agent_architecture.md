@@ -385,6 +385,21 @@ After each deliver run, `build_qa_scorecard()` records per QA agent:
 
 **Review:** `.venv\Scripts\python.exe tools\ecosystem_state.py show qa_scorecards --last 5`
 
+### Human-confirmed QA review (Azure UI)
+
+After the QA dashboard email, open the **Review QA accuracy** link (requires `QA_REVIEW_BASE_URL` + `QA_REVIEW_TOKEN` on the Function App).
+
+| Storage | Path |
+|---------|------|
+| Per-run | `boardroom-state` / `qa_human_review_{run_id}.json` |
+| Rolling ledger | `boardroom-state` / `qa_human_reviews_ledger.json` |
+| Local Cursor | `ecosystem_state.json` → `qa_human_reviews[]` (when writable) |
+| Reports | `qa_reports_{run_id}.json` (full findings for the form) |
+
+**Endpoint:** `GET/POST /api/qa-review?run_id=…&token=…`
+
+**Fetch for offline review:** `tools/fetch_azure_reports.py` pulls `qa_human_review_*` and `qa_reports_*`.
+
 ---
 
 ## 7. Visual QA golden fixtures
@@ -459,7 +474,7 @@ Areas with **multiple owners** — track reductions in `action_tracker.md`:
 
 | Date | Change |
 |------|--------|
-| May 29, 2026 | Integrity QA golden fixtures + `src/qa/integrity_audit.py` deterministic pre-check |
+| May 29, 2026 | Human-confirmed QA review UI — Azure `/api/qa-review` + dual blob/state storage |
 | May 29, 2026 | QA agent scorecard → `QA_SCORECARD` telemetry + `qa_scorecards[]` in ecosystem state |
 | May 29, 2026 | `data_oracle` → deterministic Python; debate skips duplicate run |
 | May 29, 2026 | Visual QA golden fixtures + `src/qa/visual_audit.py` |

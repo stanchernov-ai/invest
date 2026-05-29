@@ -117,19 +117,26 @@ async def run_deliver(run_id: str) -> dict:
         graphics_report = await qa_pipeline.run_graphics_designer_qa(briefing_for_visual_qa, chart_health)
         qa_reports.append(graphics_report)
 
+        from src.qa.scorecard import build_qa_scorecard, persist_scorecard
+        from src.qa.human_review import build_review_url
+
+        review_url = build_review_url(run_id)
+
         # QA-the-QA on Flash + hard timeout so it can't blow the ceiling.
-        interim_qa_dashboard_html = reporting.generate_qa_dashboard_html(qa_reports, run_id)
+        interim_qa_dashboard_html = reporting.generate_qa_dashboard_html(
+            qa_reports, run_id, review_url=review_url
+        )
         integrity_report = await qa_pipeline.run_qa_integrity_audit(
             qa_reports, raw_log_combined, json.dumps(c_data), interim_qa_dashboard_html
         )
         qa_reports.append(integrity_report)
 
-        from src.qa.scorecard import build_qa_scorecard, persist_scorecard
-
         final_qa_summary_text = "<br>".join([
             f"<strong>{r['agent_role']}</strong> {'&#9989;' if r['is_compliant'] else '&#10060;'}"
             for r in qa_reports
         ])
+
+        storage_client.save_report(f"qa_reports_{run_id}.json", json.dumps(qa_reports, indent=2, default=str))
 
         html_payload = reporting.generate_html_briefing(
             total_val=total_portfolio_value, qqq_trend=live_qqq_trend,
@@ -139,7 +146,9 @@ async def run_deliver(run_id: str) -> dict:
             qa_summary_text=final_qa_summary_text, account_holdings=account_holdings, account_returns=account_returns,
             advanced_data=advanced_data, chart_urls=chart_urls
         )
-        qa_dashboard_html = reporting.generate_qa_dashboard_html(qa_reports, run_id)
+        qa_dashboard_html = reporting.generate_qa_dashboard_html(
+            qa_reports, run_id, review_url=review_url
+        )
 
         storage_client.save_report(f"qa_dashboard_{run_id}.html", qa_dashboard_html)
         storage_client.save_report(f"executive_briefing_{run_id}.html", html_payload)

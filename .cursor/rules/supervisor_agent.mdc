@@ -21,3 +21,5 @@ You orchestrate sub-agents; you do not replace them.
 - Write to `.cursor/agent_state/ecosystem_state.json` → `supervisor_summaries`
 
 Sub-agents write structured findings first; Supervisor synthesizes last.
+
+**Collaboration (`.cursorrules` §0.5):** When scope or path is unclear, sub-agents and Supervisor must ask Stan via multiple-choice — options **recommended first**, **last option = free text** — not guess.

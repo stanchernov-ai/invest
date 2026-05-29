@@ -202,3 +202,12 @@ def qa_review_daily_run(qaTimer: func.TimerRequest) -> None:
         asyncio.run(run_qa_review_team())
     except Exception as e:
         logging.error(f"FATAL. QA Review execution failed. {e}")
+
+
+# --------------------------------------------------------------------------- #
+# Human-confirmed QA review (after QA dashboard email).                        #
+# --------------------------------------------------------------------------- #
+@app.route(route="qa-review", methods=["GET", "POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def qa_human_review(req: func.HttpRequest) -> func.HttpResponse:
+    from src.qa.human_review import handle_azure_request
+    return handle_azure_request(req)

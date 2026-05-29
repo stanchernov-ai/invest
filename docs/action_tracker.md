@@ -15,7 +15,8 @@ This document tracks identified bugs, architectural improvements, and long-term 
 | [`technical_solution.md`](technical_solution.md) | System design, data layer, deploy |
 | [`engineering_playbook.md`](engineering_playbook.md) | Before retrying a rejected approach |
 | [`fmp_data_dictionary.md`](fmp_data_dictionary.md) | FMP endpoints and field map |
-| [`.cursorrules`](../.cursorrules) | Guardrails and Cursor sub-agent triggers |
+| [`agent_architecture.md`](agent_architecture.md) | Agent diagrams, inventory, QA layers — **update when roster changes** |
+| [`.cursorrules`](../.cursorrules) §0.5 | **Collaboration protocol** — ask when unsure; MCQ recommended-first + free-text last |
 
 ---
 

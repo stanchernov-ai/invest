@@ -40,6 +40,8 @@ ARTIFACT_FAMILIES = {
     "qa_dashboard_": REPORT_CONTAINER,
     "raw_debate_log_": REPORT_CONTAINER,
     "api_telemetry_": STATE_CONTAINER,
+    "qa_reports_": STATE_CONTAINER,
+    "qa_human_review_": STATE_CONTAINER,
 }
 
 # Always-current singletons worth grabbing alongside a run.

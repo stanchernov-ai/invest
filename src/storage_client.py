@@ -234,15 +234,16 @@ def mark_phase(run_id: str, phase: str, phase_status: str, *,
     save_run_status(status)
     return status
 
+
 def save_memory(data):
     client = get_blob_service_client()
     json_str = json.dumps(data, indent=4)
-    
+
     filepath = os.path.join(DATA_DIR, "board_verdicts.json")
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, "w") as f:
         f.write(json_str)
-        
+
     if client:
         try:
             blob_client = client.get_blob_client(container=STATE_CONTAINER, blob="board_verdicts.json")
@@ -250,6 +251,57 @@ def save_memory(data):
             logger.info("Memory seamlessly uploaded to Azure Blob Storage.")
         except Exception:
             logger.error("Failed to save memory to Azure.")
+
+
+def load_state_blob(filename: str):
+    """Load a JSON or text blob from STATE_CONTAINER (Azure first, local OUTPUT_DIR fallback)."""
+    client = get_blob_service_client()
+    if client:
+        try:
+            blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=filename)
+            if blob_client.exists():
+                raw = blob_client.download_blob().readall()
+                if filename.endswith(".json"):
+                    return json.loads(raw)
+                return raw.decode("utf-8")
+        except Exception:
+            logger.warning(f"Could not load state blob {filename} from Azure.")
+
+    filepath = os.path.join(OUTPUT_DIR, filename)
+    if not os.path.exists(filepath):
+        filepath = os.path.join(DATA_DIR, filename)
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, encoding="utf-8") as f:
+                if filename.endswith(".json"):
+                    return json.load(f)
+                return f.read()
+        except Exception:
+            pass
+    return None
+
+
+def save_state_blob(filename: str, payload) -> None:
+    """Persist JSON or text to STATE_CONTAINER and local OUTPUT_DIR."""
+    if filename.endswith(".json"):
+        content = json.dumps(payload, indent=2, default=str)
+    else:
+        content = payload if isinstance(payload, str) else str(payload)
+
+    filepath = os.path.join(OUTPUT_DIR, filename)
+    os.makedirs(os.path.dirname(filepath) or OUTPUT_DIR, exist_ok=True)
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    client = get_blob_service_client()
+    if client:
+        try:
+            blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=filename)
+            blob_client.upload_blob(content, overwrite=True)
+            logger.info(f"State blob {filename} uploaded to Azure.")
+        except Exception:
+            logger.error(f"Failed to save state blob {filename} to Azure.")
+
 
 def save_report(filename, content):
     client = get_blob_service_client()
@@ -285,7 +337,12 @@ def execute_retention_policy(days_to_keep=14):
                 continue
 
             for blob in container_client.list_blobs():
-                if blob.name in ["daily_execution.lock", "board_verdicts.json", "portfolio_history.json"]:
+                if blob.name in [
+                    "daily_execution.lock",
+                    "board_verdicts.json",
+                    "portfolio_history.json",
+                    "qa_human_reviews_ledger.json",
+                ]:
                     continue
 
                 if blob.last_modified and blob.last_modified < cutoff_date:

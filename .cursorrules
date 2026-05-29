@@ -18,6 +18,45 @@
 
 ---
 
+## 0.5 Collaboration Protocol (all agents — required)
+
+Stan and the agent work as a **team**. When intent, scope, trade-offs, or implementation path are **not certain**, do **not** guess and proceed. **Stop and ask** using structured multiple-choice questions.
+
+### When to ask
+
+- Multiple valid approaches with different cost, risk, or maintenance impact  
+- Ambiguous product or UX preference (hosting, granularity, storage, timing)  
+- Destructive, wide-scope, or hard-to-reverse changes  
+- Missing config, secrets, or environment assumptions  
+- After two-strike without resolution — escalate with choices, not another blind attempt  
+
+### When you may proceed without asking
+
+- User gave an explicit, unambiguous instruction  
+- Only one reasonable interpretation matches repo conventions and §1 failsafes  
+- Purely mechanical fix with one correct outcome (typo, test failure with obvious fix)  
+
+### Question format (required)
+
+Use the **AskQuestion** tool when available; otherwise present the same structure in chat:
+
+1. **One decision per question** — do not bundle unrelated forks.  
+2. **2–5 options** — each option is a concrete path forward, not vague labels.  
+3. **Sort options by recommendation** — best default **first** (highest confidence / lowest risk / best fit for this repo). Briefly say *why* the first option is recommended in the prompt or a short line above the choices.  
+4. **Last option is always free text** — label it clearly, e.g. *"Other — I'll describe in chat"* or *"Other — I'll type my preference"*, so Stan can steer without being forced into a preset.  
+5. **Wait for answers** before implementing when the choice changes architecture, files touched, or behavior.  
+
+### Anti-patterns (forbidden)
+
+- Picking a plausible option "to keep momentum" when Stan has not chosen  
+- Presenting options in random order or burying the recommended path  
+- Omitting a free-text escape hatch on the last option  
+- Asking ten micro-questions when one well-scoped question would do  
+
+This protocol applies to **Cursor agents, Supervisor-orchestrated sub-agents, and human-facing implementation work** in this repo.
+
+---
+
 ## 1. Core Directives & Failsafes
 
 | Rule | Policy |
@@ -27,7 +66,19 @@
 | **Code over Prompts** | Rules protecting data integrity, financial limits, or PASS/FAIL compliance must be **deterministic Python** (🟢), not prompt-only (🟡). Promote 🟡 → 🟢 before shipping. |
 | **Advisory vs Blocking** | Cursor sub-agents are **advisory during editing**. Only **git hooks / CI** may hard-block commits. Sub-agents produce findings; hooks enforce gates. |
 | **Scope discipline** | Minimize diff scope. Match existing conventions in `src/`. No drive-by refactors. |
-| **Documentation habit** | PRs or commits that touch `src/core/agents.py`, `src/qa_pipeline.py`, `src/qa_review.py`, or `.cursor/rules/` should include a one-line update to `docs/agent_architecture.md` (roster table, diagram note, or §9 change log). Same for new golden fixtures — register in the fixture `manifest.json` and note in §7/§8 of that doc. |
+| **Documentation habit** | PRs or commits that touch `src/core/agents.py`, `src/qa_pipeline.py`, `src/qa_review.py`, or `.cursor/rules/` should include a one-line update to `docs/agent_architecture.md` (roster table, diagram note, or §10 change log). Same for new golden fixtures — register in the fixture `manifest.json` and note in §7/§8 of that doc. |
+| **Collaboration protocol** | When unsure: **ask** via multiple-choice (§0.5). Options sorted **recommended first**; **last option = free text**. Never guess on architectural or product forks. |
+
+### Azure — human QA review (after dashboard email)
+
+Set on the Function App (and local `.env` for testing):
+
+| Variable | Example | Purpose |
+|----------|---------|---------|
+| `QA_REVIEW_BASE_URL` | `https://app-boardroom-prod.azurewebsites.net/api` | Base URL for the review link in the QA email |
+| `QA_REVIEW_TOKEN` | *(long random secret)* | Required query param `token=` on `/api/qa-review` |
+
+Without both, deliver still runs but the email omits the review button.
 
 ---
 
@@ -139,7 +190,7 @@ Full audit history: `docs/action_tracker.md` § guardrails; runtime patterns: `d
 |-------|-------|----------|
 | `docs/action_tracker.md` | Human + all agents | Backlog, Session Handoff, architectural decisions |
 | `docs/engineering_playbook.md` | Human + all agents | Rejected approaches — read before retrying |
-| `.cursor/agent_state/ecosystem_state.json` | Sub-agents + Supervisor + scorecard | Machine ledger: conflicts, sub-agent runs, api_audit, data_insights, qa_flags, supervisor_summaries, **qa_scorecards** |
+| `.cursor/agent_state/ecosystem_state.json` | Sub-agents + Supervisor + scorecard | Machine ledger: conflicts, sub-agent runs, api_audit, data_insights, qa_flags, supervisor_summaries, **qa_scorecards**, **qa_human_reviews** |
 | `api_telemetry_{run_id}_*.json` (Azure state) | Pipeline runtime | Per-run FMP/Gemini payloads + `AGENT_ACTIVITY` |
 | `docs/fmp_data_dictionary.md` | API Optimization Agent | Endpoint truth, dead URLs, field map |
 | `docs/agent_architecture.md` | All agents + humans | Agent diagrams, inventory, QA layers — **update when roster changes** |
