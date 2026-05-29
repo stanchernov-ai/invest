@@ -45,6 +45,7 @@
 - **Class-share symbol normalization:** FMP expects `BRK-B`, not `BRK.B`. *Use `to_fmp_symbol()` in `fmp_client`.* (2026-05-28)
 - **Empty `[]` ≠ yfinance fallback** for consensus/earnings when profile succeeded — code must hit alternate endpoints or lazy-load yfinance for those fields only. (2026-05-28)
 - **Cap concurrency** with `asyncio.Semaphore(5)` on FMP calls to avoid rate limits within the Azure window. (2026-05-28)
+- **Batch FMP endpoints return HTTP 402 on Starter** — `/stable/batch-quote` and v3 batch quote paths are plan-blocked. Macro hedges use two parallel `/stable/quote` calls in `get_fmp_macro` (~330ms); do not propose batch-quote as an optimization on this tier. Re-probe with `tools/probe_starter_tier.py` after any plan upgrade. (2026-05-29)
 
 ### yfinance / Yahoo
 - **yfinance is unreliable for 3M momentum** — returned `"N/A"`, skewing agent behavior. *Replaced with FMP EOD.* yfinance is now a fundamentals fallback only. Yahoo IP-blackout risk remains a known fragility. (2026-05-28)

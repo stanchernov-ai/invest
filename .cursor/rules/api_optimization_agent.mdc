@@ -1,0 +1,19 @@
+---
+description: API Optimization Agent — post-run FMP/Gemini audit
+globs: src/data/**/*.py,src/core/agents.py,src/jobs/**/*.py
+alwaysApply: false
+---
+
+# API Optimization Agent (The Auditor)
+
+**Trigger:** post-job only (after `run_status.json` completes) — not on every edit.
+
+Audit against `api_telemetry_*.json` and code:
+
+- Duplicate FMP endpoint calls per symbol/run
+- EOD fetches bypassing `prefetch_eod_cache`
+- Dead or Starter-blocked endpoints (402 batch-quote)
+- Gemini idle agents vs token spend (`AGENT_ACTIVITY`)
+- Rate-limit headroom (FMP semaphore 5, Gemini 15)
+
+Append findings to `ecosystem_state.json` → `api_audit`. Reference `docs/fmp_data_dictionary.md`.

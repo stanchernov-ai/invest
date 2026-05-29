@@ -252,14 +252,22 @@ async def run_prepare(run_id: str = None) -> dict:
         except (ValueError, TypeError):
             qqq_3m_float = 0.0
         portfolio_3m_trend = 0.0
+        portfolio_12m_twr = 0.15
         if account_returns and account_returns.get("returns"):
-            portfolio_3m_trend = account_returns["returns"].get("Total", {}).get("3m", 0.0) or 0.0
+            total_returns = account_returns["returns"].get("Total", {})
+            portfolio_3m_trend = total_returns.get("3m", 0.0) or 0.0
+            raw_12m = total_returns.get("12m")
+            if raw_12m is not None:
+                try:
+                    portfolio_12m_twr = float(raw_12m) / 100.0
+                except (ValueError, TypeError):
+                    pass
 
         regime_block = _market_regime_block(macro_data, portfolio_3m_trend, qqq_3m_float, live_spy_trend)
 
         tradeable_tickers = [sym for sym in master_ledger.keys() if sym != "BRK_LINK" and not sym.startswith("922")]
         sorted_ledger = sorted(master_ledger.items(), key=lambda x: x[1]["Total"], reverse=True)
-        live_mandate = generate_dynamic_mandate(total_portfolio_value, 0.15)
+        live_mandate = generate_dynamic_mandate(total_portfolio_value, portfolio_12m_twr)
 
         divisor = total_portfolio_value if total_portfolio_value > 0 else 1.0
         heavy_tickers = [sym for sym, data in sorted_ledger if (data["Total"] / divisor) * 100 > 33.0 and sym in tradeable_tickers]

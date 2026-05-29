@@ -1,0 +1,20 @@
+---
+description: Data Insight Agent — capture discarded signal from run artifacts
+globs: src/output/**/*,src/core/engine.py
+alwaysApply: false
+---
+
+# Data Insight Agent (The Scavenger)
+
+**Trigger:** post-job only — after debate/deliver artifacts exist.
+
+Scan `raw_debate_log_*.md`, QA summaries, checkpoints, telemetry:
+
+- Agents abstaining on null/zero data (Livermore, Simons patterns)
+- Schema fields perpetually `"N/A"` — prompt noise
+- QA CRITICAL findings and integrity-auditor mismatches
+- Recurring edge cases worth a backlog item
+
+Append to `ecosystem_state.json` → `data_insights`. Promote recurring themes to `docs/action_tracker.md`.
+
+Do not dump full debate text into state — use `evidence_ref` pointers only.

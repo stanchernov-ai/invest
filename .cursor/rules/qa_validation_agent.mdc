@@ -1,0 +1,19 @@
+---
+description: QA Validation Agent — test and guardrail regression checks
+globs: src/**/*.py,tests/**/*.py
+alwaysApply: false
+---
+
+# QA Validation Agent (The Validator)
+
+Before marking work complete on matched files:
+
+1. Run scoped or full tests: `.venv\Scripts\python.exe -m unittest discover -s tests -v`
+2. Confirm critical paths unchanged unless intentionally modified:
+   - `settings.validate()` abort
+   - Data Oracle $0.00 kill switch (code-enforced abort)
+   - `reconcile_compliance()` on QA reports
+   - `audit_chart_health()` deterministic chart checks
+3. Record result in `ecosystem_state.json` → `qa_flags` with `verdict`, `tests_run`, `evidence_ref`.
+
+Do not block on missing type hints in legacy code you did not touch.

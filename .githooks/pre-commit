@@ -1,0 +1,17 @@
+#!/bin/sh
+# SC Invest Boardroom — pre-commit (QA Validation + Refactoring Agent)
+# Install once: .venv\Scripts\python.exe scripts\install_git_hooks.py
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT" || exit 1
+
+if [ -f ".venv/Scripts/python.exe" ]; then
+  PY=".venv/Scripts/python.exe"
+elif [ -f ".venv/bin/python" ]; then
+  PY=".venv/bin/python"
+else
+  echo "pre-commit: .venv not found. Create venv and pip install -r requirements.txt"
+  exit 1
+fi
+
+exec "$PY" scripts/pre_commit_check.py

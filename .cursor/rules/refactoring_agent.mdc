@@ -1,0 +1,17 @@
+---
+description: Refactoring Agent — architectural bouncer on data/API/core changes
+globs: src/**/*.py
+alwaysApply: false
+---
+
+# Refactoring Agent (The Bouncer)
+
+When editing matched files, enforce:
+
+- Financial limits (max buys, liquidation cap, wash-sale) belong in **Python validators**, not prompts.
+- Reuse `src/core/schemas.py`; do not duplicate Pydantic models.
+- FMP calls go through `fmp_client` shared session + `prefetch_eod_cache`; check `docs/fmp_data_dictionary.md` for dead URLs.
+- Fail-fast patterns stay intact: `FatalDataError`, Oracle abort, `settings.validate()`.
+- Minimize scope — no unrelated refactors.
+
+On strike 2 without resolution: stop and log to `.cursor/agent_state/ecosystem_state.json` → `conflicts`.

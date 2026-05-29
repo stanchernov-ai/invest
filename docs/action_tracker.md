@@ -36,8 +36,8 @@ This document tracks identified bugs, architectural improvements, and long-term 
 
 1. **Relative strength + sector weights** in `prepare.py` / prompt (Livermore + Simons).
 2. **Buffett caps in code** — conviction ≤ 7 when PE > 40 or P/S > 10.
-3. **`generate_dynamic_mandate()`** — use real 3M/12M TWR from `account_returns`, not `0.15`.
-4. **Macro `batch-quote`** for TLT/VXX (verify Starter tier first).
+3. ~~**Mandate TWR**~~ — **DONE (May 29):** prepare passes real 12M TWR from `account_returns` into `generate_dynamic_mandate`.
+4. ~~**Macro `batch-quote`**~~ — **NOT on Starter (HTTP 402).** Keep parallel `/stable/quote` in `get_fmp_macro`; see `tools/probe_starter_tier.py`.
 
 Full API reference + dead URLs: **`docs/fmp_data_dictionary.md`**. Guardrails: **`.cursorrules`**.
 
@@ -75,8 +75,8 @@ Full API reference + dead URLs: **`docs/fmp_data_dictionary.md`**. Guardrails: *
 ### Next priorities (ordered — stay on this thread)
 
 1. **P2 — Relative strength & sector concentration** — portfolio sector weight table in prompt; optional deterministic Buffett PE>40 / P>S>10 conviction cap in code.
-2. **P2 — Mandate math** — `generate_dynamic_mandate()` should use real portfolio 3M/12M TWR from `account_returns`, not hardcoded `0.15`.
-3. **P2 — Macro batch quote** — `batch-quote?symbols=TLT,VXX` (verify Starter tier).
+2. ~~**P2 — Mandate math**~~ — **DONE (May 29):** real 12M TWR from `account_returns`.
+3. ~~**P2 — Macro batch quote**~~ — **Rejected on Starter (HTTP 402).** Parallel `/quote` is correct for this tier.
 4. **P3 — New FMP endpoints** — 10Y yield, estimate revisions (see dictionary §P3).
 
 ### Do not retry (documented dead paths)
@@ -383,7 +383,7 @@ A team of focused reviewers, each producing a short scored report + prioritized 
   * **P0 code fix:** dead `/stable/rating` → `grades-consensus`; dead `/stable/earning_calendar` → `earnings`; parse `key-metrics-ttm` (ROE, FCF yield); empty-list yfinance fallback; extended `mega_prompt` (PEG/P/S/D/E, beta, sector, RS vs QQQ, macro TLT/VXX); dedupe SPY/QQQ fetches in prepare.
   * **`tests/test_fmp_client.py`** — smoke tests (consensus + earnings populated for AAPL).
 * **P1 done (2026-05-28):** shared EOD prefetch in prepare (`prefetch_eod_cache`); news headlines include `publishedDate`.
-* **Still open (P2+):** mandate CAGR from TWR, Buffett deterministic caps, macro batch-quote — see `docs/fmp_data_dictionary.md`.
+* **Still open (P2+):** Buffett deterministic caps, relative strength / sector weights — see `docs/fmp_data_dictionary.md`. Mandate TWR done; batch-quote blocked on Starter (402).
 
 ### 5.3 Azure Storage Housekeeping & Cost Control — PLANNED
 * **Description:** A dedicated "clean house" routine to delete older Azure files and keep monthly storage cost down. Stan wants this more deliberate than the current passive retention.

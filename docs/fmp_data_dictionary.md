@@ -35,6 +35,17 @@ These return **HTTP 404** (empty list in our client) on the current Starter/stab
 | `/stable/earnings-calendar?symbol=` | 200 but **wrong shape** | `/stable/earnings?symbol=` | Returns global calendar (~4000 rows); **symbol filter does not work** (0 rows for AAPL in probe). |
 | `/stable/upgrades-downgrades-consensus?symbol=` | 404 | `/stable/grades-consensus?symbol=` | — |
 
+### Starter tier — batch endpoints blocked (402)
+
+Validated May 29, 2026 via `tools/probe_starter_tier.py` on the live Starter API key.
+
+| Bad URL | HTTP | Replacement | Notes |
+|---------|------|-------------|--------|
+| `/stable/batch-quote?symbols=TLT,VXX` | **402** | Two parallel `/stable/quote?symbol=` (already in `get_fmp_macro`) | Payment/plan gate — not available on Starter. Savings would be ~130ms even if it worked; not a timeout lever. |
+| `/api/v3/quote/TLT,VXX` | **403** | Same parallel `/stable/quote` | Legacy v3 batch — deprecated for non-legacy subscribers. |
+
+**Do not retry batch optimizations on Starter.** Re-probe only after a plan upgrade.
+
 ### v3 paths (plan-blocked — 403, not a syntax fix)
 
 | URL | HTTP | Action |
@@ -253,7 +264,7 @@ Used when FMP profile/quote/ratios fail, or when consensus/earnings empty. Maps:
 
 - [x] **Single EOD fetch per symbol** — `prefetch_eod_cache()` in prepare; `get_fmp_advanced_metrics` + `history.build_account_returns` share cache (`EOD_LOOKBACK_DAYS` = 1095, history slices to 370d)
 - [x] **Dedupe SPY/QQQ** in prepare (benchmark prefetch + skip duplicate advanced-metrics fetch)
-- [ ] **Macro quotes** — one `batch-quote?symbols=TLT,VXX` if plan includes batch (verify tier)
+- [x] **Macro quotes (Starter)** — parallel `/stable/quote` for TLT + VXX in `get_fmp_macro` (~330ms). **`batch-quote` returns HTTP 402 on Starter — not pursued.** Revisit only after plan upgrade (`tools/probe_starter_tier.py`).
 - [x] **News** — `publishedDate` / `date` on headline lines (`[SYM] (YYYY-MM-DD): title`)
 
 ### P2 — Accuracy / personas
@@ -261,7 +272,7 @@ Used when FMP profile/quote/ratios fail, or when consensus/earnings empty. Maps:
 - [ ] **Relative strength** — `rel_strength_3m_vs_qqq` per ticker in prompt (Livermore)
 - [ ] **Portfolio sector weights** — aggregate `sector` × position $ (Simons)
 - [ ] **Buffett deterministic guardrails** — cap conviction in code when PE>40 or P/S>10
-- [ ] **Mandate CAGR** — pass real portfolio 12M/3M TWR into `generate_dynamic_mandate` instead of hardcoded `0.15`
+- [x] **Mandate CAGR** — `prepare.py` passes real portfolio **12M TWR** from `account_returns["returns"]["Total"]["12m"]` into `generate_dynamic_mandate` (fallback `0.15` if missing; projection still caps at 15% inside the function)
 - [ ] **Growth display** — `fmt_growth` treats decimal 0.06 as 6% in prompts
 
 ### P3 — New endpoints (not on current calls)
@@ -293,3 +304,4 @@ In `api_telemetry_{run_id}_prepare.json`, per symbol:
 |------|--------|
 | 2026-05-28 | Initial dictionary from live validation; dead URL table; P0 implementation |
 | 2026-05-28 | P1: shared `prefetch_eod_cache`, news `publishedDate` in headlines |
+| 2026-05-29 | Starter probe: `batch-quote` = HTTP 402; macro stays parallel `/quote`. Mandate wired to real 12M TWR in prepare. |
