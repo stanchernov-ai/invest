@@ -386,13 +386,20 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 {% endif %}
             {% endfor %}
             
-            {% if unicorn_trades %}
+            {% if unicorn_trades_grouped %}
             <h2>🦄 Unicorn Protocol</h2>
-            <ul>
-            {% for u in unicorn_trades %}
-                <li><strong>{{ u.verdict | upper }}</strong>: {{ u.symbol }}</li>
+            <div style="margin-left: 20px;">
+            {% for verdict, symbols in unicorn_trades_grouped.items() %}
+                <div style="display: flex; margin-bottom: 8px;">
+                    <div style="font-weight: bold; width: 120px;">{{ verdict }}:</div>
+                    <div>
+                        {% for sym in symbols %}
+                            <div>{{ sym }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
             {% endfor %}
-            </ul>
+            </div>
             {% endif %}
 
             <h2>The Action Plan</h2>
@@ -460,6 +467,13 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     """
 
     unicorn_trades = [u for u in unicorn_trades if u['verdict'].upper() != 'PASS']
+    unicorn_trades_grouped = {}
+    for u in unicorn_trades:
+        v = u['verdict'].upper()
+        if v not in unicorn_trades_grouped:
+            unicorn_trades_grouped[v] = []
+        unicorn_trades_grouped[v].append(u['symbol'])
+
     all_positions = chairman_data.get('portfolio_positions', []) + chairman_data.get('watchlist_positions', [])
     
     grouped_actions = {cat: [] for cat in ['STRONG BUY', 'BUY', 'HOLD', 'TRIM', 'SELL', 'STRONG SELL']}
@@ -486,7 +500,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         mandate=mandate,
         sotu_quotes=sotu_quotes,
         brawl_text=brawl_text,
-        unicorn_trades=unicorn_trades,
+        unicorn_trades_grouped=unicorn_trades_grouped,
         grouped_actions=grouped_actions,
         alpha_pick=alpha_pick,
         events=events,
