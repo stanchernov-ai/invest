@@ -28,6 +28,25 @@ ch.setLevel(logging.INFO)
 ch.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S'))
 logger.addHandler(ch)
 
+def reconcile_compliance(report: dict) -> dict:
+    """A QA agent cannot self-report PASS while logging a CRITICAL finding. The
+    PASS/FAIL badge is derived from evidence (findings), not the model's free-form
+    boolean, so a contradictory report can't slip through as a green check."""
+    try:
+        has_critical = any(
+            str(f.get("severity", "")).upper() == "CRITICAL"
+            for f in report.get("findings", []) or []
+        )
+        if has_critical and report.get("is_compliant"):
+            logger.warning(
+                f"Forcing is_compliant False for '{report.get('agent_role')}': "
+                f"agent self-reported PASS but logged CRITICAL finding(s)."
+            )
+            report["is_compliant"] = False
+    except Exception as e:
+        logger.warning(f"Could not reconcile compliance for a QA report: {e}")
+    return report
+
 def parse_board_matrix(raw_messages, all_tickers):
     matrix = {ticker: {"buffett": "", "lynch": "", "livermore": "", "huang": "", "simons": ""} for ticker in all_tickers}
     for msg in raw_messages:
@@ -97,7 +116,7 @@ async def run_post_flight_qa(raw_log: str, chairman_json: str):
             try:
                 parsed_res = json.loads(res.text)
                 parsed_res["agent_role"] = role_name
-                qa_reports.append(parsed_res)
+                qa_reports.append(reconcile_compliance(parsed_res))
             except Exception as e:
                 logger.error(f"Failed to parse QA report for {role_name}: {e}")
                 qa_reports.append({
@@ -113,6 +132,100 @@ async def run_post_flight_qa(raw_log: str, chairman_json: str):
                 })
             
     return qa_reports
+
+async def run_graphics_designer_qa(briefing_html: str, dashboard_html: str, chart_health: str = ""):
+    logger.info("Initiating Graphics Designer Visual SME Audit.")
+    
+    qa_prompt = (
+        f"Review the following HTML layouts and provide visual presentation recommendations.\n\n"
+        f"DETERMINISTIC CHART HEALTH REPORT (ground truth from automated HTTP checks — "
+        f"trust this over any guess about whether images render; any BROKEN entry is a "
+        f"visible failure to the reader):\n{chart_health or 'No chart health data provided.'}\n\n"
+        f"EXECUTIVE BRIEFING HTML:\n{briefing_html[:15000]}\n\n"
+        f"QA DASHBOARD HTML:\n{dashboard_html[:15000]}"
+    )
+    contents = [types.Content(role="user", parts=[types.Part.from_text(text=qa_prompt)])]
+    
+    info = agent_config["board_members"]["graphics_designer_qa"]
+    config_params = {
+        "system_instruction": info["system_instruction"], 
+        "temperature": 0.15,
+        "response_mime_type": "application/json",
+        "response_schema": QAAgentReport
+    }
+    if info["model"] == FAST_MODEL:
+        config_params["max_output_tokens"] = FLASH_TOKEN_LIMIT
+        
+    try:
+        res = await call_gemini_async(info["model"], contents, types.GenerateContentConfig(**config_params), agent_name="graphics_designer_qa")
+        parsed_res = json.loads(res.text)
+        parsed_res["agent_role"] = info["role"]
+        return reconcile_compliance(parsed_res)
+    except Exception as e:
+        logger.error(f"Failed to execute or parse Graphics Designer QA: {e}")
+        return {
+            "agent_role": info["role"],
+            "is_compliant": False,
+            "findings": [{
+                "severity": "CRITICAL",
+                "category": "Execution Error",
+                "description": f"Agent failed to execute: {str(e)}",
+                "recommendation": "Check API logs and retry."
+            }],
+            "summary": "Agent execution encountered a fatal error."
+        }
+
+async def run_qa_integrity_audit(qa_reports, raw_log: str, chairman_json: str, qa_dashboard_html: str):
+    """The QA-of-the-QA: validate that the QA team's verdicts are supported by the
+    actual run evidence and that the rendered dashboard faithfully reflects them."""
+    logger.info("Initiating QA Integrity Audit (QA-of-the-QA).")
+
+    reports_digest = json.dumps([
+        {
+            "agent_role": r.get("agent_role"),
+            "is_compliant": r.get("is_compliant"),
+            "summary": r.get("summary"),
+            "findings": r.get("findings", []),
+        }
+        for r in qa_reports
+    ], default=str)
+
+    qa_prompt = (
+        f"RAW DEBATE LOG (ground truth of what actually happened):\n{raw_log[:25000]}\n\n"
+        f"FINAL CHAIRMAN ALLOCATION:\n{chairman_json[:8000]}\n\n"
+        f"QA AGENT REPORTS (the conclusions you must independently verify):\n{reports_digest[:15000]}\n\n"
+        f"RENDERED QA DASHBOARD HTML (what the human will actually see):\n{qa_dashboard_html[:10000]}"
+    )
+    contents = [types.Content(role="user", parts=[types.Part.from_text(text=qa_prompt)])]
+
+    info = agent_config["board_members"]["qa_integrity_auditor"]
+    config_params = {
+        "system_instruction": info["system_instruction"],
+        "temperature": 0.15,
+        "response_mime_type": "application/json",
+        "response_schema": QAAgentReport
+    }
+    if info["model"] == FAST_MODEL:
+        config_params["max_output_tokens"] = FLASH_TOKEN_LIMIT
+
+    try:
+        res = await call_gemini_async(info["model"], contents, types.GenerateContentConfig(**config_params), agent_name="qa_integrity_auditor")
+        parsed_res = json.loads(res.text)
+        parsed_res["agent_role"] = info["role"]
+        return reconcile_compliance(parsed_res)
+    except Exception as e:
+        logger.error(f"Failed to execute or parse QA Integrity Audit: {e}")
+        return {
+            "agent_role": info["role"],
+            "is_compliant": False,
+            "findings": [{
+                "severity": "CRITICAL",
+                "category": "Execution Error",
+                "description": f"Agent failed to execute: {str(e)}",
+                "recommendation": "Check API logs and retry."
+            }],
+            "summary": "Agent execution encountered a fatal error."
+        }
 
 async def main_batch():
     logger.info("Initializing high performance quantitative pipeline engine.")
@@ -172,7 +285,12 @@ async def main_batch():
             qqq_adv = await get_fmp_advanced_metrics("QQQ", settings.FMP_API_KEY, session, api_telemetry)
             spy_adv = await get_fmp_advanced_metrics("SPY", settings.FMP_API_KEY, session, api_telemetry)
             
-            tasks = [get_fmp_advanced_metrics(sym, settings.FMP_API_KEY, session, api_telemetry) for sym in clean_symbols]
+            adv_sem = asyncio.Semaphore(5)
+            async def _fetch_adv(sym):
+                async with adv_sem:
+                    return await get_fmp_advanced_metrics(sym, settings.FMP_API_KEY, session, api_telemetry)
+            
+            tasks = [_fetch_adv(sym) for sym in clean_symbols]
             results_list = await asyncio.gather(*tasks, return_exceptions=True)
             
             advanced_data = {}
@@ -358,11 +476,46 @@ async def main_batch():
         raw_log_combined = "".join(raw_log_lines)
         
         qa_reports = await run_post_flight_qa(raw_log_combined, json.dumps(c_data))
-        qa_dashboard_html = reporting.generate_qa_dashboard_html(qa_reports, file_timestamp)
-        storage_client.save_report(f"qa_dashboard_{file_timestamp}.html", qa_dashboard_html)
         
-        qa_summary_text = "<br>".join([
-            f"&bull; <strong>{r['agent_role']}</strong>: {'&#9989; PASS' if r['is_compliant'] else '&#10060; FAIL'} - {r['summary']}"
+        draft_qa_summary_text = "<br>".join([
+            f"<strong>{r['agent_role']}</strong> {'&#9989;' if r['is_compliant'] else '&#10060;'}"
+            for r in qa_reports
+        ])
+        
+        # Build every chart once so the rendered briefing and the chart-health
+        # audit reference the exact same image URLs.
+        chart_urls = reporting.build_briefing_charts(sorted_ledger, account_holdings, account_returns, history_data)
+        chart_health = reporting.audit_chart_health(chart_urls)
+        chart_health_text = reporting.format_chart_health(chart_health)
+        broken_charts = [h["name"] for h in chart_health if not h["ok"]]
+        if broken_charts:
+            logger.warning(f"Broken/missing briefing charts detected: {', '.join(broken_charts)}")
+
+        draft_html_payload = reporting.generate_html_briefing(
+            total_val=total_portfolio_value, qqq_trend=live_qqq_trend,
+            portfolio_3m_trend=portfolio_3m_trend, mandate=live_mandate, 
+            chairman_data=c_data, cos_data=cos_data, matrix_md=matrix_md, unicorn_trades=unicorn_trades,
+            sorted_ledger=sorted_ledger, red_team_data=red_team_data, history_data=history_data,
+            qa_summary_text=draft_qa_summary_text, account_holdings=account_holdings, account_returns=account_returns,
+            advanced_data=advanced_data, chart_urls=chart_urls
+        )
+
+        draft_qa_dashboard_html = reporting.generate_qa_dashboard_html(qa_reports, file_timestamp)
+
+        # Run Graphics Designer Visual SME review on the draft HTML, armed with the
+        # deterministic chart-health report so it can actually flag broken graphs.
+        gd_report = await run_graphics_designer_qa(draft_html_payload, draft_qa_dashboard_html, chart_health_text)
+        qa_reports.append(gd_report)
+
+        # QA-the-QA: audit whether the QA team's verdicts are supported by the run
+        # and whether the dashboard faithfully represents those reports.
+        interim_qa_dashboard_html = reporting.generate_qa_dashboard_html(qa_reports, file_timestamp)
+        integrity_report = await run_qa_integrity_audit(qa_reports, raw_log_combined, json.dumps(c_data), interim_qa_dashboard_html)
+        qa_reports.append(integrity_report)
+
+        # Re-generate final HTML with the Graphics Designer's report included
+        final_qa_summary_text = "<br>".join([
+            f"<strong>{r['agent_role']}</strong> {'&#9989;' if r['is_compliant'] else '&#10060;'}"
             for r in qa_reports
         ])
         
@@ -371,10 +524,13 @@ async def main_batch():
             portfolio_3m_trend=portfolio_3m_trend, mandate=live_mandate, 
             chairman_data=c_data, cos_data=cos_data, matrix_md=matrix_md, unicorn_trades=unicorn_trades,
             sorted_ledger=sorted_ledger, red_team_data=red_team_data, history_data=history_data,
-            qa_summary_text=qa_summary_text, account_holdings=account_holdings, account_returns=account_returns,
-            advanced_data=advanced_data
+            qa_summary_text=final_qa_summary_text, account_holdings=account_holdings, account_returns=account_returns,
+            advanced_data=advanced_data, chart_urls=chart_urls
         )
         
+        qa_dashboard_html = reporting.generate_qa_dashboard_html(qa_reports, file_timestamp)
+        
+        storage_client.save_report(f"qa_dashboard_{file_timestamp}.html", qa_dashboard_html)
         storage_client.save_report(f"executive_briefing_{file_timestamp}.html", html_payload)
         storage_client.save_report(f"raw_debate_log_{file_timestamp}.md", raw_log_combined)
         

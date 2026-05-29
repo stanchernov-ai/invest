@@ -46,68 +46,46 @@ async def fetch_json_endpoint(session: aiohttp.ClientSession, url: str) -> list:
             raise RateLimitError("API capacity exhausted.")
         return data if isinstance(data, list) else [data]
 
-async def fetch_momentum_trend(symbol: str, api_key: str, session: aiohttp.ClientSession, telemetry: dict = None) -> float:
-    # 3-month price momentum from FMP's stable EOD endpoint. The legacy v3
-    # endpoint is 403 on the starter tier and yfinance is unreliable, so we
-    # source this directly from the same FMP feed as the rest of the metrics.
-    end_date = datetime.datetime.today()
-    start_date = end_date - datetime.timedelta(days=95)
-    start_str = start_date.strftime("%Y" + dash + "%m" + dash + "%d")
-    end_str = end_date.strftime("%Y" + dash + "%m" + dash + "%d")
-    url = f"https://financialmodelingprep.com/stable/historical-price-eod/light?symbol={symbol}&from={start_str}&to={end_str}&apikey={api_key}"
-
-    trend = 'N/A'
-    try:
-        data = await fetch_json_endpoint(session, url)
-        # Records are newest-first: index 0 is the latest close, [-1] the oldest.
-        prices = [d.get("price") for d in data if isinstance(d, dict) and d.get("price") is not None]
-        if len(prices) >= 2:
-            end_price = float(prices[0])
-            start_price = float(prices[~0])
-            if start_price > 0:
-                trend = round(((end_price - start_price) / start_price) * 100, 2)
-    except Exception:
-        logger.warning(f"FMP momentum fetch failed for {symbol}")
-        trend = 'N/A'
-
-    if telemetry is not None:
-        if symbol not in telemetry: telemetry[symbol] = {}
-        telemetry[symbol]["3m_momentum"] = {
-            "source": "fmp_stable_eod_light",
-            "url": url.replace(api_key, "REDACTED"),
-            "response": trend,
-        }
-    return trend
-
-async def fetch_3y_cagr(symbol: str, api_key: str, session: aiohttp.ClientSession, telemetry: dict = None) -> float:
+async def fetch_historical_metrics(symbol: str, api_key: str, session: aiohttp.ClientSession, telemetry: dict = None) -> tuple:
     end_date = datetime.datetime.today()
     start_date = end_date - datetime.timedelta(days=1095)
     start_str = start_date.strftime("%Y" + dash + "%m" + dash + "%d")
     end_str = end_date.strftime("%Y" + dash + "%m" + dash + "%d")
     url = f"https://financialmodelingprep.com/stable/historical-price-eod/light?symbol={symbol}&from={start_str}&to={end_str}&apikey={api_key}"
 
+    trend = 'N/A'
     cagr = 'N/A'
     try:
         data = await fetch_json_endpoint(session, url)
-        prices = [d.get("price") for d in data if isinstance(d, dict) and d.get("price") is not None]
+        prices = [d for d in data if isinstance(d, dict) and d.get("price") is not None and d.get("date") is not None]
         if len(prices) >= 2:
-            end_price = float(prices[0])
-            start_price = float(prices[~0])
-            if start_price > 0:
-                cagr_val = ((end_price / start_price) ** (1/3)) - 1
+            end_price = float(prices[0].get("price"))
+            
+            start_price_3y = float(prices[~0].get("price"))
+            if start_price_3y > 0:
+                cagr_val = ((end_price / start_price_3y) ** (1/3)) - 1
                 cagr = round(cagr_val * 100, 2)
+                
+            target_3m_date = (end_date - datetime.timedelta(days=95)).strftime("%Y" + dash + "%m" + dash + "%d")
+            start_price_3m = None
+            for p in reversed(prices):
+                if p.get("date") >= target_3m_date:
+                    start_price_3m = float(p.get("price"))
+                    break
+                    
+            if start_price_3m and start_price_3m > 0:
+                trend = round(((end_price - start_price_3m) / start_price_3m) * 100, 2)
     except Exception:
-        logger.warning(f"FMP 3Y CAGR fetch failed for {symbol}")
-        cagr = 'N/A'
+        logger.warning(f"FMP historical metrics fetch failed for {symbol}")
 
     if telemetry is not None:
         if symbol not in telemetry: telemetry[symbol] = {}
-        telemetry[symbol]["3y_cagr"] = {
+        telemetry[symbol]["historical_metrics"] = {
             "source": "fmp_stable_eod_light",
             "url": url.replace(api_key, "REDACTED"),
-            "response": cagr,
+            "response": {"3m_momentum": trend, "3y_cagr": cagr},
         }
-    return cagr
+    return trend, cagr
 
 async def fetch_price_series(symbol: str, api_key: str, session: aiohttp.ClientSession, start_str: str, end_str: str) -> dict:
     # Daily EOD closes for [start, end] from FMP's stable light endpoint (the same
@@ -174,10 +152,7 @@ async def get_fmp_advanced_metrics(symbol: str, api_key: str, session: aiohttp.C
         beta = safe_float(yf_info.get('beta'))
         image_url = ''
 
-    trend_3m, cagr_3y = await asyncio.gather(
-        fetch_momentum_trend(symbol, api_key, session, telemetry_ledger),
-        fetch_3y_cagr(symbol, api_key, session, telemetry_ledger)
-    )
+    trend_3m, cagr_3y = await fetch_historical_metrics(symbol, api_key, session, telemetry_ledger)
 
     if is_etf:
         quote_url = f"{base_url}/quote?symbol={symbol}&apikey={api_key}"
