@@ -491,6 +491,14 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     </head>
     <body>
         <div class="container">
+            {% set pill_styles = {
+                'STRONG BUY': 'background-color:#dcfce7; color:#166534;',
+                'BUY': 'background-color:#dcfce7; color:#166534;',
+                'HOLD': 'background-color:#f3f4f6; color:#374151;',
+                'TRIM': 'background-color:#fef3c7; color:#92400e;',
+                'SELL': 'background-color:#fee2e2; color:#991b1b;',
+                'STRONG SELL': 'background-color:#fee2e2; color:#991b1b;'
+            } %}
             <h1>Invest AI: Executive Briefing</h1>
             
             <div class="metric-box">
@@ -612,7 +620,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                             </td>
                             {% endif %}
                             <td valign="middle">
-                                <span class="verdict-pill" style="{{ pill_styles.get(item.verdict, pill_styles['HOLD']) }} margin-bottom: 0;">{{ item.verdict }} : {{ item.symbol }}</span>
+                                <span class="verdict-pill" style="{{ pill_styles[item.verdict] if item.verdict in pill_styles else pill_styles['HOLD'] }} margin-bottom: 0;">{{ item.verdict }} : {{ item.symbol }}</span>
                             </td>
                         </tr>
                     </table>
@@ -639,14 +647,6 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {% endif %}
 
             {% set action_categories = ['STRONG BUY', 'BUY', 'HOLD', 'TRIM', 'SELL', 'STRONG SELL'] %}
-            {% set pill_styles = {
-                'STRONG BUY':  'background-color:#dcfce7; color:#166534;',
-                'BUY':         'background-color:#dcfce7; color:#166534;',
-                'HOLD':        'background-color:#f3f4f6; color:#374151;',
-                'TRIM':        'background-color:#fef3c7; color:#92400e;',
-                'SELL':        'background-color:#fee2e2; color:#991b1b;',
-                'STRONG SELL': 'background-color:#fee2e2; color:#991b1b;'
-            } %}
             {% for category in action_categories %}
                 {% if grouped_actions[category] %}
                     {% for pos in grouped_actions[category] %}
@@ -774,14 +774,6 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         sotu_quotes=sotu_quotes,
         brawl_text=brawl_text,
         unicorn_protocol_items=unicorn_protocol_items,
-        pill_styles={
-            'STRONG BUY': 'background-color:#dcfce7; color:#166534;',
-            'BUY': 'background-color:#dcfce7; color:#166534;',
-            'HOLD': 'background-color:#f3f4f6; color:#374151;',
-            'TRIM': 'background-color:#fef3c7; color:#92400e;',
-            'SELL': 'background-color:#fee2e2; color:#991b1b;',
-            'STRONG SELL': 'background-color:#fee2e2; color:#991b1b;',
-        },
         grouped_actions=grouped_actions,
         alpha_pick=alpha_pick,
         events=events,
@@ -799,7 +791,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
 
     return rendered_html
 
-def generate_qa_dashboard_html(reports, timestamp):
+def generate_qa_dashboard_html(reports, timestamp, review_url: str = None):
     html_template = """
     <!DOCTYPE html>
     <html>
@@ -891,6 +883,10 @@ def generate_qa_dashboard_html(reports, timestamp):
             
             <div class="footer">
                 Automated Post-Flight Quality Assurance Report.<br>
+                {% if review_url %}
+                <p style="margin: 16px 0;"><a href="{{ review_url }}" style="display:inline-block;background:#2563eb;color:#ffffff;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">Review QA accuracy for this run</a></p>
+                <p style="font-size: 0.85em;">Confirm or reject each QA agent's verdict (2–5 min). Link requires your review token.</p>
+                {% endif %}
                 Invest AI Boardroom
             </div>
         </div>
@@ -899,4 +895,4 @@ def generate_qa_dashboard_html(reports, timestamp):
     """
     
     template = Template(html_template)
-    return template.render(reports=reports, timestamp=timestamp)
+    return template.render(reports=reports, timestamp=timestamp, review_url=review_url)
