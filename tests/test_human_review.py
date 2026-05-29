@@ -22,12 +22,25 @@ class TestHumanReviewAuth(unittest.TestCase):
 
     def test_build_review_url(self):
         with patch.dict(os.environ, {
-            "QA_REVIEW_BASE_URL": "https://example.azurewebsites.net/api",
+            "QA_REVIEW_BASE_URL": "https://example.azurewebsites.net",
             "QA_REVIEW_TOKEN": "abc",
         }):
             url = build_review_url("20260529_120000")
+            self.assertEqual(
+                url,
+                "https://example.azurewebsites.net/api/qa-review?run_id=20260529_120000&token=abc",
+            )
+
+    def test_build_review_url_encodes_special_chars(self):
+        token = "abc%def+ghi&jkl"
+        with patch.dict(os.environ, {
+            "QA_REVIEW_BASE_URL": "https://example.azurewebsites.net",
+            "QA_REVIEW_TOKEN": token,
+        }):
+            url = build_review_url("20260529_120000")
             self.assertIn("run_id=20260529_120000", url)
-            self.assertIn("token=abc", url)
+            self.assertIn("token=abc%25def%2Bghi%26jkl", url)
+            self.assertNotIn(f"token={token}", url)
 
 
 class TestHumanReviewHandler(unittest.TestCase):

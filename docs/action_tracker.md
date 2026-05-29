@@ -61,7 +61,7 @@ This document tracks identified bugs, architectural improvements, and long-term 
 
 | Priority | Item |
 |----------|------|
-| **P1** | **URL-encode `token` in `build_review_url()`** — token contains `%`; may break query string if unencoded (probe saw 403). |
+| ~~**P1**~~ | ~~**URL-encode `token` in `build_review_url()`**~~ **DONE (May 29, 2026)** — `urlencode()` in `src/qa/human_review.py`. |
 | **P1** | **First human review on a real run** — validate email link + blob `qa_human_review_{run_id}.json`. |
 | **P2** | Wire post-job Cursor agents (`api_audit`, `data_insights`, `supervisor_summaries` still empty in ecosystem state). |
 | **P2** | Relative strength + sector weights in prepare (FMP thread). |

@@ -14,6 +14,7 @@ import os
 import re
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlencode
 
 from src import storage_client
 
@@ -41,7 +42,8 @@ def build_review_url(run_id: str) -> str | None:
     token = os.getenv("QA_REVIEW_TOKEN", "").strip()
     if not base or not token or not run_id:
         return None
-    return f"{base}/api/qa-review?run_id={run_id}&token={token}"
+    query = urlencode({"run_id": run_id, "token": token})
+    return f"{base}/api/qa-review?{query}"
 
 
 def _validate_run_id(run_id: str) -> bool:
