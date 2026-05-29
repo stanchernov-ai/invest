@@ -25,6 +25,7 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | I need to… | Read |
 |------------|------|
 | See agent diagrams, production roster, QA layers | [`agent_architecture.md`](agent_architecture.md) |
+| Understand **which QA module** does what | [`qa_layers.md`](qa_layers.md) |
 | Understand pipeline phases, deploy, data layer | [`technical_solution.md`](technical_solution.md) |
 | Map FMP endpoints / fields / Starter tier | [`fmp_data_dictionary.md`](fmp_data_dictionary.md) |
 | Review subscriptions, SaaS costs, finance oversight | [`tech_stack_and_subscriptions.md`](tech_stack_and_subscriptions.md) + `subscriptions_registry.json` |
@@ -49,7 +50,9 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 
 | Document | SSOT for |
 |----------|----------|
+| [`../README.md`](../README.md) | Repo entry point — quick start + doc chain |
 | [`agent_architecture.md`](agent_architecture.md) | Agent inventory, mermaid diagrams, QA layers L0–L7, golden fixtures |
+| [`qa_layers.md`](qa_layers.md) | **Which QA file runs when** — deliver vs weekly vs dev |
 | [`technical_solution.md`](technical_solution.md) | End-to-end flow, repo layout, env vars, blob containers |
 | [`agent_guardrails.md`](agent_guardrails.md) | **Pointer only** → `.cursorrules` |
 
