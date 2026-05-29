@@ -19,7 +19,7 @@ This document tracks identified bugs, architectural improvements, and long-term 
 | **SoTU section order** | `a91b05a` | Charts → TWR → **State of the Union** → Alpha Pick → Action Plan |
 | **CAGR notation** | `a91b05a` | Metric box shows `12.00%` not spelled-out `percent` |
 | **Pie legend removal** | `41cc31d` | `plugins.legend: false` (boolean); canvas 600×420 |
-| **Dark line + bar charts** | *(this commit)* | `#111827` canvas; `May '25` x-axis; bar `%` datalabels; light green/red on dark |
+| **Dark line + bar charts** | `3f66433` | `#111827` canvas; `May '25` x-axis; bar `%` datalabels; light green/red on dark |
 
 ### Validation runs
 
