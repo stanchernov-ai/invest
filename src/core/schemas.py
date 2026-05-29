@@ -82,6 +82,17 @@ class ComplianceReport(BaseModel):
     violations: list[str] = Field(description="A list of any rules the Chairman broke.")
     feedback_to_chairman: str = Field(description="Direct, constructive feedback telling the Chairman exactly what to fix in the next iteration.")
 
+class UnicornRebuttal(BaseModel):
+    symbol: str = Field(description="Ticker symbol from the Unicorn Protocol (unanimous board verdict).")
+    rebuttal: str = Field(description="Original adversarial bear-case paragraph weaponizing live headlines against this unanimous trade. Do NOT quote board members.")
+
+class RedTeamReport(BaseModel):
+    bear_case_narrative: str = Field(description="Bear case rebuttal against the Alpha Pick only.")
+    unicorn_rebuttals: list[UnicornRebuttal] = Field(
+        default_factory=list,
+        description="One dedicated Red Team rebuttal per Unicorn Protocol symbol (unanimous panel verdict).",
+    )
+
 class BoardroomState(BaseModel):
     base_data_prompt: str
     live_mandate: str

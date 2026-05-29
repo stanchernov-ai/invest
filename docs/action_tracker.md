@@ -7,6 +7,18 @@ This document tracks identified bugs, architectural improvements, and long-term 
 
 ---
 
+## Documentation index
+
+| Document | Use when |
+|----------|----------|
+| [`agent_architecture.md`](agent_architecture.md) | Agent diagrams, inventory, QA layers — **update when roster changes** |
+| [`technical_solution.md`](technical_solution.md) | System design, data layer, deploy |
+| [`engineering_playbook.md`](engineering_playbook.md) | Before retrying a rejected approach |
+| [`fmp_data_dictionary.md`](fmp_data_dictionary.md) | FMP endpoints and field map |
+| [`.cursorrules`](../.cursorrules) | Guardrails and Cursor sub-agent triggers |
+
+---
+
 ## Session Handoff — FMP / Market Data (pick up here — morning)
 
 > **Stan — start here when you’re back.** Super tired EOD; deploy is pushed, verification + P2 are next. Read this section + [`docs/fmp_data_dictionary.md`](fmp_data_dictionary.md).

@@ -1,0 +1,26 @@
+[
+  {
+    "agent_role": "Post Mortem QA Auditor",
+    "is_compliant": true,
+    "summary": "Chairman followed procedural rules.",
+    "findings": []
+  },
+  {
+    "agent_role": "Systems Architect QA",
+    "is_compliant": true,
+    "summary": "Pipeline executed cleanly.",
+    "findings": []
+  },
+  {
+    "agent_role": "Prompt Engineer QA",
+    "is_compliant": true,
+    "summary": "No persona drift detected.",
+    "findings": []
+  },
+  {
+    "agent_role": "Graphics Designer Visual SME (deterministic)",
+    "is_compliant": true,
+    "summary": "All charts OK.",
+    "findings": []
+  }
+]

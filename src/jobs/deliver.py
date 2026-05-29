@@ -124,6 +124,8 @@ async def run_deliver(run_id: str) -> dict:
         )
         qa_reports.append(integrity_report)
 
+        from src.qa.scorecard import build_qa_scorecard, persist_scorecard
+
         final_qa_summary_text = "<br>".join([
             f"<strong>{r['agent_role']}</strong> {'&#9989;' if r['is_compliant'] else '&#10060;'}"
             for r in qa_reports
@@ -147,9 +149,13 @@ async def run_deliver(run_id: str) -> dict:
         notifier.send_qa_dashboard(qa_dashboard_html)
 
         # Merge telemetry from all three phases into the canonical run file.
+        deliver_activity = agent_activity.snapshot()
+        qa_scorecard = build_qa_scorecard(run_id, qa_reports, deliver_activity)
+        persist_scorecard(qa_scorecard)
         merged_telemetry = _merge_telemetry(
-            prep.get("telemetry"), debate.get("telemetry"), agent_activity.snapshot()
+            prep.get("telemetry"), debate.get("telemetry"), deliver_activity
         )
+        merged_telemetry["QA_SCORECARD"] = qa_scorecard
         storage_client.save_report(f"api_telemetry_{run_id}.json", json.dumps(merged_telemetry, indent=4))
 
         finished = now_local()

@@ -6,7 +6,7 @@ from google.genai import types
 
 from src.core.schemas import (
     BoardroomState, PanelistPortfolioVerdict, ChiefOfStaffSynthesis, 
-    ChairmanMasterSynthesis, ComplianceReport, DATA_SCHEMA_BINDING, 
+    ChairmanMasterSynthesis, ComplianceReport, RedTeamReport, DATA_SCHEMA_BINDING, 
     TONE_OVERRIDE, MUNGER_DOCTRINE, CHAIRMAN_MANDATE, RETAIL_EDGE_DOCTRINE, 
     WATCHLIST_RULING
 )
@@ -20,9 +20,6 @@ CONCENTRATION_EXEMPTION = (
     "You are strictly FORBIDDEN from voting to Sell or Trim purely to achieve sector diversification. "
     "Evaluate assets on individual mathematical metrics and edge."
 )
-
-class RedTeamReport(BaseModel):
-    bear_case_narrative: str
 
 class StateMachineOrchestrator:
     def __init__(self, state: BoardroomState):
@@ -260,7 +257,19 @@ class StateMachineOrchestrator:
             self.state.qa_feedback = res.get("feedback_to_chairman", "Compliance rejection triggered.")
 
     async def execute_red_team(self) -> None:
-        prompt = f"Construct structural bear case narrative opposing allocations:\n\n{self.state.chairman_draft_json}"
+        unicorns = json.dumps(self.state.unicorn_trades or [])
+        headlines = self.state.base_data_prompt or ""
+        if "=== LIVE MARKET HEADLINES ===" in headlines:
+            headlines = headlines[headlines.find("=== LIVE MARKET HEADLINES ==="):]
+        headlines = headlines[:6000]
+        prompt = (
+            f"Construct adversarial bear-case narratives opposing the Chairman's plan.\n\n"
+            f"LIVE MARKET HEADLINES (weaponize these):\n{headlines}\n\n"
+            f"UNICORN PROTOCOL (unanimous panel verdict — you MUST output one `unicorn_rebuttals` "
+            f"entry per symbol below):\n{unicorns}\n\n"
+            f"Also write `bear_case_narrative` targeting the Alpha Pick only.\n\n"
+            f"CHAIRMAN FINAL PLAN:\n{self.state.chairman_draft_json}"
+        )
         res = await self._run_agent("red_teamer", prompt, schema=RedTeamReport)
         self.red_team_json = json.dumps(res) if res else "{}"
 

@@ -1,0 +1,10 @@
+{
+  "expect_compliant": false,
+  "required_findings": [
+    {
+      "severity": "CRITICAL",
+      "category": "Dashboard Fidelity",
+      "description_contains": "Post Mortem"
+    }
+  ]
+}

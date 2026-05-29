@@ -198,7 +198,9 @@ async def run_graphics_designer_qa(
     3. Multimodal LLM review of rendered charts + email HTML layout."""
     from src.output import reporting
 
-    deterministic = build_graphics_report(chart_health)
+    from src.qa.visual_audit import build_deterministic_visual_report
+
+    deterministic = build_deterministic_visual_report(final_briefing_html, chart_health)
     if not deterministic.get("is_compliant"):
         logger.warning("Graphics QA: deterministic chart-health failed; skipping visual LLM review.")
         return deterministic
@@ -277,12 +279,16 @@ async def run_qa_integrity_audit(qa_reports, raw_log: str, chairman_json: str,
                                  qa_dashboard_html: str, *,
                                  model_override: str = None,
                                  timeout_seconds: int = QA_INTEGRITY_TIMEOUT_SECONDS):
-    """The QA-of-the-QA: validate that the QA team's verdicts are supported by the
-    actual run evidence and that the rendered dashboard faithfully reflects them.
+    """The QA-of-the-QA: deterministic pre-checks plus LLM verdict validation.
 
-    Runs on `model_override` (default FAST_MODEL) with a hard timeout so it can
-    never again exceed the per-function ceiling."""
+    Deterministic layer (dashboard fidelity, coverage, self-contradiction) runs
+    first via src/qa/integrity_audit.py. The LLM pass adds debate-log accuracy
+    checks. Golden fixtures: tests/fixtures/integrity_qa/.
+    """
+    from src.qa.integrity_audit import build_deterministic_integrity_report, merge_integrity_reports
+
     logger.info("Initiating QA Integrity Audit (QA-of-the-QA).")
+    deterministic = build_deterministic_integrity_report(qa_reports, qa_dashboard_html)
 
     reports_digest = json.dumps([
         {
@@ -320,10 +326,10 @@ async def run_qa_integrity_audit(qa_reports, raw_log: str, chairman_json: str,
         )
         parsed_res = json.loads(res.text)
         parsed_res["agent_role"] = info["role"]
-        return reconcile_compliance(parsed_res)
+        return merge_integrity_reports(deterministic, reconcile_compliance(parsed_res))
     except asyncio.TimeoutError:
         logger.warning(f"QA Integrity Audit timed out after {timeout_seconds}s; emitting non-blocking WARNING.")
-        return {
+        timeout_report = {
             "agent_role": info["role"],
             "is_compliant": True,
             "findings": [{
@@ -334,6 +340,7 @@ async def run_qa_integrity_audit(qa_reports, raw_log: str, chairman_json: str,
             }],
             "summary": "QA integrity audit skipped (timeout). Not treated as a violation.",
         }
+        return merge_integrity_reports(deterministic, timeout_report)
     except Exception as e:
         logger.error(f"Failed to execute or parse QA Integrity Audit: {e}")
-        return _execution_error_report(info["role"], e)
+        return merge_integrity_reports(deterministic, _execution_error_report(info["role"], e))

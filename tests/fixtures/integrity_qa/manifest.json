@@ -1,0 +1,32 @@
+{
+  "fixtures": [
+    {
+      "id": "good_alignment",
+      "description": "Dashboard badges match QA report JSON",
+      "qa_reports": "good_alignment.qa_reports.json",
+      "generate_dashboard": true,
+      "expected": "good_alignment.expected.json"
+    },
+    {
+      "id": "dashboard_mismatch",
+      "description": "Dashboard shows PASS but report JSON says FAIL",
+      "qa_reports": "dashboard_mismatch.qa_reports.json",
+      "dashboard": "dashboard_mismatch.dashboard.html",
+      "expected": "dashboard_mismatch.expected.json"
+    },
+    {
+      "id": "self_contradictory_qa",
+      "description": "QA agent self-reported PASS with CRITICAL finding",
+      "qa_reports": "self_contradictory_qa.qa_reports.json",
+      "generate_dashboard": true,
+      "expected": "self_contradictory_qa.expected.json"
+    },
+    {
+      "id": "missing_qa_agent",
+      "description": "Required post-flight QA agent absent from reports",
+      "qa_reports": "missing_qa_agent.qa_reports.json",
+      "generate_dashboard": true,
+      "expected": "missing_qa_agent.expected.json"
+    }
+  ]
+}

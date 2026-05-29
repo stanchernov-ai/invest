@@ -1,7 +1,7 @@
 # SC Invest Boardroom — Technical Solution
 
 **Document version:** 1.1  
-**Last updated:** May 28, 2026  
+**Last updated:** May 29, 2026  
 **Repository:** `sc-invest-boardroom`
 
 ---
@@ -114,6 +114,8 @@ Production runs still read/write runtime copies under `/tmp/data` and Azure `boa
 ---
 
 ## 2. Core Pipeline Flow and Agent Interactions
+
+> **Agent diagrams, inventory, and QA layers:** see [`agent_architecture.md`](agent_architecture.md) (keep updated when the roster changes). This section covers sequence and contracts.
 
 ### 2.1 End-to-End Batch Flow (`main_batch`)
 
@@ -249,7 +251,7 @@ Yields keyed stages for observability:
 | `simons` | Jim Simons | Pro | Quant/Kelly sizing; refuses trade on null data |
 | `clerk` | Ray Dalio (Chief of Staff) | Flash | Debate synthesis, State of the Union quotes |
 | `chairman` | Stanley Druckenmiller | Pro | Final allocations, capital math scratchpad |
-| `data_oracle` | Pre-Flight Data Oracle | Flash | Kill switch on zero prices only |
+| `data_oracle` | Pre-Flight Data Oracle | — (Python) | 🟢 Kill switch on zero prices — `src/core/data_oracle.py`; once in prepare, not LLM |
 | `compliance` | Harry Markopolos | Flash | Forensic audit of chairman vs board |
 | `red_teamer` | Adversarial Red Teamer | Pro | Bear case from headlines (isolated from debate) |
 | `post_mortem_qa` | Post Mortem QA Auditor | Pro | Post-run procedural audit |

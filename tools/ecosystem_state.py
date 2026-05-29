@@ -26,6 +26,7 @@ ARRAY_KEYS = (
     "api_audit",
     "data_insights",
     "supervisor_summaries",
+    "qa_scorecards",
 )
 MAX_ENTRIES = 50
 

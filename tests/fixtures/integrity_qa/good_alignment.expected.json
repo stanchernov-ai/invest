@@ -1,0 +1,5 @@
+{
+  "expect_compliant": true,
+  "required_findings": [],
+  "forbidden_severities": ["CRITICAL"]
+}

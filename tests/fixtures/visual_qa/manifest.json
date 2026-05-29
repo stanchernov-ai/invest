@@ -1,0 +1,39 @@
+{
+  "fixtures": [
+    {
+      "id": "good_briefing",
+      "description": "Table-based email-safe layout with valid chart images",
+      "html": "good_briefing.html",
+      "chart_health": "good_briefing.chart_health.json",
+      "expected": "good_briefing.expected.json"
+    },
+    {
+      "id": "broken_flex_layout",
+      "description": "Flexbox chart row — breaks in Gmail/Outlook",
+      "html": "broken_flex_layout.html",
+      "chart_health": "all_charts_ok.chart_health.json",
+      "expected": "broken_flex_layout.expected.json"
+    },
+    {
+      "id": "missing_chart",
+      "description": "Chart container with empty img src",
+      "html": "missing_chart.html",
+      "chart_health": "all_charts_ok.chart_health.json",
+      "expected": "missing_chart.expected.json"
+    },
+    {
+      "id": "missing_alt",
+      "description": "Chart image without alt text",
+      "html": "missing_alt.html",
+      "chart_health": "all_charts_ok.chart_health.json",
+      "expected": "missing_alt.expected.json"
+    },
+    {
+      "id": "broken_chart_health",
+      "description": "Valid HTML but HTTP probe reports broken chart URL",
+      "html": "good_briefing.html",
+      "chart_health": "broken_chart_health.chart_health.json",
+      "expected": "broken_chart_health.expected.json"
+    }
+  ]
+}

@@ -125,6 +125,48 @@ def fetch_briefing_visual_assets(html: str, max_images: int = 10) -> list[dict]:
             logger.warning(f"Could not fetch briefing image {src[:120]}: {e}")
     return assets
 
+def build_unicorn_protocol_items(unicorn_trades, chairman_data, advanced_data=None, red_team_data=None):
+    """Enrich unanimous panel trades with chairman narrative + Red Team rebuttals."""
+    advanced_data = advanced_data or {}
+    red_team_data = red_team_data or {}
+    rebuttal_map = {
+        r.get("symbol"): r.get("rebuttal", "")
+        for r in red_team_data.get("unicorn_rebuttals", []) or []
+        if r.get("symbol")
+    }
+
+    pos_by_symbol = {}
+    for pos in (chairman_data or {}).get("portfolio_positions", []) + (chairman_data or {}).get("watchlist_positions", []):
+        sym = pos.get("symbol")
+        if sym:
+            pos_by_symbol[sym] = pos
+
+    verdict_rank = {"STRONG BUY": 0, "BUY": 1, "HOLD": 2, "TRIM": 3, "SELL": 4, "STRONG SELL": 5, "PASS": 6}
+    items = []
+    unicorn_symbols = set()
+
+    for u in unicorn_trades or []:
+        sym = u.get("symbol")
+        panel_verdict = (u.get("verdict") or "").upper()
+        if not sym or panel_verdict == "PASS":
+            continue
+        unicorn_symbols.add(sym)
+        pos = pos_by_symbol.get(sym, {})
+        narrative = pos.get("narrative") or {}
+        items.append({
+            "symbol": sym,
+            "verdict": panel_verdict,
+            "synthesis": pos.get("synthesis", ""),
+            "champion": narrative.get("champion", ""),
+            "champion_quote": narrative.get("champion_quote", ""),
+            "red_team_rebuttal": rebuttal_map.get(sym, ""),
+            "image": advanced_data.get(sym, {}).get("image", ""),
+        })
+
+    items.sort(key=lambda x: (verdict_rank.get(x["verdict"], 99), x["symbol"]))
+    return items, unicorn_symbols
+
+
 def fmt_dol(val):
     try:
         return f"${float(val):,.2f}"
@@ -557,20 +599,35 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 {% endif %}
             {% endfor %}
             
-            {% if unicorn_trades_grouped %}
+            {% if unicorn_protocol_items %}
             <h2>🦄 Unicorn Protocol</h2>
-            <div style="margin-left: 20px;">
-            {% for verdict, symbols in unicorn_trades_grouped.items() %}
-                <div style="display: flex; margin-bottom: 8px;">
-                    <div style="font-weight: bold; width: 120px;">{{ verdict }}:</div>
-                    <div>
-                        {% for sym in symbols %}
-                            <div>{{ sym }}</div>
-                        {% endfor %}
-                    </div>
+            <p style="color:#6b7280; font-size:0.95em; margin-top:-5px;">Unanimous board verdict — full context with Red Team rebuttal.</p>
+            {% for item in unicorn_protocol_items %}
+                <div style="margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
+                        <tr>
+                            {% if item.image %}
+                            <td valign="middle" style="padding-right: 12px;">
+                                <img src="{{ item.image }}" alt="{{ item.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; display: block; max-width: 28px; height: auto;">
+                            </td>
+                            {% endif %}
+                            <td valign="middle">
+                                <span class="verdict-pill" style="{{ pill_styles.get(item.verdict, pill_styles['HOLD']) }} margin-bottom: 0;">{{ item.verdict }} : {{ item.symbol }}</span>
+                            </td>
+                        </tr>
+                    </table>
+                    {% if item.synthesis %}
+                    <p><strong>Strategic Context:</strong> {{ item.synthesis }}</p>
+                    {% endif %}
+                    {% if item.champion_quote %}
+                    <p><span class="champion">The Champion ({{ item.champion }}):</span> "{{ item.champion_quote }}"</p>
+                    {% endif %}
+                    {% if item.red_team_rebuttal %}
+                    <p style="margin-top: 12px; margin-bottom: 6px; font-weight: bold; color: #991b1b;">⚠️ Red Team Rebuttal</p>
+                    <div class="red-team-box">{{ item.red_team_rebuttal }}</div>
+                    {% endif %}
                 </div>
             {% endfor %}
-            </div>
             {% endif %}
 
             <h2>The Action Plan</h2>
@@ -603,7 +660,9 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                             <p><strong>Strategic Context:</strong> {{ pos.synthesis }}</p>
                             {% if pos.narrative %}
                                 <p><span class="champion">The Champion ({{ pos.narrative.champion }}):</span> "{{ pos.narrative.champion_quote }}"</p>
+                                {% if pos.narrative.dissenter and pos.narrative.dissenter|upper != 'NONE' and pos.narrative.dissenter_quote|upper != 'N/A' %}
                                 <p><span class="dissenter">The Dissent ({{ pos.narrative.dissenter }}):</span> "{{ pos.narrative.dissenter_quote }}"</p>
+                                {% endif %}
                             {% endif %}
                         </div>
                     {% endfor %}
@@ -670,21 +729,21 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     """
 
     unicorn_trades = [u for u in unicorn_trades if u['verdict'].upper() != 'PASS']
-    unicorn_trades_grouped = {}
-    for u in unicorn_trades:
-        v = u['verdict'].upper()
-        if v not in unicorn_trades_grouped:
-            unicorn_trades_grouped[v] = []
-        unicorn_trades_grouped[v].append(u['symbol'])
+    unicorn_protocol_items, unicorn_symbols = build_unicorn_protocol_items(
+        unicorn_trades, chairman_data, advanced_data, red_team_data
+    )
 
     all_positions = chairman_data.get('portfolio_positions', []) + chairman_data.get('watchlist_positions', [])
     
     if advanced_data is None: advanced_data = {}
     grouped_actions = {cat: [] for cat in ['STRONG BUY', 'BUY', 'HOLD', 'TRIM', 'SELL', 'STRONG SELL']}
     for pos in all_positions:
+        sym = pos.get('symbol')
+        if sym in unicorn_symbols:
+            continue
         verdict = pos.get('final_verdict', 'Pass').upper()
         if verdict in grouped_actions:
-            pos['image'] = advanced_data.get(pos['symbol'], {}).get('image', '')
+            pos['image'] = advanced_data.get(sym, {}).get('image', '')
             grouped_actions[verdict].append(pos)
             
     for cat in grouped_actions:
@@ -714,7 +773,15 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         proj_text=proj_text,
         sotu_quotes=sotu_quotes,
         brawl_text=brawl_text,
-        unicorn_trades_grouped=unicorn_trades_grouped,
+        unicorn_protocol_items=unicorn_protocol_items,
+        pill_styles={
+            'STRONG BUY': 'background-color:#dcfce7; color:#166534;',
+            'BUY': 'background-color:#dcfce7; color:#166534;',
+            'HOLD': 'background-color:#f3f4f6; color:#374151;',
+            'TRIM': 'background-color:#fef3c7; color:#92400e;',
+            'SELL': 'background-color:#fee2e2; color:#991b1b;',
+            'STRONG SELL': 'background-color:#fee2e2; color:#991b1b;',
+        },
         grouped_actions=grouped_actions,
         alpha_pick=alpha_pick,
         events=events,

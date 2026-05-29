@@ -1,0 +1,27 @@
+[
+  {
+    "agent_role": "Post Mortem QA Auditor",
+    "is_compliant": true,
+    "summary": "Looks fine.",
+    "findings": [
+      {
+        "severity": "CRITICAL",
+        "category": "Procedural",
+        "description": "Chairman skipped hedge mandate.",
+        "recommendation": "Fix hedge purchase."
+      }
+    ]
+  },
+  {
+    "agent_role": "Systems Architect QA",
+    "is_compliant": true,
+    "summary": "OK.",
+    "findings": []
+  },
+  {
+    "agent_role": "Prompt Engineer QA",
+    "is_compliant": true,
+    "summary": "OK.",
+    "findings": []
+  }
+]

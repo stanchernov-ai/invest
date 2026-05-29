@@ -1,0 +1,10 @@
+{
+  "expect_compliant": false,
+  "required_findings": [
+    {
+      "severity": "CRITICAL",
+      "category": "Accessibility",
+      "description_contains": "missing alt"
+    }
+  ]
+}

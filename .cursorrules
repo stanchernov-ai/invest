@@ -12,6 +12,7 @@
 1. Read `docs/action_tracker.md` — especially **Session Handoff** (human backlog + pickup point).
 2. Skim `docs/engineering_playbook.md` before retrying any rejected approach.
 3. Load `.cursor/agent_state/ecosystem_state.json` when auditing, post-job review, or resuming a blocked sub-agent cycle.
+4. When adding/removing agents or QA layers, read and update `docs/agent_architecture.md` (diagrams + inventory SSOT).
 
 **Do not** treat terminal scrollback as state. Log durable findings to the state files in §3.
 
@@ -26,6 +27,7 @@
 | **Code over Prompts** | Rules protecting data integrity, financial limits, or PASS/FAIL compliance must be **deterministic Python** (🟢), not prompt-only (🟡). Promote 🟡 → 🟢 before shipping. |
 | **Advisory vs Blocking** | Cursor sub-agents are **advisory during editing**. Only **git hooks / CI** may hard-block commits. Sub-agents produce findings; hooks enforce gates. |
 | **Scope discipline** | Minimize diff scope. Match existing conventions in `src/`. No drive-by refactors. |
+| **Documentation habit** | PRs or commits that touch `src/core/agents.py`, `src/qa_pipeline.py`, `src/qa_review.py`, or `.cursor/rules/` should include a one-line update to `docs/agent_architecture.md` (roster table, diagram note, or §9 change log). Same for new golden fixtures — register in the fixture `manifest.json` and note in §7/§8 of that doc. |
 
 ---
 
@@ -137,11 +139,12 @@ Full audit history: `docs/action_tracker.md` § guardrails; runtime patterns: `d
 |-------|-------|----------|
 | `docs/action_tracker.md` | Human + all agents | Backlog, Session Handoff, architectural decisions |
 | `docs/engineering_playbook.md` | Human + all agents | Rejected approaches — read before retrying |
-| `.cursor/agent_state/ecosystem_state.json` | Sub-agents + Supervisor | Machine ledger: conflicts, sub-agent runs, api_audit, data_insights, qa_flags, supervisor_summaries |
+| `.cursor/agent_state/ecosystem_state.json` | Sub-agents + Supervisor + scorecard | Machine ledger: conflicts, sub-agent runs, api_audit, data_insights, qa_flags, supervisor_summaries, **qa_scorecards** |
 | `api_telemetry_{run_id}_*.json` (Azure state) | Pipeline runtime | Per-run FMP/Gemini payloads + `AGENT_ACTIVITY` |
 | `docs/fmp_data_dictionary.md` | API Optimization Agent | Endpoint truth, dead URLs, field map |
+| `docs/agent_architecture.md` | All agents + humans | Agent diagrams, inventory, QA layers — **update when roster changes** |
 
-**ecosystem_state.json rules:** append-only arrays; cap each array at **50** entries (rotate oldest to `ecosystem_state_archive/`); never store secrets or full debate logs — use `evidence_ref` pointers (blob path, run_id, file:line).
+**ecosystem_state.json rules:** append-only arrays; cap each array at **50** entries (rotate oldest to `ecosystem_state_archive/`); never store secrets or full debate logs — use `evidence_ref` pointers (blob path, run_id, file:line). **`qa_scorecards`** — one entry per deliver run; use `human_confirmed` / `human_notes` in the scorecard payload when validating QA agent quality over time.
 
 ---
 

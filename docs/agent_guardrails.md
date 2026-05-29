@@ -1,7 +1,7 @@
 # Agent Guardrails — moved
 
-**This content now lives in the repo root:** [`.cursorrules`](../.cursorrules)
+**Guardrails:** [`.cursorrules`](../.cursorrules) (single source of truth).
 
-That file is the single source of truth for boardroom guardrails and is loaded automatically by Cursor agents in this project.
+**Agent diagrams & inventory:** [`agent_architecture.md`](agent_architecture.md) — update when adding/removing agents or QA layers.
 
 Do not duplicate guardrails here — edit `.cursorrules` only.
