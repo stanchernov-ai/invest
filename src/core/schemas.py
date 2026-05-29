@@ -138,3 +138,15 @@ def generate_dynamic_mandate(current_portfolio_value: float, weighted_cagr: floa
         f"Demand excellence, alpha, and aggressive outperformance to push this projection higher."
     )
     return mandate
+
+class QAFinding(BaseModel):
+    severity: Literal["INFO", "WARNING", "CRITICAL"] = Field(..., description="Severity of the finding.")
+    category: str = Field(..., description="Category of the finding (e.g., 'Procedural', 'Technical', 'Prompt Drift').")
+    description: str = Field(..., description="Detailed description of the issue or observation.")
+    recommendation: str = Field(..., description="Actionable recommendation to resolve the issue.")
+
+class QAAgentReport(BaseModel):
+    agent_role: str = Field(..., description="The role of the QA agent.")
+    is_compliant: bool = Field(..., description="Whether the overall run passes this agent's audit.")
+    findings: list[QAFinding] = Field(default_factory=list, description="List of specific QA findings.")
+    summary: str = Field(..., description="High-level summary of the audit.")

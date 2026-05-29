@@ -14,7 +14,7 @@ from src.data.news_client import fetch_ticker_news
 
 from src.output import reporting
 from src.output import notifier
-from src.core.schemas import generate_dynamic_mandate
+from src.core.schemas import generate_dynamic_mandate, QAAgentReport
 from src.core.engine import app
 from src.data.fmp_client import get_fmp_advanced_metrics, get_fmp_macro
 from src.config.settings import settings, DATA_DIR, now_local
@@ -65,23 +65,54 @@ async def run_post_flight_qa(raw_log: str, chairman_json: str):
     agent_keys = ["post_mortem_qa", "system_architect", "prompt_engineer"]
     for key in agent_keys:
         info = agent_config["board_members"][key]
-        config_params = {"system_instruction": info["system_instruction"], "temperature": 0.15}
+        config_params = {
+            "system_instruction": info["system_instruction"], 
+            "temperature": 0.15,
+            "response_mime_type": "application/json",
+            "response_schema": QAAgentReport
+        }
         if info["model"] == FAST_MODEL:
             config_params["max_output_tokens"] = FLASH_TOKEN_LIMIT
         tasks.append(call_gemini_async(info["model"], contents, types.GenerateContentConfig(**config_params), agent_name=key))
         
     results = await asyncio.gather(*tasks, return_exceptions=True)
     
-    qa_report = ""
+    qa_reports = []
     for key, res in zip(agent_keys, results):
         role_name = agent_config["board_members"][key]["role"]
-        qa_report += f"### {role_name} Report ###\n"
         if isinstance(res, Exception):
-            qa_report += f"QA execution failed.\n\n"
+            logger.error(f"QA execution failed for {role_name}: {res}")
+            qa_reports.append({
+                "agent_role": role_name,
+                "is_compliant": False,
+                "findings": [{
+                    "severity": "CRITICAL",
+                    "category": "Execution Error",
+                    "description": f"Agent failed to execute: {str(res)}",
+                    "recommendation": "Check API logs and retry."
+                }],
+                "summary": "Agent execution encountered a fatal error."
+            })
         else:
-            qa_report += f"{res.text.strip()}\n\n"
+            try:
+                parsed_res = json.loads(res.text)
+                parsed_res["agent_role"] = role_name
+                qa_reports.append(parsed_res)
+            except Exception as e:
+                logger.error(f"Failed to parse QA report for {role_name}: {e}")
+                qa_reports.append({
+                    "agent_role": role_name,
+                    "is_compliant": False,
+                    "findings": [{
+                        "severity": "CRITICAL",
+                        "category": "Parsing Error",
+                        "description": "Agent returned malformed JSON.",
+                        "recommendation": "Review raw agent output for syntax errors."
+                    }],
+                    "summary": "Failed to parse agent JSON output."
+                })
             
-    return qa_report
+    return qa_reports
 
 async def main_batch():
     logger.info("Initializing high performance quantitative pipeline engine.")
@@ -313,24 +344,30 @@ async def main_batch():
         matrix_md = generate_matrix_markdown(board_matrix)
         raw_log_combined = "".join(raw_log_lines)
         
+        qa_reports = await run_post_flight_qa(raw_log_combined, json.dumps(c_data))
+        qa_dashboard_html = reporting.generate_qa_dashboard_html(qa_reports, file_timestamp)
+        storage_client.save_report(f"qa_dashboard_{file_timestamp}.html", qa_dashboard_html)
+        
+        qa_summary_text = "<br>".join([
+            f"&bull; <strong>{r['agent_role']}</strong>: {'&#9989; PASS' if r['is_compliant'] else '&#10060; FAIL'} - {r['summary']}"
+            for r in qa_reports
+        ])
+        
         html_payload = reporting.generate_html_briefing(
             total_val=total_portfolio_value, qqq_trend=live_qqq_trend,
             portfolio_3m_trend=portfolio_3m_trend, mandate=live_mandate, 
             chairman_data=c_data, cos_data=cos_data, matrix_md=matrix_md, unicorn_trades=unicorn_trades,
             sorted_ledger=sorted_ledger, red_team_data=red_team_data, history_data=history_data,
-            account_holdings=account_holdings, account_returns=account_returns
+            qa_summary_text=qa_summary_text, account_holdings=account_holdings, account_returns=account_returns
         )
         
         storage_client.save_report(f"executive_briefing_{file_timestamp}.html", html_payload)
         storage_client.save_report(f"raw_debate_log_{file_timestamp}.md", raw_log_combined)
         
-        qa_report_md = await run_post_flight_qa(raw_log_combined, json.dumps(c_data))
-        storage_client.save_report(f"qa_summary_{file_timestamp}.md", qa_report_md)
-        
         notifier.send_executive_briefing(html_payload)
         run_outcome = "success"
         run_status["briefing_blob"] = f"executive_briefing_{file_timestamp}.html"
-        run_status["qa_blob"] = f"qa_summary_{file_timestamp}.md"
+        run_status["qa_blob"] = f"qa_dashboard_{file_timestamp}.html"
         logger.info("Pipeline finalized successfully.")
 
     except Exception as e:

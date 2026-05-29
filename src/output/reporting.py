@@ -495,3 +495,85 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     )
 
     return rendered_html
+
+def generate_qa_dashboard_html(reports, timestamp):
+    html_template = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; color: #1f2937; margin: 0; padding: 20px; }
+            .container { max-width: 1000px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+            h1 { color: #111827; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
+            h2 { color: #2563eb; margin-top: 30px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;}
+            h3 { color: #374151; margin-top: 25px; margin-bottom: 10px; }
+            .status-badge { display: inline-block; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 14px; margin-bottom: 15px; }
+            .status-pass { background-color: #dcfce7; color: #166534; border: 1px solid #22c55e; }
+            .status-fail { background-color: #fee2e2; color: #991b1b; border: 1px solid #ef4444; }
+            
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+            th { text-align: left; padding: 10px; background-color: #f8fafc; border-bottom: 2px solid #e5e7eb; color: #4b5563; }
+            td { padding: 12px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+            
+            .sev-CRITICAL { color: #dc2626; font-weight: bold; }
+            .sev-WARNING { color: #d97706; font-weight: bold; }
+            .sev-INFO { color: #2563eb; font-weight: bold; }
+            
+            .summary-box { background-color: #f8fafc; padding: 15px; border-radius: 5px; border-left: 4px solid #64748b; font-style: italic; margin-bottom: 20px; }
+            .footer { margin-top: 40px; font-size: 0.8em; color: #6b7280; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 20px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>SC Invest: QA Audit Dashboard</h1>
+            <p style="color: #6b7280; margin-top: -10px; margin-bottom: 30px;">Generated: {{ timestamp }}</p>
+            
+            {% for report in reports %}
+            <div style="margin-bottom: 50px;">
+                <h2>{{ report.agent_role }} Audit</h2>
+                
+                {% if report.is_compliant %}
+                    <span class="status-badge status-pass">✅ AUDIT PASSED</span>
+                {% else %}
+                    <span class="status-badge status-fail">❌ AUDIT FAILED</span>
+                {% endif %}
+                
+                <div class="summary-box">
+                    {{ report.summary }}
+                </div>
+                
+                {% if report.findings %}
+                <h3>Detailed Findings</h3>
+                <table>
+                    <tr>
+                        <th width="10%">Severity</th>
+                        <th width="15%">Category</th>
+                        <th width="40%">Description</th>
+                        <th width="35%">Recommendation</th>
+                    </tr>
+                    {% for finding in report.findings %}
+                    <tr>
+                        <td class="sev-{{ finding.severity }}">{{ finding.severity }}</td>
+                        <td>{{ finding.category }}</td>
+                        <td>{{ finding.description }}</td>
+                        <td>{{ finding.recommendation }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                <p style="color: #6b7280; font-style: italic;">No specific findings reported.</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+            
+            <div class="footer">
+                Automated Post-Flight Quality Assurance Report.<br>
+                SC Invest Boardroom AI
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    template = Template(html_template)
+    return template.render(reports=reports, timestamp=timestamp)
