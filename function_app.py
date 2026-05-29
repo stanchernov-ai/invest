@@ -44,10 +44,22 @@ def boardroom_daily_run(myTimer: func.TimerRequest) -> None:
 
         if not blob_client.exists():
             blob_client.upload_blob("lock_established", overwrite=True)
+        else:
+            try:
+                props = blob_client.get_blob_properties()
+                from datetime import datetime, timezone
+                age = (datetime.now(timezone.utc) - props.last_modified).total_seconds()
+                if age > 3600:
+                    lease_client = BlobLeaseClient(blob_client)
+                    lease_client.break_lease()
+                    logging.info("Broke orphaned lease from a previous failed run.")
+            except Exception as e:
+                logging.warning(f"Could not check or break orphaned lease: {e}")
 
         lease_client = BlobLeaseClient(blob_client)
         
         lease_client.acquire(lease_duration=-1)
+        blob_client.upload_blob("lock_established", overwrite=True, lease=lease_client)
         logging.info("Distributed lock acquired (infinite lease). Guaranteeing idempotent execution.")
         
         try:
@@ -60,3 +72,13 @@ def boardroom_daily_run(myTimer: func.TimerRequest) -> None:
         logging.warning("Lock acquisition failed. Another container is processing this window. Terminating safely.")
     except Exception as e:
         logging.error(f"FATAL. Boardroom execution failed during locked transaction. {e}")
+
+@app.timer_trigger(schedule="0 30 11 * * 1-5", arg_name="qaTimer", run_on_startup=False, use_monitor=False)
+def qa_review_daily_run(qaTimer: func.TimerRequest) -> None:
+    logging.info("Waking up the QA & Cost Review Team. Initiating daily run.")
+    
+    try:
+        from src.qa_review import run_qa_review_team
+        asyncio.run(run_qa_review_team())
+    except Exception as e:
+        logging.error(f"FATAL. QA Review execution failed. {e}")

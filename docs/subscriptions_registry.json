@@ -1,0 +1,218 @@
+{
+  "last_updated": "2026-05-28",
+  "updated_by": "Stan (manual) + agent inventory from codebase",
+  "currency": "USD",
+  "billing_period_note": "Monthly figures unless noted. Annual subs show monthly equivalent.",
+  "services": [
+    {
+      "id": "google_ai_ultra",
+      "name": "Google AI Ultra (consumer subscription)",
+      "category": "ai_platform",
+      "role_in_project": "Personal Gemini app + (likely) pipeline API usage via bundled entitlement.",
+      "plan": "Ultra — 20x Pro usage, 30 TB storage",
+      "billing": "monthly",
+      "cost_usd": 199.99,
+      "cost_confidence": "confirmed",
+      "includes_services": ["gemini_api"],
+      "validation_status": "confirmed_price_unvalidated_bundle",
+      "renewal": null,
+      "env_keys": [],
+      "code_refs": [],
+      "status": "active",
+      "notes": "Stan believes API calls via GEMINI_API_KEY are included in this subscription — agent must validate against Google invoices. Pipeline is the primary API consumer."
+    },
+    {
+      "id": "gemini_api",
+      "name": "Gemini API (google-genai)",
+      "category": "ai_inference",
+      "role_in_project": "All board + QA LLM agents (2.5 Pro + Flash). Primary runtime AI cost driver.",
+      "plan": "Bundled with Google AI Ultra (Stan assumption — validate)",
+      "billing": "bundled",
+      "cost_usd": 0,
+      "cost_confidence": "assumed_bundled",
+      "bundled_in": "google_ai_ultra",
+      "tcoe_include": false,
+      "validation_status": "unvalidated",
+      "renewal": null,
+      "env_keys": ["GEMINI_API_KEY"],
+      "code_refs": ["src/core/agents.py", "src/core/engine.py", "src/main.py", "src/qa_review.py"],
+      "status": "active",
+      "notes": "All LLM agents. Do NOT add separate line to TCO if bundled in Ultra — but VERIFY no separate Google AI Studio / Cloud invoice exists."
+    },
+    {
+      "id": "azure_platform",
+      "name": "Microsoft Azure (Functions + Storage + App Insights)",
+      "category": "cloud_hosting",
+      "role_in_project": "Hosts app-boardroom-prod (Flex Consumption), blob containers (inputs/state/reports), deploy artifacts, Application Insights logging.",
+      "plan": "Pay-as-you-go (free trial credits active until expiry)",
+      "billing": "monthly",
+      "cost_usd": 8.06,
+      "cost_forecast_usd": 8.95,
+      "cost_confidence": "confirmed_portal",
+      "renewal": null,
+      "env_keys": ["AZURE_STORAGE_CONNECTION_STRING"],
+      "code_refs": ["function_app.py", "src/storage_client.py", ".github/workflows/deploy.yml"],
+      "status": "active",
+      "notes": "Portal snapshot 2026-05-28. Future: Azure Cost Management API for live current/forecast."
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "category": "dev_tooling",
+      "role_in_project": "IDE + Agent for building/maintaining this repo.",
+      "plan": "Pro+ (annual)",
+      "billing": "annual",
+      "cost_usd": 48.0,
+      "cost_annual_usd": 576.0,
+      "cost_confidence": "confirmed",
+      "renewal": "2027-05-28",
+      "env_keys": [],
+      "code_refs": [],
+      "status": "active",
+      "notes": "3x usage vs Pro; higher Agent limits. Not runtime cost but full project TCO."
+    },
+    {
+      "id": "fmp",
+      "name": "Financial Modeling Prep (FMP)",
+      "category": "market_data",
+      "role_in_project": "EOD prices, fundamentals, news, macro (TLT/VXX), momentum — core data feed.",
+      "plan": "Starter (confirmed in playbook; no bulk endpoints)",
+      "billing": "monthly",
+      "cost_usd": 29.0,
+      "cost_confidence": "confirmed",
+      "env_keys": ["FMP_API_KEY"],
+      "code_refs": ["src/data/fmp_client.py", "src/scout.py"],
+      "status": "active",
+      "notes": "Starter tier $29/mo (Stan confirmed 2026-05-28). Validate tier still sufficient as symbol count grows (~22 runs/mo × N symbols)."
+    },
+    {
+      "id": "quickchart",
+      "name": "QuickChart.io",
+      "category": "visualization",
+      "role_in_project": "Renders briefing charts (pie/bar/line) via POST /chart/create short URLs.",
+      "plan": "Free tier (assumed)",
+      "billing": "free",
+      "cost_usd": 0,
+      "cost_confidence": "assumed",
+      "env_keys": [],
+      "code_refs": ["src/output/reporting.py"],
+      "status": "active",
+      "notes": "External dependency; if rate-limited, consider paid tier or local matplotlib (backlog)."
+    },
+    {
+      "id": "gmail_smtp",
+      "name": "Gmail SMTP",
+      "category": "notifications",
+      "role_in_project": "Executive briefing, QA dashboard, error alerts, QA digest email delivery.",
+      "plan": "Personal Gmail / Google account (assumed free)",
+      "billing": "free",
+      "cost_usd": 0,
+      "cost_confidence": "assumed",
+      "env_keys": ["SENDER_EMAIL", "SENDER_PASSWORD", "STAN_PERSONAL_EMAIL"],
+      "code_refs": ["src/output/notifier.py"],
+      "status": "active",
+      "notes": "If moved to Google Workspace, add monthly cost."
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "category": "dev_tooling",
+      "role_in_project": "Source control + OIDC deploy to Azure Functions (Actions).",
+      "plan": "Free",
+      "billing": "free",
+      "cost_usd": 0,
+      "cost_confidence": "confirmed",
+      "env_keys": [],
+      "code_refs": [".github/workflows/deploy.yml"],
+      "status": "active",
+      "notes": "Free tier (Stan confirmed 2026-05-28). OIDC deploy via Actions; minutes negligible for this repo."
+    },
+    {
+      "id": "polygon",
+      "name": "Polygon.io",
+      "category": "market_data",
+      "role_in_project": "NOT USED — POLYGON_API_KEY may exist in app settings but no code references.",
+      "plan": "Free tier",
+      "billing": "free",
+      "cost_usd": 0,
+      "cost_confidence": "confirmed",
+      "env_keys": ["POLYGON_API_KEY"],
+      "code_refs": [],
+      "status": "unused",
+      "notes": "Remove key from Azure app settings to avoid confusion; no spend."
+    },
+    {
+      "id": "yfinance",
+      "name": "Yahoo Finance (yfinance library)",
+      "category": "market_data",
+      "role_in_project": "Fundamentals fallback only; momentum replaced by FMP.",
+      "plan": "Unofficial scrape — no subscription",
+      "billing": "free",
+      "cost_usd": 0,
+      "cost_confidence": "confirmed",
+      "env_keys": [],
+      "code_refs": ["requirements.txt"],
+      "status": "active_fallback",
+      "notes": "Reliability risk; not a paid line item."
+    }
+  ],
+  "billing_notes": {
+    "gemini_api_ultra": "Stan believes Gemini API (GEMINI_API_KEY) is included in Google AI Ultra $199.99/mo — UNVALIDATED. Agent must verify via Google account invoices and flag if a separate API charge appears."
+  },
+  "possible_hidden_costs": [
+    {
+      "id": "google_workspace",
+      "name": "Google Workspace",
+      "why": "Pipeline sends via Gmail SMTP (SENDER_EMAIL). If not personal @gmail.com, may be a paid Workspace seat.",
+      "where_to_check": "admin.google.com billing"
+    },
+    {
+      "id": "azure_post_credit",
+      "name": "Azure after free-trial credits expire",
+      "why": "Currently ~$8/mo on credits; forecast may jump when credits run out.",
+      "where_to_check": "Azure Portal → Cost Management → Credits + Forecast"
+    },
+    {
+      "id": "quickchart_paid",
+      "name": "QuickChart.io paid tier",
+      "why": "Every briefing POSTs 4 charts/run × ~22 runs/mo. Free tier may rate-limit; paid if limits hit.",
+      "where_to_check": "quickchart.io account / email receipts"
+    },
+    {
+      "id": "google_one_storage",
+      "name": "Google One / cloud storage (beyond Ultra)",
+      "why": "Ultra includes 30 TB — verify no separate Google One charge.",
+      "where_to_check": "Google account → Subscriptions"
+    },
+    {
+      "id": "domain_dns",
+      "name": "Custom domain / DNS (if any)",
+      "why": "Not in codebase; check if boardroom uses a custom domain for email or Azure.",
+      "where_to_check": "Registrar + Azure DNS"
+    },
+    {
+      "id": "azure_app_insights_overages",
+      "name": "Application Insights ingestion overages",
+      "why": "host.json enables App Insights sampling; high log volume could add cost beyond Functions baseline.",
+      "where_to_check": "Azure Portal → App Insights → Usage and estimated costs"
+    },
+    {
+      "id": "misc_env_keys",
+      "name": "Stale paid keys in Azure App Settings",
+      "why": "POLYGON_API_KEY exists but unused (free). Audit Azure Function app settings for other keys tied to paid services.",
+      "where_to_check": "Azure Portal → app-boardroom-prod → Environment variables"
+    }
+  ],
+  "run_cadence": {
+    "boardroom_pipeline": "Weekdays 11:00 UTC (Mon-Fri)",
+    "qa_review_team": "Weekdays 11:30 UTC (Mon-Fri)",
+    "estimated_runs_per_month": 22
+  },
+  "future_automation": [
+    "Azure Cost Management API: current spend + forecast + credit expiry date",
+    "Google account subscriptions + AI Studio usage: validate Ultra includes API (no double bill)",
+    "FMP dashboard: plan tier + call volume",
+    "AGENT_ACTIVITY from latest api_telemetry: per-run token volume vs Ultra entitlements",
+    "Scan Azure Function app settings for env keys mapping to paid SaaS"
+  ]
+}

@@ -8,18 +8,80 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def get_quickchart_short_url(chart_config):
+def get_quickchart_short_url(chart_config, width=600, height=300):
+    # Prefer the short-URL endpoint: the inline GET fallback encodes the entire
+    # config into the querystring, which silently breaks for large charts (e.g.
+    # the benchmark line chart with a full year of points blows past URL limits).
+    payload = {
+        "chart": chart_config,
+        "width": width,
+        "height": height,
+        "backgroundColor": "white",
+        "devicePixelRatio": 2,
+    }
+    last_err = None
+    for attempt in range(2):
+        try:
+            response = requests.post(
+                'https://quickchart.io/chart/create',
+                json=payload,
+                timeout=15,
+            )
+            response.raise_for_status()
+            url = response.json().get('url')
+            if url:
+                return url
+            last_err = "QuickChart returned no url field."
+        except Exception as e:
+            last_err = e
+    logger.error(f"Failed to create short URL for chart after retries: {last_err}")
+    encoded_config = urllib.parse.quote(json.dumps(chart_config))
+    return f"https://quickchart.io/chart?w={width}&h={height}&bkg=white&c={encoded_config}"
+
+
+def _probe_image_url(url):
+    """Best-effort HTTP check that a chart URL actually serves an image."""
+    if not url:
+        return False, "No chart generated (empty URL)."
     try:
-        response = requests.post(
-            'https://quickchart.io/chart/create',
-            json={'chart': chart_config}
-        )
-        response.raise_for_status()
-        return response.json().get('url')
+        resp = requests.get(url, timeout=12, stream=True)
+        status = resp.status_code
+        ctype = resp.headers.get("content-type", "")
+        resp.close()
+        if status != 200:
+            return False, f"HTTP {status} when fetching chart."
+        if "image" not in ctype and "svg" not in ctype:
+            return False, f"Non-image content-type returned: {ctype or 'unknown'}."
+        return True, f"OK (HTTP 200, {ctype})."
     except Exception as e:
-        logger.error(f"Failed to create short URL for chart: {e}")
-        encoded_config = urllib.parse.quote(json.dumps(chart_config))
-        return f"https://quickchart.io/chart?w=600&h=300&c={encoded_config}"
+        return False, f"Request failed: {e}"
+
+
+def audit_chart_health(chart_urls):
+    """Deterministically verify each briefing chart renders. Ground truth for the
+    Graphics Designer QA agent, which cannot 'see' rendered images itself."""
+    labels = {
+        "line_chart_url": "Performance vs. Benchmark (line)",
+        "bar_chart_url": "Personal Return by Asset (bar)",
+        "pie_chart_url": "Unrealized Gains (pie)",
+        "account_pie_url": "12M Return by Account (pie)",
+    }
+    health = []
+    for key, name in labels.items():
+        url = (chart_urls or {}).get(key, "")
+        ok, detail = _probe_image_url(url)
+        health.append({"name": name, "ok": ok, "detail": detail, "url": url})
+    return health
+
+
+def format_chart_health(health):
+    if not health:
+        return "No charts to validate."
+    lines = []
+    for h in health:
+        status = "OK" if h["ok"] else "BROKEN"
+        lines.append(f"- [{status}] {h['name']}: {h['detail']}")
+    return "\n".join(lines)
 
 def fmt_dol(val):
     try:
@@ -167,26 +229,57 @@ def build_returns_bar_chart(sorted_ledger):
     }
     return get_quickchart_short_url(chart_config)
 
+def _downsample(labels, series_list, max_points=90):
+    """Evenly subsample parallel label + series lists, always keeping the last point."""
+    n = len(labels)
+    if n <= max_points:
+        return labels, series_list
+    step = n / float(max_points)
+    idxs = sorted(set([int(i * step) for i in range(max_points)] + [n - 1]))
+    new_labels = [labels[i] for i in idxs]
+    new_series = [[s[i] for i in idxs] for s in series_list]
+    return new_labels, new_series
+
+
 def build_benchmark_line_chart(history_data):
-    if not history_data or len(history_data) < 2:
+    if not history_data:
         return ""
 
+    # Merge static benchmarks for historical context (one-time scrub data)
+    import os, json
+    static_path = os.path.join(os.path.dirname(__file__), "..", "data", "static_benchmarks.json")
+    if os.path.exists(static_path):
+        try:
+            with open(static_path, "r") as f:
+                static_data = json.load(f)
+            for d, vals in static_data.items():
+                if d not in history_data:
+                    history_data[d] = vals
+                else:
+                    # Don't overwrite portfolio data, just backfill missing benchmarks
+                    if "spy" not in history_data[d] and "spy" in vals:
+                        history_data[d]["spy"] = vals["spy"]
+                    if "qqq" not in history_data[d] and "qqq" in vals:
+                        history_data[d]["qqq"] = vals["qqq"]
+        except Exception:
+            pass
+
     dates = sorted(history_data.keys())
-    # Backfilled history may start with $0 portfolio before holdings existed.
-    # Anchor the chart on the first date with a meaningful portfolio value.
-    baseline_idx = 0
-    for i, d in enumerate(dates):
-        row = history_data[d]
-        if row.get("portfolio", 0) > 1000 and row.get("spy", 0) > 0:
-            baseline_idx = i
-            break
-    dates = dates[baseline_idx:]
     if len(dates) < 2:
         return ""
 
-    base_port = history_data[dates[0]].get("portfolio", 0)
-    base_spy = history_data[dates[0]].get("spy", 0)
-    base_qqq = history_data[dates[0]].get("qqq", 0)
+    # Anchor the chart on the first date with a meaningful portfolio value.
+    base_port = 0
+    base_spy = 0
+    base_qqq = 0
+    for d in dates:
+        row = history_data[d]
+        if row.get("portfolio", 0) > 1000 and row.get("spy", 0) > 0:
+            base_port = row.get("portfolio")
+            base_spy = row.get("spy")
+            base_qqq = row.get("qqq", 0)
+            break
+
     if base_port <= 0 or base_spy <= 0:
         return ""
     has_qqq = base_qqq > 0
@@ -196,20 +289,37 @@ def build_benchmark_line_chart(history_data):
     qqq_data = []
 
     for d in dates:
-        p_val = history_data[d].get("portfolio", base_port)
-        s_val = history_data[d].get("spy", base_spy)
-        port_data.append(round(((p_val - base_port) / base_port) * 100, 2))
-        spy_data.append(round(((s_val - base_spy) / base_spy) * 100, 2))
+        p_val = history_data[d].get("portfolio", 0)
+        s_val = history_data[d].get("spy", 0)
+        
+        if p_val > 1000 and base_port > 0:
+            port_data.append(round(((p_val - base_port) / base_port) * 100, 2))
+        else:
+            port_data.append(None)
+            
+        if s_val > 0 and base_spy > 0:
+            spy_data.append(round(((s_val - base_spy) / base_spy) * 100, 2))
+        else:
+            spy_data.append(None)
+            
         if has_qqq:
-            q_val = history_data[d].get("qqq", base_qqq)
-            qqq_data.append(round(((q_val - base_qqq) / base_qqq) * 100, 2))
+            q_val = history_data[d].get("qqq", 0)
+            if q_val > 0 and base_qqq > 0:
+                qqq_data.append(round(((q_val - base_qqq) / base_qqq) * 100, 2))
+            else:
+                qqq_data.append(None)
+
+    # Downsample to keep the QuickChart config compact. A full trailing-12-month
+    # daily series (~250 pts) bloats the URL/payload; ~90 evenly-spaced points
+    # render an identical-looking line at a fraction of the size.
+    dates, (port_data, spy_data, qqq_data) = _downsample(dates, [port_data, spy_data, qqq_data])
 
     datasets = [
-        {"label": "Portfolio", "data": port_data, "borderColor": "#2563eb", "fill": False, "tension": 0.1},
-        {"label": "S&P 500", "data": spy_data, "borderColor": "#9ca3af", "fill": False, "tension": 0.1},
+        {"label": "Portfolio", "data": port_data, "borderColor": "#2563eb", "fill": False, "tension": 0.1, "spanGaps": True},
+        {"label": "S&P 500", "data": spy_data, "borderColor": "#9ca3af", "fill": False, "tension": 0.1, "spanGaps": True},
     ]
     if has_qqq:
-        datasets.append({"label": "NASDAQ", "data": qqq_data, "borderColor": "#10b981", "fill": False, "tension": 0.1})
+        datasets.append({"label": "NASDAQ", "data": qqq_data, "borderColor": "#10b981", "fill": False, "tension": 0.1, "spanGaps": True})
 
     chart_config = {
         "type": "line",
@@ -228,14 +338,27 @@ def build_benchmark_line_chart(history_data):
     }
     return get_quickchart_short_url(chart_config)
 
-def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None, account_returns=None, advanced_data=None):
+def build_briefing_charts(sorted_ledger, account_holdings, account_returns, history_data):
+    """Build every briefing chart URL once so callers can both render and health-check
+    the exact same images (avoids regenerating differing short URLs)."""
+    return {
+        "pie_chart_url": build_portfolio_pie_chart(sorted_ledger),
+        "account_pie_url": build_account_allocation_pie(account_holdings, account_returns),
+        "bar_chart_url": build_returns_bar_chart(sorted_ledger),
+        "line_chart_url": build_benchmark_line_chart(history_data),
+    }
 
-    pie_chart_url = build_portfolio_pie_chart(sorted_ledger)
-    account_pie_url = build_account_allocation_pie(account_holdings, account_returns)
+
+def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None, account_returns=None, advanced_data=None, chart_urls=None):
+
+    if chart_urls is None:
+        chart_urls = build_briefing_charts(sorted_ledger, account_holdings, account_returns, history_data)
+    pie_chart_url = chart_urls.get("pie_chart_url", "")
+    account_pie_url = chart_urls.get("account_pie_url", "")
+    bar_chart_url = chart_urls.get("bar_chart_url", "")
+    line_chart_url = chart_urls.get("line_chart_url", "")
     returns_rows = build_returns_rows(account_returns)
     returns_updated = (account_returns or {}).get("updated", "")
-    bar_chart_url = build_returns_bar_chart(sorted_ledger)
-    line_chart_url = build_benchmark_line_chart(history_data)
     
     if red_team_data is None:
         red_team_data = {}
@@ -275,15 +398,16 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             .champion { color: #166534; font-weight: bold; }
             .dissenter { color: #991b1b; font-weight: bold; }
             .verdict-pill { display: inline-block; padding: 6px 14px; border-radius: 6px; font-weight: bold; font-size: 13px; letter-spacing: 0.5px; margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.06); }
-            .chart-container { margin: 20px 0; text-align: center; border: 1px solid #e5e7eb; padding: 10px; border-radius: 5px;}
-            .chart-img { max-width: 100%; height: auto; }
+            .chart-container { margin: 0; text-align: center; border: 1px solid #e5e7eb; padding: 10px; border-radius: 5px; background-color: #ffffff; }
+            .chart-title { color: #2563eb; font-size: 1.3em; font-weight: 600; margin: 0 0 10px 0; padding-bottom: 5px; border-bottom: 1px solid #e5e7eb; }
+            .chart-img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
             .footer { margin-top: 40px; font-size: 0.8em; color: #6b7280; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 20px; }
-            .qa-box { margin-top: 40px; font-size: 0.75em; color: #6b7280; border-top: 1px dashed #e5e7eb; padding-top: 15px; }
+            .qa-box { margin-top: 40px; font-size: 0.85em; line-height: 1.7; color: #6b7280; border-top: 1px dashed #e5e7eb; padding-top: 15px; }
         </style>
     </head>
     <body>
         <div class="container">
-            <h1>SC Invest: Executive Briefing</h1>
+            <h1>Invest AI: Executive Briefing</h1>
             
             <div class="metric-box">
                 <strong>Portfolio Value:</strong> {{ total_val }}<br>
@@ -291,68 +415,50 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 <strong>Current CAGR:</strong> {{ cagr_text }} &nbsp;|&nbsp; <strong>Projected Balance (Age 65):</strong> {{ proj_text }}
             </div>
 
-            {% if returns_rows %}
-            <h2>Time-Weighted Returns</h2>
-            <table style="width:100%; border-collapse:collapse; margin:10px 0;">
-                <tr style="text-align:left; color:#6b7280; font-size:13px;">
-                    <th style="padding:6px 8px; border-bottom:2px solid #e5e7eb;">Account</th>
-                    <th style="padding:6px 8px; border-bottom:2px solid #e5e7eb; text-align:right;">YTD</th>
-                    <th style="padding:6px 8px; border-bottom:2px solid #e5e7eb; text-align:right;">12 Mo</th>
-                </tr>
-                {% for r in returns_rows %}
-                <tr>
-                    <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6;{% if r.name == 'Total' %} font-weight:bold;{% endif %}">{{ r.name }}</td>
-                    <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6; text-align:right; font-weight:bold; color:{{ r.ytd_color }};">{{ '%+.2f'|format(r.ytd) }}%</td>
-                    <td style="padding:6px 8px; border-bottom:1px solid #f3f4f6; text-align:right; font-weight:bold; color:{{ r.twelve_color }};">{{ '%+.2f'|format(r.twelve) }}%</td>
-                </tr>
-                {% endfor %}
-            </table>
-            <p style="font-size:11px; color:#9ca3af; margin-top:4px;">Time-weighted return (securities only); neutralizes deposits, withdrawals, and trades. Updated {{ returns_updated }}.</p>
-            {% endif %}
-
             {% if line_chart_url or bar_chart_url %}
-            <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 30px; align-items: flex-start;">
-                {% if line_chart_url %}
-                <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
-                    <h2 style="margin-top: 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; flex-shrink: 0;">Performance vs. Benchmark</h2>
-                    <div class="chart-container" style="margin-top: 10px; flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 0; border: none;">
-                        <img class="chart-img" src="{{ line_chart_url }}" alt="Benchmark Performance Line Chart" style="width: 100%; object-fit: contain;">
-                    </div>
-                </div>
-                {% endif %}
-
-                {% if bar_chart_url %}
-                <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
-                    <h2 style="margin-top: 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; flex-shrink: 0;">Personal Return by Asset</h2>
-                    <div class="chart-container" style="margin-top: 10px; flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 0; border: none;">
-                        <img class="chart-img" src="{{ bar_chart_url }}" alt="Portfolio Returns Bar Chart" style="width: 100%; object-fit: contain;">
-                    </div>
-                </div>
-                {% endif %}
-            </div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 30px; border-collapse: separate; border-spacing: 0;">
+                <tr>
+                    {% if line_chart_url %}
+                    <td valign="top" width="{{ '50%' if bar_chart_url else '100%' }}" style="padding: 0 {{ '10px' if bar_chart_url else '0' }} 0 0;">
+                        <div class="chart-title">Performance vs. Benchmark</div>
+                        <div class="chart-container">
+                            <img class="chart-img" src="{{ line_chart_url }}" alt="Benchmark Performance Line Chart">
+                        </div>
+                    </td>
+                    {% endif %}
+                    {% if bar_chart_url %}
+                    <td valign="top" width="{{ '50%' if line_chart_url else '100%' }}" style="padding: 0 0 0 {{ '10px' if line_chart_url else '0' }};">
+                        <div class="chart-title">Personal Return by Asset</div>
+                        <div class="chart-container">
+                            <img class="chart-img" src="{{ bar_chart_url }}" alt="Portfolio Returns Bar Chart">
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+            </table>
             {% endif %}
 
             {% if pie_chart_url or account_pie_url %}
-            <div style="display: flex; flex-wrap: wrap; gap: 20px; margin-top: 30px; align-items: flex-start;">
-                {% if pie_chart_url %}
-                <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
-                    <h2 style="margin-top: 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; flex-shrink: 0;">Unrealized Gains</h2>
-                    <div class="chart-container" style="margin-top: 10px; flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 0; border: none;">
-                        <img class="chart-img" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart" style="width: 100%; object-fit: contain;">
-                    </div>
-                </div>
-                {% endif %}
-
-                {% if account_pie_url %}
-                <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
-                    <h2 style="margin-top: 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; flex-shrink: 0;">12 M Return</h2>
-                    <p style="font-size:12px; color:#6b7280; margin-top:5px; margin-bottom: 0; flex-shrink: 0;">Slice size = account weight. Color = 12M return.</p>
-                    <div class="chart-container" style="margin-top: 10px; flex-grow: 1; display: flex; align-items: center; justify-content: center; padding: 0; border: none;">
-                        <img class="chart-img" src="{{ account_pie_url }}" alt="12 M Return Pie Chart" style="width: 100%; object-fit: contain;">
-                    </div>
-                </div>
-                {% endif %}
-            </div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 30px; border-collapse: separate; border-spacing: 0;">
+                <tr>
+                    {% if pie_chart_url %}
+                    <td valign="top" width="{{ '50%' if account_pie_url else '100%' }}" style="padding: 0 {{ '10px' if account_pie_url else '0' }} 0 0;">
+                        <div class="chart-title">Unrealized Gains</div>
+                        <div class="chart-container">
+                            <img class="chart-img" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart">
+                        </div>
+                    </td>
+                    {% endif %}
+                    {% if account_pie_url %}
+                    <td valign="top" width="{{ '50%' if pie_chart_url else '100%' }}" style="padding: 0 0 0 {{ '10px' if pie_chart_url else '0' }};">
+                        <div class="chart-title">1 Yr Return</div>
+                        <div class="chart-container">
+                            <img class="chart-img" src="{{ account_pie_url }}" alt="1 Yr Return Pie Chart">
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+            </table>
             {% endif %}
 
             <h2>The State of the Union</h2>
@@ -478,6 +584,32 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {% endfor %}
             </ul>
 
+            {% if returns_rows %}
+            <h2>Time-Weighted Returns</h2>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: separate; border-spacing: 0;">
+                <tr>
+                    <td width="55%" valign="top">
+                        <table width="100%" style="border-collapse:collapse; background-color:#f8fafc; border:1px solid #e5e7eb; border-radius:6px;">
+                            <tr style="text-align:left; color:#6b7280; font-size:13px;">
+                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb;">Account</th>
+                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb; text-align:right;">YTD</th>
+                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb; text-align:right;">12 Mo</th>
+                            </tr>
+                            {% for r in returns_rows %}
+                            <tr>
+                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6;{% if r.name == 'Total' %} font-weight:bold;{% endif %}">{{ r.name }}</td>
+                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6; text-align:right; font-weight:bold; color:{{ r.ytd_color }};">{{ '%+.2f'|format(r.ytd) }}%</td>
+                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6; text-align:right; font-weight:bold; color:{{ r.twelve_color }};">{{ '%+.2f'|format(r.twelve) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        <p style="font-size:11px; color:#9ca3af; margin:8px 0 0 0;">Time-weighted return (securities only); neutralizes deposits, withdrawals, and trades. Updated {{ returns_updated }}.</p>
+                    </td>
+                    <td width="45%"></td>
+                </tr>
+            </table>
+            {% endif %}
+
             <div class="footer">
                 Generated autonomously by the AI Board of Directors.<br>
                 Data provided by Financial Modeling Prep and ETrade Fidelity Logs.
@@ -485,7 +617,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             
             {% if qa_summary_text %}
             <div class="qa-box">
-                <strong>P.S. Automated QA Auditor Summary:</strong><br>
+                <strong style="color:#4b5563;">Automated QA Audit</strong>
+                <span style="color:#9ca3af;">&mdash; see the QA Audit Dashboard for details on any &#10060;.</span><br><br>
                 {{ qa_summary_text }}
             </div>
             {% endif %}
@@ -586,8 +719,28 @@ def generate_qa_dashboard_html(reports, timestamp):
     </head>
     <body>
         <div class="container">
-            <h1>SC Invest: QA Audit Dashboard</h1>
+            <h1>Invest AI: QA Audit Dashboard</h1>
             <p style="color: #6b7280; margin-top: -10px; margin-bottom: 30px;">Generated: {{ timestamp }}</p>
+            
+            <h2>QA Agents Summary</h2>
+            <table style="margin-bottom: 40px;">
+                <tr>
+                    <th width="70%">Agent Role</th>
+                    <th width="30%">Status</th>
+                </tr>
+                {% for report in reports %}
+                <tr>
+                    <td><strong>{{ report.agent_role }}</strong></td>
+                    <td>
+                        {% if report.is_compliant %}
+                            <span style="color: #166534; font-weight: bold;">✅ PASS</span>
+                        {% else %}
+                            <span style="color: #dc2626; font-weight: bold;">❌ FAIL</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
             
             {% for report in reports %}
             <div style="margin-bottom: 50px;">
@@ -629,7 +782,7 @@ def generate_qa_dashboard_html(reports, timestamp):
             
             <div class="footer">
                 Automated Post-Flight Quality Assurance Report.<br>
-                SC Invest Boardroom AI
+                Invest AI Boardroom
             </div>
         </div>
     </body>

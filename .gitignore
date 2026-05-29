@@ -50,3 +50,10 @@ __pycache__/
 __blobstorage__
 __queuestorage__
 __azurite_db*__.json
+
+# Local cache of Azure artifacts pulled by tools/fetch_azure_reports.py
+.cache/
+
+# Generated finance oversight reports (re-run on demand)
+docs/finance_oversight/oversight_*.json
+docs/finance_oversight/oversight_*.html

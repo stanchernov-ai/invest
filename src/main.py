@@ -19,6 +19,7 @@ from src.core.engine import app
 from src.data.fmp_client import get_fmp_advanced_metrics, get_fmp_macro
 from src.config.settings import settings, DATA_DIR, now_local
 from src.core.agents import call_gemini_async, agent_config, FAST_MODEL, FLASH_TOKEN_LIMIT
+from src.core import agent_activity
 
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
@@ -231,6 +232,7 @@ async def main_batch():
     logger.info("Initializing high performance quantitative pipeline engine.")
     file_timestamp = now_local().strftime('%Y%m%d_%H%M%S')
     api_telemetry = {}
+    agent_activity.reset()
     run_started = now_local()
     run_status = {
         "run_id": file_timestamp,
@@ -555,6 +557,7 @@ async def main_batch():
             "error": run_error,
         })
         storage_client.save_run_status(run_status)
+        api_telemetry['AGENT_ACTIVITY'] = agent_activity.snapshot()
         storage_client.save_report(f"api_telemetry_{file_timestamp}.json", json.dumps(api_telemetry, indent=4))
         storage_client.execute_retention_policy(14)
         logger.info("Telemetry ledger flushed. Worker shutting down.")

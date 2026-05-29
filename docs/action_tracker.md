@@ -1,7 +1,7 @@
 # SC Invest Boardroom — Action Tracker
 
 **Status:** Active  
-**Last Updated:** May 28, 2026  
+**Last Updated:** May 28, 2026 (22:10)  
 
 This document tracks identified bugs, architectural improvements, and long-term backlog items for the SC Invest Boardroom pipeline. Items are broken down into manageable blocks with specific implementation details.
 
@@ -91,11 +91,15 @@ This document tracks identified bugs, architectural improvements, and long-term 
 
 ## Phase 3: Observability, Tooling & Agent Access
 
-### 3.1 Provide AI Agents Access to Azure Outputs
+### 3.1 Provide AI Agents Access to Azure Outputs — DONE (May 28, 2026)
 * **Description:** Allow Cursor agents to read historical reports, debate logs, and telemetry stored in Azure Blob Storage to provide weekly feedback and performance analysis.
 * **Implementation Details:**
   * Create a utility script (e.g., `tools/fetch_azure_reports.py`) that uses `azure-storage-blob` to download the latest files from the `boardroom-reports` and `boardroom-state` containers to a local `.cache/` directory.
   * The Cursor agent can then be instructed to run this script via the Shell tool and read the resulting files to analyze past performance.
+* **Resolution (2026-05-28):** Added `tools/fetch_azure_reports.py`. Reuses the pipeline's `get_blob_service_client` + container constants (DRY auth via `AZURE_STORAGE_CONNECTION_STRING`). Downloads timestamped artifact families (`executive_briefing_`, `qa_dashboard_`, `raw_debate_log_`, `api_telemetry_`) plus the current state singletons (`run_status`, `portfolio_history`, `portfolio_returns`, `board_verdicts`) into `.cache/{reports,state}/` and writes a `manifest.json`.
+  * Flags: `--list` (enumerate run IDs, no download), `--latest N` (N of each family, default 1), `--run-id YYYYMMDD_HHMMSS` (one coherent run), `--out`, `--no-state-singletons`. Exit codes 0/2/3.
+  * Run from repo root via the venv: `.venv\Scripts\python.exe tools/fetch_azure_reports.py`. `.cache/` is gitignored.
+  * **Verified live:** `--list` returned 23 runs; default fetch pulled 8 files (~840 KB) and wrote the manifest. Unblocks Phase 5 (QA review team reading real outputs).
 
 ### 3.2 Cursor Architecture & QA Agents
 * **Description:** Create specialized agent workflows/rules to validate architecture changes and analyze portfolio performance.
@@ -173,6 +177,20 @@ Reference briefing: `executive_briefing_20260528_204417.html` (Azure `boardroom-
   * **Verified end-to-end** against live Azure CSVs: 254 trading days reconstructed; daily total grew $11K→$155K over the year while TWR correctly reported **Total +38.26% (12M) / +9.68% (YTD)** — confirming contributions are excluded. Engine runtime ~33s.
 * **Possible follow-ups:** money-weighted (XIRR) view; benchmark the 12M line chart against the new daily-total series; surface a small per-account sparkline.
 
+### 4.5 Chart Rendering & Report Flow Fixes — DONE (May 28, 2026)
+* **Description:** On the live briefing the charts looked broken/ugly: the benchmark line chart rendered as a broken image, and chart titles appeared *beside* their charts instead of on top. Stan also wanted the report to flow better — move the Time-Weighted Returns table to the bottom at ~half width, and replace the verbose end-of-report QA summary with a compact agent + PASS/FAIL icon list.
+* **Root causes:**
+  * **Header beside chart:** the briefing used `display:flex; flex-direction:column`. Gmail/Outlook strip flexbox, collapsing the column into a row so the `<h2>` rendered next to the image.
+  * **Broken line chart:** `get_quickchart_short_url` had no timeout/retry, so on a failed POST it fell back to a giant inline GET URL with the whole config encoded. Only the line chart (~250 history points → largest config) blew past URL limits; the small pie/bar fallbacks survived.
+* **Resolution (`src/output/reporting.py`, `src/main.py`):**
+  * Rewrote both chart sections as **email-safe `<table>` layouts** — chart title is its own block stacked directly above the `<img>`. Removed all `flex`/`object-fit`. Added `.chart-title` CSS.
+  * Hardened `get_quickchart_short_url`: 15s timeout + one retry, sends `width/height/backgroundColor:white/devicePixelRatio`, only falls back to the inline GET URL as a last resort.
+  * Added `_downsample()` — the benchmark line series is capped to ~90 evenly-spaced points (identical-looking line, small payload).
+  * Extracted `build_briefing_charts()` so URLs are built **once** and reused for both rendering and health checks; `generate_html_briefing` accepts a `chart_urls` kwarg.
+  * **Report flow:** moved the Time-Weighted Returns table from near the top to just above the footer, constrained to ~55% width (paired empty cell) so it reads as intentional rather than a sparse full-width strip.
+  * **Compact QA footer:** replaced the verbose per-agent summary with `<strong>Agent</strong> ✅/❌` only, plus a "see the QA Audit Dashboard for details on any ❌" hint.
+* **Verified:** isolated Jinja render — headers precede their images, no flexbox, table-based layout, returns table sits above the footer at half width, QA footer is icon-only.
+
 ---
 
 ## Phase 5: Standing QA Review Team & Cost Governance
@@ -217,7 +235,7 @@ A team of focused reviewers, each producing a short scored report + prioritized 
   * A standalone Cursor/maintenance task (or scheduled function) to report current storage footprint + projected monthly cost and prune on demand.
   * Verify the deployment storage account (`rgboardroomprod93bf`) isn't accumulating old build artifacts.
 
-### 5.4 HR Efficiency Consultant — PLANNED
+### 5.4 HR Efficiency Consultant — DONE (May 28, 2026)
 * **Description:** A meta-governance reviewer that keeps the *agent roster itself* lean as we keep adding agents. Stan's concern: "I think we almost need an HR Efficiency Consultant to ensure we are not using unneeded agents." Tracks activity across all agents and reports on team efficiency, redundancy, and gaps.
 * **Distinct from 5.2 (Opportunity):** Opportunity maximizes value extracted from each *API call/data field*; HR right-sizes the *headcount* — eliminating redundant/idle/low-impact agents and recommending new roles only where they add clear value.
 * **What it tracks:**
@@ -227,16 +245,42 @@ A team of focused reviewers, each producing a short scored report + prioritized 
   * **Gaps** — missing roles that would materially improve decisions or governance.
 * **Output:** A per-period "org chart + utilization report" — table of agent → invocations → token cost → consumed-by → keep/merge/cut recommendation, plus proposed new roles. Feeds the weekly QA digest.
 * **Implementation notes:** Likely a Cursor subagent reading the agent roster (`agents.py`), per-run debate logs, and telemetry. Needs lightweight per-agent activity logging if not already captured (tie into Phase 3.1 fetch + telemetry).
+* **Resolution (2026-05-28):** Built the missing **deterministic per-agent activity logging** first, then the consultant on top of it.
+  * **New `src/core/agent_activity.py`** — an in-memory ledger (`reset`/`record`/`snapshot`). `call_gemini_async` (the single LLM chokepoint) now records every invocation's model + token usage (prompt/output/thinking) + errors, keyed by the `agent_name` config key (`_run_agent` already passes `agent_key`). `main.py` calls `agent_activity.reset()` at run start and snapshots into `api_telemetry['AGENT_ACTIVITY']` in the `finally` block — 3 surgical lines + 1 import, so it composes cleanly with concurrent edits.
+  * **New `src/hr_review.py`** — `build_utilization()` merges the **full configured roster** with the activity ledger so **idle agents (0 invocations) are surfaced**, computes an estimated USD cost (rough Gemini 2.5 pricing constants, clearly labeled — tokens are the source of truth), and sorts by cost. Text + HTML renderers, plus `run_hr_efficiency_review()` (HEAVY model, `HRReport` schema: per-agent KEEP/MERGE/CUT/ADD_BUDGET/WATCH verdict, redundancies, proposed new roles, roster-health 1-5). The LLM gets the deterministic table as ground truth — it never guesses who fired.
+  * **Wired into the standing QA digest (`qa_review.py`):** removed the old generic `hr_efficiency` stub from `QA_TEAM_CONFIG`; the digest now parses `AGENT_ACTIVITY` from the latest telemetry, runs the consultant, and renders the utilization table + verdicts at the top of the digest.
+  * **Standalone:** `python -m src.hr_review <telemetry.json>` prints the utilization table (pairs with the 3.1 `.cache/` fetch).
+  * **Verified:** roster-merge/idle-detection/cost/sort and the HTML+digest rendering all confirmed via isolated tests. Live AGENT_ACTIVITY will populate on the next pipeline build (runs predating this change won't have it).
+* **Latency:** zero added cost to the per-run pipeline (logging is in-memory); the LLM consultant runs only in the separate QA digest process.
 
-### 5.5 Graphics Designer — PLANNED
+### 5.5 Graphics Designer — DONE (in-pipeline) (May 28, 2026)
 * **Description:** A design-focused reviewer/agent whose sole job is to make the final report "amazing." Stan: "want a graphics designer agent to make sure final report is amazing."
 * **Scope:**
   * Visual hierarchy, typography, spacing, and color consistency across the HTML briefing.
   * Chart quality and legibility (pie/bar/line) — labels, contrast, sizing, the new per-account grid (4.2), and the verdict pills (4.3).
   * Rendering robustness across email clients and browsers (inline styles, table-based layouts, image fallbacks for QuickChart).
   * Brand/polish: header, section dividers, mobile/responsive behavior.
-* **Output:** A prioritized list of concrete visual improvements (with before/after notes) and, where low-risk, proposed template diffs to `reporting.py`. Could run after each design change or weekly.
-* **Implementation notes:** Cursor subagent that reads `reporting.py` + a rendered sample briefing (pulled from Azure via Phase 3.1) and critiques against a design rubric. Pairs naturally with the Phase 4 reporting work just completed.
+* **Resolution (2026-05-28):** Implemented as the **in-pipeline `graphics_designer_qa` agent** (`run_graphics_designer_qa` in `main.py`) rather than a weekly Cursor subagent, so it gates every run.
+  * **Broken-chart detection:** the agent can't "see" rendered images, so `reporting.audit_chart_health()` HTTP-probes every chart URL (status + content-type) and feeds a deterministic CHART HEALTH REPORT into the prompt as ground truth. Any BROKEN chart is a CRITICAL finding.
+  * **Sharpened instructions (`agents.py`):** now explicitly audits for email-unsafe CSS (flex/grid/object-fit), header-beside-chart, missing alt text, **report flow / section ordering**, and **element sizing/balance** (e.g. a narrow table stretched full width).
+* **Follow-up (optional):** a *weekly* design subagent that critiques trends across many briefings (vs. the per-run gate) once Phase 3.1 fetch exists.
+
+### 5.6 QA Integrity Auditor (QA-of-the-QA) & Deterministic Compliance — DONE (May 28, 2026)
+* **Description:** Stan: "we need a QA to QA that QA dashboard" — validate the QA dashboard actually matches what happened and that the QA agents' own verdicts were accurate. Also fixes a trust bug where an agent self-reported ✅ PASS while logging CRITICAL issues.
+* **Resolution (2026-05-28):**
+  * New **`qa_integrity_auditor`** agent (`run_qa_integrity_audit` in `main.py`, HEAVY model). It cross-checks every QA agent's PASS/FAIL verdict + findings against the raw debate log and chairman allocation (catching both hallucinated problems and rubber-stamped passes), verifies the rendered QA dashboard faithfully reflects the underlying reports, and flags coverage blind spots. Runs after the graphics-designer QA so it audits that agent too, then appears in the final dashboard.
+  * **Deterministic compliance guard:** `main.reconcile_compliance()` forces `is_compliant=False` for any report containing a CRITICAL finding, applied at every QA parse site (post-flight, graphics designer, integrity auditor). The PASS/FAIL badge is now derived from evidence, not the model's self-graded boolean — fixes the "✅ PASS — requires critical adjustments" contradiction seen in run `20260528`.
+* **Latency note:** adds ~1 heavy LLM call + 4 HTTP chart probes to the tail; benchmark against the 10-min ceiling on the next run and parallelize the graphics/integrity audits if it creeps.
+* **Roster note (feeds 5.4):** this adds two more agents (`graphics_designer_qa` already existed; `qa_integrity_auditor` is new). The growing QA roster makes the HR Efficiency Consultant (5.4) more relevant.
+
+### 5.7 Finance & Subscription Oversight — DONE (May 28, 2026)
+* **Description:** Stan wants subscription/plan-fit governance across the whole project — not just per-run token usage (HR) or per-run duration (qa_review finance_cost), but "are we on the right plan, right tool, spending wisely?" including dev tooling (Cursor) and moving cloud/API bills.
+* **Resolution (2026-05-28):**
+  * **`docs/subscriptions_registry.json`** — machine-readable registry (Stan-provided: Google AI Ultra $199.99/mo, Azure ~$8.06 forecast ~$8.95, Cursor Pro+ $48/mo; plus code-inventoried FMP, QuickChart, Gmail, GitHub, unused Polygon free).
+  * **`docs/tech_stack_and_subscriptions.md`** — human narrative + architecture map + **Gemini Ultra vs API key billing overlap** callout (critical open question).
+  * **`src/finance_oversight.py`** — standalone on-demand consultant: reads registry, optional latest `api_telemetry` (`--telemetry` or `--fetch-latest`), LLM produces RIGHT_PLAN/UPGRADE/DOWNGRADE/CUT/WATCH/FILL_IN_DATA per service; writes `docs/finance_oversight/oversight_*.html/json`; optional `--email`.
+  * **Future automation** documented in registry: Azure Cost Management API, Google API billing reconciliation, FMP dashboard.
+* **Open validation:** Gemini Ultra/API bundling (Google invoices). Agent hunts hidden costs from `possible_hidden_costs` list.
 
 ---
 
