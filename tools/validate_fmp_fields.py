@@ -16,11 +16,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import aiohttp
-from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+import src.config.settings  # noqa: F401 — loads .env via settings SSOT
+from src.config.settings import settings
 from src.data.fmp_client import fetch_json_endpoint, safe_float  # noqa: E402
 
 dash = chr(45)
@@ -183,8 +184,7 @@ async def probe_eod(session, sym: str, api_key: str) -> dict:
 
 
 async def run_validation(symbols: list[str]) -> dict:
-    load_dotenv(ROOT / ".env")
-    api_key = os.getenv("FMP_API_KEY")
+    api_key = settings.FMP_API_KEY
     if not api_key:
         raise SystemExit("FMP_API_KEY not set in .env or environment.")
 

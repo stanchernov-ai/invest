@@ -76,7 +76,7 @@ Cursor adopts these personas via `.cursor/rules/*.mdc` files. The Supervisor orc
 ## 3. State Management
 * `docs/action_tracker.md` is owned by human and all agents for backlog and decisions.
 * `docs/engineering_playbook.md` tracks rejected approaches.
-* `.cursor/agent_state/ecosystem_state.json` is the machine ledger for conflicts, audits, insights, and scorecards. Rotate oldest entries to an archive folder at 50 records to prevent bloat.
+* `.cursor/agent_state/ecosystem_state.json` is the machine ledger for conflicts, audits, insights, and scorecards. **Gitignored locally** — bootstrap from `ecosystem_state.example.json` on first write; rotate oldest entries to `ecosystem_state_archive/` at 50 records to prevent bloat.
 
 ## 4. Execution Triggers
 * **During active coding:** Refactoring is advisory on save.

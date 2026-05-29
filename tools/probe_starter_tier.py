@@ -12,13 +12,14 @@ import time
 from pathlib import Path
 
 import aiohttp
-from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-load_dotenv(ROOT / ".env")
 
-API_KEY = os.getenv("FMP_API_KEY")
+import src.config.settings  # noqa: F401 — loads .env via settings SSOT
+from src.config.settings import settings
+
+API_KEY = settings.FMP_API_KEY
 if not API_KEY:
     raise SystemExit("FMP_API_KEY not set")
 

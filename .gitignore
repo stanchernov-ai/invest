@@ -70,3 +70,7 @@ tools/*_probe_results.json
 # Local scratch (one-off probes, commit drafts)
 test_chart.py
 _commitmsg.txt
+
+# Local Cursor agent ledger (bootstrap from ecosystem_state.example.json)
+.cursor/agent_state/ecosystem_state.json
+.cursor/agent_state/ecosystem_state_archive/

@@ -18,9 +18,7 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from dotenv import load_dotenv
-
-load_dotenv()
+import src.config.settings  # noqa: F401 — loads .env via settings SSOT
 
 from src.storage_client import load_run_status
 

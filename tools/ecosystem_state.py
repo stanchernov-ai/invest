@@ -17,6 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 STATE_PATH = ROOT / ".cursor" / "agent_state" / "ecosystem_state.json"
+EXAMPLE_PATH = ROOT / ".cursor" / "agent_state" / "ecosystem_state.example.json"
 ARCHIVE_DIR = ROOT / ".cursor" / "agent_state" / "ecosystem_state_archive"
 
 ARRAY_KEYS = (
@@ -44,14 +45,34 @@ def _default_state() -> dict:
     }
 
 
+def _bootstrap_state_file() -> None:
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if EXAMPLE_PATH.exists():
+        STATE_PATH.write_text(EXAMPLE_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    else:
+        save_state(_default_state())
+
+
+def _maintain_buckets(state: dict) -> bool:
+    changed = False
+    for key in ARRAY_KEYS:
+        bucket = state.get(key, [])
+        if len(bucket) > MAX_ENTRIES:
+            state[key] = _rotate(key, bucket)
+            changed = True
+    return changed
+
+
 def load_state() -> dict:
     if not STATE_PATH.exists():
-        return _default_state()
+        _bootstrap_state_file()
     with STATE_PATH.open(encoding="utf-8") as fh:
         data = json.load(fh)
     for key in ARRAY_KEYS:
         data.setdefault(key, [])
     data.setdefault("version", 1)
+    if _maintain_buckets(data):
+        save_state(data)
     return data
 
 

@@ -3,14 +3,10 @@ import json
 import logging
 from datetime import datetime, timedelta, timezone
 from azure.storage.blob import BlobServiceClient
-from dotenv import load_dotenv
 
-from src.config.settings import DATA_DIR, OUTPUT_DIR
+from src.config.settings import DATA_DIR, OUTPUT_DIR, settings
 
-load_dotenv()
 logger = logging.getLogger(__name__)
-
-AZURE_CONN_STR = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 dash = chr(45)
 INPUT_CONTAINER = f"boardroom{dash}inputs"
 STATE_CONTAINER = f"boardroom{dash}state"
@@ -72,10 +68,10 @@ def load_run_status() -> dict | None:
     return None
 
 def get_blob_service_client():
-    if not AZURE_CONN_STR:
+    if not settings.AZURE_CONN_STR:
         return None
     try:
-        return BlobServiceClient.from_connection_string(AZURE_CONN_STR)
+        return BlobServiceClient.from_connection_string(settings.AZURE_CONN_STR)
     except Exception:
         logger.error("Failed to connect to Azure.")
         return None

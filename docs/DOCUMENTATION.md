@@ -85,7 +85,7 @@ Persona rule files: `refactoring_agent.mdc`, `qa_validation_agent.mdc`, `api_opt
 
 | Path | Purpose |
 |------|---------|
-| `.cursor/agent_state/ecosystem_state.json` | Conflicts, audits, QA flags, scorecards (rotate at 50 entries) |
+| `.cursor/agent_state/ecosystem_state.json` | Conflicts, audits, QA flags, scorecards (gitignored; copy from `ecosystem_state.example.json`; rotate at 50 entries) |
 | `BOARDROOM_DATA_DIR` / Azure `boardroom-state` | Runtime JSON: `board_verdicts.json`, checkpoints, telemetry |
 | `.cache/` | Local Azure artifact pull via `tools/fetch_azure_reports.py` |
 

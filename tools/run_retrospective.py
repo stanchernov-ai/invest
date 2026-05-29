@@ -16,9 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from dotenv import load_dotenv
-
-load_dotenv()
+import src.config.settings  # noqa: F401 — loads .env via settings SSOT
 
 from src.qa.retrospective import execute_retrospective, default_action_tracker_path
 from src.storage_client import load_run_status

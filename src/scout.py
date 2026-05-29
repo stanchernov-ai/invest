@@ -5,11 +5,9 @@ import datetime
 import operator
 import requests
 from bs4 import BeautifulSoup
-from dotenv import load_dotenv
 
-from src.config.settings import DATA_DIR
+from src.config.settings import DATA_DIR, settings
 
-load_dotenv()
 logger = logging.getLogger(__name__)
 dash = chr(45)
 
@@ -79,7 +77,7 @@ def run_scout_pipeline(owned_tickers=None):
     
     trending_tickers = scrape_yahoo_trending()
     
-    api_key = os.getenv("FMP_API_KEY")
+    api_key = settings.FMP_API_KEY
     if not trending_tickers and api_key:
         logger.warning("Scraper returned empty. Falling back to FMP API Screener.")
         try:

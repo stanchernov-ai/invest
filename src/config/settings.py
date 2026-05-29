@@ -5,6 +5,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from dotenv import load_dotenv
 
+# Single entry point for .env — other modules must import settings (or this module) instead of load_dotenv().
 load_dotenv()
 
 logger = logging.getLogger(__name__)

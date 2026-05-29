@@ -1,14 +1,11 @@
 """Smoke tests for FMP field mapping (requires FMP_API_KEY in .env)."""
 import asyncio
-import os
 import unittest
 
-from dotenv import load_dotenv
-
-load_dotenv()
+from src.config.settings import settings
 
 
-@unittest.skipUnless(os.getenv("FMP_API_KEY"), "FMP_API_KEY not set")
+@unittest.skipUnless(settings.FMP_API_KEY, "FMP_API_KEY not set")
 class TestFmpAdvancedMetrics(unittest.TestCase):
     def test_aapl_consensus_and_earnings_populated(self):
         import aiohttp
@@ -17,7 +14,7 @@ class TestFmpAdvancedMetrics(unittest.TestCase):
         async def _run():
             async with aiohttp.ClientSession() as session:
                 return await get_fmp_advanced_metrics(
-                    "AAPL", os.environ["FMP_API_KEY"], session, {}
+                    "AAPL", settings.FMP_API_KEY, session, {}
                 )
 
         m = asyncio.run(_run())
@@ -33,7 +30,7 @@ class TestFmpAdvancedMetrics(unittest.TestCase):
         async def _run():
             async with aiohttp.ClientSession() as session:
                 return await get_fmp_advanced_metrics(
-                    "SPY", os.environ["FMP_API_KEY"], session, {}
+                    "SPY", settings.FMP_API_KEY, session, {}
                 )
 
         m = asyncio.run(_run())

@@ -48,7 +48,7 @@ This document tracks identified bugs, architectural improvements, and long-term 
 | **P2** | Root `README.md` + `docs/qa_layers.md` one-pager |
 | **P2** | Wire post-job Cursor agents (`api_audit`, `data_insights`, `supervisor_summaries`) |
 | **P2** | Relative strength + sector weights in prepare; Buffett PE/P/S caps in Python |
-| **P3** | Consolidate `load_dotenv()` to `settings.py` only; rotate/gitignore `ecosystem_state.json` noise |
+| ~~**P3**~~ | ~~Consolidate `load_dotenv()` to `settings.py` only; rotate/gitignore `ecosystem_state.json` noise~~ **DONE (May 29)** — `.funcignore` expanded; `settings.py` SSOT; local ledger gitignored + example template |
 | **P3** | Optional: block verdict memory on post-flight QA CRITICAL; panel `unanimous_pass` for 14-day cooldown |
 
 ### Not in repo (by design — gitignored)
