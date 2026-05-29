@@ -225,11 +225,35 @@ class StateMachineOrchestrator:
             self.state.qa_feedback = "Chairman produced empty execution arrays."
             return
 
-        prompt = f"Audit implementation contract for ledger discrepancies:\n\n{self.state.chairman_draft_json}"
+        from src.core.compliance_audit import (
+            audit_chairman_compliance,
+            format_compliance_digest,
+            format_debate_for_compliance,
+            merge_compliance_reports,
+        )
+
+        try:
+            chairman = json.loads(self.state.chairman_draft_json)
+        except json.JSONDecodeError:
+            self.state.is_approved = False
+            self.state.qa_feedback = "Chairman output is not valid JSON."
+            return
+
+        deterministic_violations = audit_chairman_compliance(chairman)
+        debate_text = format_debate_for_compliance(self.state.messages)
+        digest = format_compliance_digest(deterministic_violations)
+
+        prompt = (
+            f"{digest}\n\n"
+            f"RAW BOARD DEBATE LOG (Round 2 votes are ground truth for majority checks):\n"
+            f"{debate_text}\n\n"
+            f"CHAIRMAN JSON OUTPUT (audit this against the debate):\n"
+            f"{self.state.chairman_draft_json}"
+        )
         res = await self._run_agent("compliance", prompt, schema=ComplianceReport)
-        if res:
-            self.state.is_approved = res.get("is_compliant", False)
-            self.state.qa_feedback = res.get("feedback_to_chairman", "Compliance rejection triggered.")
+        merged = merge_compliance_reports(deterministic_violations, res)
+        self.state.is_approved = merged.get("is_compliant", False)
+        self.state.qa_feedback = merged.get("feedback_to_chairman", "Compliance rejection triggered.")
 
     async def execute_red_team(self) -> None:
         unicorns = json.dumps(self.state.unicorn_trades or [])
