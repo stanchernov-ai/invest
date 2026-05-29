@@ -27,6 +27,23 @@ class BenchmarkChartTests(unittest.TestCase):
         self.assertAlmostEqual(rebased[1], 100.0)
         self.assertAlmostEqual(rebased[2], 150.0)
 
+    def test_line_chart_uses_compact_month_labels(self):
+        history = {
+            f"2025{m:02d}01": {
+                "portfolio_index": 100.0 + m,
+                "spy": 500 + m,
+                "qqq": 400 + m,
+            }
+            for m in range(1, 13)
+        }
+        with patch.object(reporting, "get_quickchart_short_url", return_value="https://example.com/chart.png") as mock_url:
+            reporting.build_benchmark_line_chart(history)
+        labels = mock_url.call_args[0][0]["data"]["labels"]
+        self.assertLessEqual(len(labels), reporting.LINE_CHART_MAX_POINTS)
+        self.assertRegex(labels[0], r"^[A-Z][a-z]{2} '\d{2}$")
+        self.assertNotRegex(labels[0], r"^\d{8}$")
+        self.assertEqual(mock_url.call_args[1]["background_color"], reporting.CHART_BG_DARK)
+
 
 class BriefingCopyTests(unittest.TestCase):
     def test_sanitize_qa_amendment_jargon(self):
@@ -107,8 +124,12 @@ class ChartColorTests(unittest.TestCase):
         with patch.object(reporting, "get_quickchart_short_url", return_value="https://example.com/bar.png") as mock_url:
             reporting.build_returns_bar_chart(ledger)
         opts = mock_url.call_args[0][0]["options"]
-        self.assertFalse(opts["plugins"]["legend"]["display"])
+        datalabels = opts["plugins"]["datalabels"]
+        self.assertIs(opts["plugins"]["legend"], False)
         self.assertEqual(opts["scales"]["y"]["title"]["text"], "Return (%)")
+        self.assertEqual(datalabels["color"], reporting.CHART_LABEL_ON_DARK)
+        self.assertIn("formatter", datalabels)
+        self.assertEqual(mock_url.call_args[1]["background_color"], reporting.CHART_BG_DARK)
 
 
 class BriefingHtmlTests(unittest.TestCase):

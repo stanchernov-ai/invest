@@ -3,12 +3,13 @@ import urllib.parse
 import requests
 import json
 import re
+from datetime import datetime
 from jinja2 import Template
 import logging
 
 logger = logging.getLogger(__name__)
 
-def get_quickchart_short_url(chart_config, width=600, height=300):
+def get_quickchart_short_url(chart_config, width=600, height=300, background_color="white"):
     # Prefer the short-URL endpoint: the inline GET fallback encodes the entire
     # config into the querystring, which silently breaks for large charts (e.g.
     # the benchmark line chart with a full year of points blows past URL limits).
@@ -16,7 +17,7 @@ def get_quickchart_short_url(chart_config, width=600, height=300):
         "chart": chart_config,
         "width": width,
         "height": height,
-        "backgroundColor": "white",
+        "backgroundColor": background_color,
         "devicePixelRatio": 2,
     }
     last_err = None
@@ -36,7 +37,8 @@ def get_quickchart_short_url(chart_config, width=600, height=300):
             last_err = e
     logger.error(f"Failed to create short URL for chart after retries: {last_err}")
     encoded_config = urllib.parse.quote(json.dumps(chart_config))
-    return f"https://quickchart.io/chart?w={width}&h={height}&bkg=white&c={encoded_config}"
+    bkg = urllib.parse.quote(background_color)
+    return f"https://quickchart.io/chart?w={width}&h={height}&bkg={bkg}&c={encoded_config}"
 
 
 def _probe_image_url(url):
@@ -200,15 +202,64 @@ def _lerp_hex(color_low: str, color_high: str, t: float) -> str:
     )
 
 
-# Gain/loss chart palette — dark shades only (readable on white; no light green/red).
-GAIN_GREEN_HIGH = "#166534"  # lighter of the two greens (still dark)
-GAIN_GREEN_LOW = "#052e16"   # darker green
-LOSS_RED_HIGH = "#b91c1c"    # lighter of the two reds (still saturated)
-LOSS_RED_LOW = "#450a0a"     # darker red
+# Gain/loss chart palette — dark shades on white canvas (pie charts in email body).
+GAIN_GREEN_HIGH = "#166534"
+GAIN_GREEN_LOW = "#052e16"
+LOSS_RED_HIGH = "#b91c1c"
+LOSS_RED_LOW = "#450a0a"
+# Lighter ramp for bar/line charts on dark canvas — readable against #111827.
+GAIN_GREEN_ON_DARK_HIGH = "#86efac"
+GAIN_GREEN_ON_DARK_LOW = "#22c55e"
+LOSS_RED_ON_DARK_HIGH = "#fca5a5"
+LOSS_RED_ON_DARK_LOW = "#ef4444"
+CHART_BG_DARK = "#111827"
+CHART_LABEL_ON_DARK = "#ecfdf5"
+CHART_AXIS_ON_DARK = "#9ca3af"
+CHART_GRID_ON_DARK = "rgba(255,255,255,0.12)"
 CHART_LABEL_ON_SLICE = "#ffffff"
 CHART_LABEL_ON_AXIS = "#111827"
 PIE_CHART_WIDTH = 600
 PIE_CHART_HEIGHT = 420
+LINE_CHART_MAX_POINTS = 12
+BAR_DATALABEL_FORMATTER = (
+    "function(value){return value==null?'':(Math.round(value*10)/10)+'%';}"
+)
+
+
+def _format_history_axis_labels(date_keys: list[str]) -> list[str]:
+    """YYYYMMDD keys → compact 'May '25' labels for chart x-axes."""
+    labels = []
+    for key in date_keys:
+        try:
+            dt = datetime.strptime(str(key), "%Y%m%d")
+        except ValueError:
+            labels.append(str(key))
+            continue
+        labels.append(dt.strftime("%b '%y"))
+    return labels
+
+
+def _dark_chart_scales(*, y_title: str, y_begin_at_zero: bool = False) -> dict:
+    tick = {"color": CHART_AXIS_ON_DARK, "font": {"size": 10}}
+    grid = {"color": CHART_GRID_ON_DARK}
+    return {
+        "y": {
+            "beginAtZero": y_begin_at_zero,
+            "title": {"display": True, "text": y_title, "color": "#e5e7eb", "font": {"size": 11}},
+            "ticks": tick,
+            "grid": grid,
+        },
+        "x": {
+            "ticks": {
+                **tick,
+                "maxTicksLimit": 6,
+                "maxRotation": 0,
+                "minRotation": 0,
+                "autoSkip": True,
+            },
+            "grid": {"display": False},
+        },
+    }
 
 
 def _outlabeled_pie_options() -> dict:
@@ -241,12 +292,18 @@ def _render_outlabeled_pie_chart(labels, data, colors):
     return get_quickchart_short_url(chart_config, width=PIE_CHART_WIDTH, height=PIE_CHART_HEIGHT)
 
 
-def colors_for_metric(values: list[float]) -> list[str]:
+def colors_for_metric(values: list[float], *, theme: str = "light") -> list[str]:
     """Gradual colors across the slice set — min→max spread shows disparity.
 
-    Green-only ramp for gains, red-only ramp for losses (no light tints).
-    Diverging sets use the same dark green / dark red endpoints.
+    Green-only ramp for gains, red-only ramp for losses (no light tints on white).
+    Use theme='dark' for bar charts on the dark canvas (lighter greens/reds).
     """
+    if theme == "dark":
+        gain_high, gain_low = GAIN_GREEN_ON_DARK_HIGH, GAIN_GREEN_ON_DARK_LOW
+        loss_high, loss_low = LOSS_RED_ON_DARK_HIGH, LOSS_RED_ON_DARK_LOW
+    else:
+        gain_high, gain_low = GAIN_GREEN_HIGH, GAIN_GREEN_LOW
+        loss_high, loss_low = LOSS_RED_HIGH, LOSS_RED_LOW
     if not values:
         return []
     vals = [float(v) for v in values]
@@ -255,9 +312,9 @@ def colors_for_metric(values: list[float]) -> list[str]:
         if vmin == 0:
             mid = "#6b7280"
         elif vmin > 0:
-            mid = _lerp_hex(GAIN_GREEN_HIGH, GAIN_GREEN_LOW, 0.5)
+            mid = _lerp_hex(gain_high, gain_low, 0.5)
         else:
-            mid = _lerp_hex(LOSS_RED_HIGH, LOSS_RED_LOW, 0.5)
+            mid = _lerp_hex(loss_high, loss_low, 0.5)
         return [mid for _ in vals]
 
     if vmin < 0 < vmax:
@@ -265,16 +322,16 @@ def colors_for_metric(values: list[float]) -> list[str]:
         for v in vals:
             if v >= 0:
                 t = v / vmax if vmax else 0.0
-                colors.append(_lerp_hex(GAIN_GREEN_HIGH, GAIN_GREEN_LOW, t))
+                colors.append(_lerp_hex(gain_high, gain_low, t))
             else:
                 t = v / vmin if vmin else 0.0
-                colors.append(_lerp_hex(LOSS_RED_HIGH, LOSS_RED_LOW, t))
+                colors.append(_lerp_hex(loss_high, loss_low, t))
         return colors
 
     if vmin >= 0:
-        low, high = GAIN_GREEN_HIGH, GAIN_GREEN_LOW
+        low, high = gain_high, gain_low
     else:
-        low, high = LOSS_RED_HIGH, LOSS_RED_LOW
+        low, high = loss_high, loss_low
     span = vmax - vmin
     return [_lerp_hex(low, high, (v - vmin) / span) for v in vals]
 
@@ -374,7 +431,7 @@ def build_returns_bar_chart(sorted_ledger):
     if not data:
         return ""
 
-    colors = colors_for_metric(returns)
+    colors = colors_for_metric(returns, theme="dark")
 
     chart_config = {
         "type": "bar",
@@ -384,26 +441,21 @@ def build_returns_bar_chart(sorted_ledger):
         },
         "options": {
             "plugins": {
-                "legend": {"display": False},
+                "legend": False,
                 "datalabels": {
                     "display": True,
                     "align": "end",
                     "anchor": "end",
-                    "color": CHART_LABEL_ON_SLICE,
-                    "font": {"weight": "bold"},
+                    "color": CHART_LABEL_ON_DARK,
+                    "font": {"weight": "bold", "size": 12},
+                    "formatter": BAR_DATALABEL_FORMATTER,
                 },
             },
-            "scales": {
-                "y": {
-                    "beginAtZero": True,
-                    "title": {"display": True, "text": "Return (%)", "color": CHART_LABEL_ON_AXIS},
-                    "ticks": {"color": CHART_LABEL_ON_AXIS},
-                },
-                "x": {"ticks": {"color": CHART_LABEL_ON_AXIS}},
-            },
+            "scales": _dark_chart_scales(y_title="Return (%)", y_begin_at_zero=True),
+            "legend": {"display": False},
         },
     }
-    return get_quickchart_short_url(chart_config)
+    return get_quickchart_short_url(chart_config, background_color=CHART_BG_DARK)
 
 def _downsample(labels, series_list, max_points=90):
     """Evenly subsample parallel label + series lists, always keeping the last point."""
@@ -530,13 +582,16 @@ def build_benchmark_line_chart(history_data):
         _rebase_index_series(qqq_data),
     )
 
-    dates, (port_data, spy_data, qqq_data) = _downsample(dates, [port_data, spy_data, qqq_data])
+    dates, (port_data, spy_data, qqq_data) = _downsample(
+        dates, [port_data, spy_data, qqq_data], max_points=LINE_CHART_MAX_POINTS,
+    )
+    axis_labels = _format_history_axis_labels(dates)
 
     datasets = [
         {
             "label": "Portfolio (TWR)",
             "data": port_data,
-            "borderColor": "#2563eb",
+            "borderColor": "#60a5fa",
             "fill": False,
             "tension": 0.1,
             "spanGaps": True,
@@ -544,7 +599,7 @@ def build_benchmark_line_chart(history_data):
         {
             "label": "S&P 500",
             "data": spy_data,
-            "borderColor": "#9ca3af",
+            "borderColor": "#d1d5db",
             "fill": False,
             "tension": 0.1,
             "spanGaps": True,
@@ -554,7 +609,7 @@ def build_benchmark_line_chart(history_data):
         datasets.append({
             "label": "NASDAQ",
             "data": qqq_data,
-            "borderColor": "#10b981",
+            "borderColor": "#34d399",
             "fill": False,
             "tension": 0.1,
             "spanGaps": True,
@@ -563,7 +618,7 @@ def build_benchmark_line_chart(history_data):
     chart_config = {
         "type": "line",
         "data": {
-            "labels": dates,
+            "labels": axis_labels,
             "datasets": datasets,
         },
         "options": {
@@ -572,22 +627,18 @@ def build_benchmark_line_chart(history_data):
                 "title": {
                     "display": True,
                     "text": "Indexed performance (start = 100)",
-                    "font": {"size": 14},
+                    "font": {"size": 12},
+                    "color": "#e5e7eb",
                 },
-                "legend": {"position": "bottom"},
-            },
-            "scales": {
-                "x": {
-                    "ticks": {"maxTicksLimit": 8, "maxRotation": 45, "minRotation": 0},
-                },
-                "y": {
-                    "beginAtZero": False,
-                    "title": {"display": True, "text": "Index"},
+                "legend": {
+                    "position": "bottom",
+                    "labels": {"color": "#e5e7eb", "font": {"size": 11}},
                 },
             },
+            "scales": _dark_chart_scales(y_title="Index"),
         },
     }
-    return get_quickchart_short_url(chart_config, width=640, height=340)
+    return get_quickchart_short_url(chart_config, width=640, height=340, background_color=CHART_BG_DARK)
 
 def build_briefing_charts(sorted_ledger, account_holdings, account_returns, history_data):
     """Build every briefing chart URL once so callers can both render and health-check

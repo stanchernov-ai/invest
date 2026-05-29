@@ -1,7 +1,7 @@
 # Documentation Index
 
 **Status:** Active  
-**Last updated:** May 29, 2026 (vote_engine Phase A)  
+**Last updated:** May 29, 2026 (briefing charts handoff)  
 **SSOT for:** which document to read or update — agents should start here when unsure where something lives.
 
 **Do not duplicate** content from the docs below into this file. Link only.
@@ -27,6 +27,7 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | See agent diagrams, production roster, QA layers | [`agent_architecture.md`](agent_architecture.md) |
 | Understand **which QA module** does what | [`qa_layers.md`](qa_layers.md) |
 | Understand pipeline phases, deploy, data layer, **vote_engine** | [`technical_solution.md`](technical_solution.md) |
+| Edit briefing charts / QuickChart / section order | [`briefing_charts_handoff.md`](briefing_charts_handoff.md) + `src/output/reporting.py` |
 | Debug chairman retries / vote alignment | [`qa_layers.md`](qa_layers.md) § Debate-phase audit + `src/core/vote_engine.py` |
 | Map FMP endpoints / fields / Starter tier | [`fmp_data_dictionary.md`](fmp_data_dictionary.md) |
 | Review subscriptions, SaaS costs, finance oversight | [`tech_stack_and_subscriptions.md`](tech_stack_and_subscriptions.md) + `subscriptions_registry.json` |
@@ -54,6 +55,7 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | [`../README.md`](../README.md) | Repo entry point — quick start + doc chain |
 | [`agent_architecture.md`](agent_architecture.md) | Agent inventory, mermaid diagrams, QA layers L0–L7, golden fixtures |
 | [`qa_layers.md`](qa_layers.md) | **Which QA file runs when** — deliver vs weekly vs dev |
+| [`briefing_charts_handoff.md`](briefing_charts_handoff.md) | QuickChart, palettes, briefing layout |
 | [`technical_solution.md`](technical_solution.md) | End-to-end flow, repo layout, env vars, blob containers, vote_engine |
 | [`agent_guardrails.md`](agent_guardrails.md) | **Pointer only** → `.cursorrules` |
 
@@ -114,5 +116,6 @@ Persona rule files: `refactoring_agent.mdc`, `qa_validation_agent.mdc`, `api_opt
 | Cursor rule in `.cursor/rules/` | `.cursorrules` if mandate/trigger changes; `agent_architecture.md` §2 file table |
 | Pipeline phase or checkpoint shape | `agent_architecture.md`, `technical_solution.md` |
 | Vote engine / compliance Python checks | `technical_solution.md` §2.2, `agent_architecture.md` §6, `tests/test_vote_engine.py` |
+| Briefing charts / QuickChart config | [`briefing_charts_handoff.md`](briefing_charts_handoff.md) + `tests/test_reporting_briefing.py` |
 | New doc file | **This index** + `action_tracker.md` Documentation index |
 | Shipped work / new priority | `action_tracker.md` Session Handoff |

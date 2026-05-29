@@ -1,15 +1,85 @@
 # SC Invest Boardroom — Action Tracker
 
 **Status:** Active  
-**Last Updated:** May 29, 2026 (EOD — vote_engine Phase A validated on `144833`)  
+**Last Updated:** May 29, 2026 (EOD — briefing charts sprint; see [`briefing_charts_handoff.md`](briefing_charts_handoff.md))
 
 This document tracks identified bugs, architectural improvements, and long-term backlog items for the SC Invest Boardroom pipeline. Items are broken down into manageable blocks with specific implementation details.
 
 ---
 
-## Session Handoff — May 29, 2026 (vote_engine Phase A — **pick up here**)
+## Session Handoff — May 29, 2026 (briefing charts — **pick up here**)
 
-> **Next developer — start here.** Phase A shipped and validated on production run **`20260529_144833`**. Verdict memory, per-run status, and vote math decoupling are live on `main` (`6107539`).
+> **Next developer — start here.** Chart palette, pie legend removal, SoTU order, and dark top-row charts are implemented in `src/output/reporting.py`. **Read [`briefing_charts_handoff.md`](briefing_charts_handoff.md)** for QuickChart gotchas, color rules, and validation runs.
+
+### Shipped (May 29, 2026 — briefing / charts)
+
+| Area | Commit | Detail |
+|------|--------|--------|
+| **Gain/loss palette (light)** | `ce577bf` | Dark green/red on white — pies + TWR table; no light tints |
+| **SoTU section order** | `a91b05a` | Charts → TWR → **State of the Union** → Alpha Pick → Action Plan |
+| **CAGR notation** | `a91b05a` | Metric box shows `12.00%` not spelled-out `percent` |
+| **Pie legend removal** | `41cc31d` | `plugins.legend: false` (boolean); canvas 600×420 |
+| **Dark line + bar charts** | *(this commit)* | `#111827` canvas; `May '25` x-axis; bar `%` datalabels; light green/red on dark |
+
+### Validation runs
+
+| Run | Result | Notes |
+|-----|--------|-------|
+| `20260529_144833` | success | Pre-chart-fix; Graphics FAIL (light green pies) |
+| `20260529_152151` | success | Post `ce577bf`; Graphics FAIL (bar labels white-on-white, crowded dates) — fixed locally |
+
+Pull artifacts: `.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id 20260529_152151`
+
+### First steps next session
+
+1. **Deploy + validate** — full pipeline or `/api/deliver?run_id=...` after chart sprint lands; confirm Graphics QA PASS.
+2. **P1 — Round 2 debate quality** — verbatim R1 in R2 (Prompt Engineer CRITICAL on `152151`).
+3. **P1 — Post Mortem vote verification** — AMZN false majority (Integrity CRITICAL on `152151`).
+4. [`briefing_charts_handoff.md`](briefing_charts_handoff.md) — SSOT for chart edits.
+5. [`post_deliver_checklist.md`](post_deliver_checklist.md) after deliver.
+
+### Open items (ordered)
+
+| Priority | Item |
+|----------|------|
+| ~~**P1**~~ | ~~**Briefing chart palette / pie contrast**~~ **DONE** — `ce577bf` + `41cc31d`. |
+| ~~**P1**~~ | ~~**SoTU before Action Plan**~~ **DONE** — `a91b05a`. |
+| ~~**P1**~~ | ~~**Pie top legend removal**~~ **DONE** — `41cc31d`. |
+| ~~**P1**~~ | ~~**Line/bar chart UX**~~ **DONE** — dark canvas, compact dates, bar labels (see handoff doc). |
+| **P1** | **Production chart validation** — Graphics QA on first post-sprint deliver. |
+| **P1** | **Round 2 prompt quality** — unique rebuttal text; reduce Pass spam in logs. |
+| **P1** | **Post Mortem vote tally** — verify chairman claims vs `raw_verdicts` / debate log. |
+| **P2** | Split `reporting.py` + extract prompts from `agents.py` |
+| **P2** | Relative strength + sector weights in prepare; Buffett PE/P/S caps in Python |
+| **P2** | Wire post-job Cursor agents (`api_audit`, `data_insights`, `supervisor_summaries`) |
+| **P3** | Dedupe same-day `board_verdicts` rows; optional verdict memory gated on graphics CRITICAL |
+
+### Archived handoffs (historical — do not pick up)
+
+<details>
+<summary>May 29 vote_engine Phase A (`6107539`, run `144833`)</summary>
+
+Phase A `vote_engine`, verdict memory, chairman guardrails validated on `20260529_144833`. See git history / `technical_solution.md` §2.2.
+</details>
+
+<details>
+<summary>May 29 architecture cleanup (pre–vote_engine deploy)</summary>
+
+- Run `20260529_120049`: verdict memory **not** validated (chairman omitted implicit Pass) — **fixed** in `144833`.
+- Overlapping kick caused `prepare: null` — **fixed** with per-run status files.
+</details>
+
+<details>
+<summary>May 29 agent/QA hardening (`e39b337`)</summary>
+
+Human QA review UI, visual/integrity golden fixtures, QA scorecard, deterministic data oracle. See section below.
+</details>
+
+---
+
+## Session Handoff — May 29, 2026 (vote_engine Phase A — archived)
+
+> **Superseded** by briefing charts handoff above. Kept for history.
 
 ### Shipped & validated (May 29, 2026)
 
@@ -63,44 +133,6 @@ Pull artifacts: `.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id 
 
 **Known minor issue:** `META` has duplicate Pass rows on `20260529` (earlier run + `144833`). Scout cooldown still works; dedupe is backlog P3.
 
-### First steps next session
-
-1. **P1 — Briefing layout:** Fix pie chart colors/contrast (`reporting.py` / QuickChart config); move State of the Union earlier — see Graphics CRITICALs on `144833`.
-2. **P1 — Round 2 debate quality:** Panelists copy Round 1 overview verbatim in Round 2 (Prompt Engineer WARNING on `144833`).
-3. **After each deliver:** [`post_deliver_checklist.md`](post_deliver_checklist.md).
-4. **Manual pipeline kickoff:** `POST https://<defaultHostName>/api/prepare?code=<function-key>` — resolve hostname via `engineering_playbook.md` §2.
-
-### Open items (ordered)
-
-| Priority | Item |
-|----------|------|
-| ~~**P0**~~ | ~~Deploy verdict memory + per-run status + double-run guard~~ **DONE** — validated `144833`. |
-| ~~**P1**~~ | ~~**Verdict memory validation**~~ **DONE** — 21 Pass rows on `144833`. |
-| ~~**P1**~~ | ~~**Phase A vote_engine**~~ **DONE** — `6107539`, validated `144833`. |
-| ~~**P1**~~ | ~~**State of the Union**~~ **DONE** — deterministic SoTU; validated `144833`. |
-| ~~**P1**~~ | ~~**Human QA on post-fix run**~~ **DONE** — `144833`, all agents confirmed. |
-| **P1** | **Briefing layout / charts** — pie chart CRITICALs, SoTU section order (`144833`; same thread as `120049`). |
-| **P1** | **Round 2 prompt quality** — enforce unique rebuttal text; reduce Pass spam in logs (Systems Architect WARNING). |
-| **P2** | Split `reporting.py` + extract prompts from `agents.py` |
-| **P2** | Relative strength + sector weights in prepare; Buffett PE/P/S caps in Python |
-| **P2** | Wire post-job Cursor agents (`api_audit`, `data_insights`, `supervisor_summaries`) |
-| **P3** | Dedupe same-day `board_verdicts` rows; optional verdict memory gated on graphics CRITICAL; `unanimous_pass` 14-day cooldown |
-
-### Archived handoffs (historical — do not pick up)
-
-<details>
-<summary>May 29 architecture cleanup (pre–vote_engine deploy)</summary>
-
-- Run `20260529_120049`: verdict memory **not** validated (chairman omitted implicit Pass) — **fixed** in `144833`.
-- Overlapping kick caused `prepare: null` — **fixed** with per-run status files.
-</details>
-
-<details>
-<summary>May 29 agent/QA hardening (`e39b337`)</summary>
-
-Human QA review UI, visual/integrity golden fixtures, QA scorecard, deterministic data oracle. See section below.
-</details>
-
 ---
 
 ## Documentation index
@@ -114,7 +146,7 @@ Human QA review UI, visual/integrity golden fixtures, QA scorecard, deterministi
 | [`agent_architecture.md`](agent_architecture.md) | Agent diagrams, inventory, QA L0–L7 — **update when roster changes** |
 | [`technical_solution.md`](technical_solution.md) | System design, data layer, deploy |
 | [`engineering_playbook.md`](engineering_playbook.md) | Before retrying a rejected approach |
-| [`post_deliver_checklist.md`](post_deliver_checklist.md) | After every deliver — retrospective + backlog hygiene |
+| [`briefing_charts_handoff.md`](briefing_charts_handoff.md) | QuickChart config, gain/loss palettes, briefing section order |
 | [`fmp_data_dictionary.md`](fmp_data_dictionary.md) | FMP endpoints and field map |
 | [`.cursorrules`](../.cursorrules) §0.5 | **Collaboration protocol** — ask when unsure; MCQ recommended-first + free-text last |
 | [`.cursorrules`](../.cursorrules) §1 | Azure `QA_REVIEW_*` app settings + correct hostname |

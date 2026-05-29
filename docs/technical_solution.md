@@ -479,7 +479,7 @@ Email subject: `SC Invest: Executive Boardroom Briefing - {date}`.
 | **Scout price placeholder** | Scout writes `price: 0.0`; FMP fills before oracle. | Fail fast in scout if FMP unavailable before oracle (optional). |
 | **No workflow framework** | Custom state machine is readable but lacks checkpoint/resume, visual debugging, or per-step metrics. | Acceptable at current scale; consider LangGraph or durable functions if steps multiply. |
 | **Chairman loop cost** | Up to 3× (chairman + compliance) on rejection; bypass skips Pro on unanimous actionable days. | Monitor `AGENT_ACTIVITY`; tune deathmatch Python ranking (Phase B). |
-| **Briefing chart readability** | Graphics QA CRITICAL on pie charts (`144833`) — green-on-green labels. | Fix QuickChart palette in `reporting.py`; golden fixture. |
+| **Briefing chart readability** | ~~Graphics QA CRITICAL on pie charts (`144833`)~~ **Addressed May 29** — palette, legends, dark top-row charts. SSOT: [`briefing_charts_handoff.md`](briefing_charts_handoff.md). Validate on next deliver. |
 | **Email as sole alert channel** | No Slack/webhook on oracle abort or compliance failure. | Optional failure notification path. |
 | **10-minute function timeout** | Large portfolios × many FMP calls × multi-round Gemini may approach limit on bad network days. | Monitor telemetry duration; shard FMP or reduce watchlist size. |
 

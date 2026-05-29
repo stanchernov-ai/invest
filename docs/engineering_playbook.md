@@ -38,6 +38,10 @@
   * **Human signal:** executive briefing email still fires on success; failure email is backlog item 2.2.
   * **Rejected:** fixed `sleep 300` then list blobs hoping a new file appeared — racey and wastes time. (2026-05-28)
 
+- **QuickChart `outlabeledPie` legend:** `"plugins": { "legend": false }` must be a **boolean** — `{ "display": false }` is ignored and the top ticker row still renders. Same for bar charts. SSOT: `docs/briefing_charts_handoff.md`. (2026-05-29)
+- **Bar chart datalabels on white canvas were invisible** — white text on white background. Top-row line/bar charts now use dark canvas `#111827` with light label text. Pies stay white. (2026-05-29)
+- **`wait_for_run.py` false timeout after deploy** — ~10 min queue delay before debate starts can consume the 660s budget. Use `--timeout 900` or poll from debate phase. (2026-05-29)
+
 ## 3. Data & APIs
 
 ### FMP (Financial Modeling Prep)
