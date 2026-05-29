@@ -9,7 +9,7 @@ import logging
 import os
 
 from src.config.settings import DATA_DIR, now_local
-from src.storage_client import STATE_CONTAINER, get_blob_service_client
+from src.storage_client import STATE_CONTAINER, get_blob_service_client, load_state_blob
 
 logger = logging.getLogger(__name__)
 
@@ -20,24 +20,52 @@ def _verdict_path() -> str:
     return os.path.join(DATA_DIR, BOARD_VERDICTS_FILE)
 
 
-def load_board_verdicts() -> dict:
+def _read_local_board_verdicts() -> dict | None:
     path = _verdict_path()
     if not os.path.exists(path):
-        return {}
+        return None
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        return data if isinstance(data, dict) else {}
+        return data if isinstance(data, dict) else None
     except Exception:
-        logger.warning("Could not read board_verdicts.json; starting empty.")
-        return {}
+        logger.warning("Could not read local board_verdicts.json.")
+        return None
+
+
+def _cache_board_verdicts_local(history: dict) -> None:
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(_verdict_path(), "w", encoding="utf-8") as f:
+        json.dump(history, f, indent=4)
+
+
+def load_board_verdicts() -> dict:
+    """Azure state first (Functions cold start), then local DATA_DIR copy."""
+    cloud = load_state_blob(BOARD_VERDICTS_FILE)
+    if isinstance(cloud, dict) and cloud:
+        _cache_board_verdicts_local(cloud)
+        return cloud
+
+    local = _read_local_board_verdicts()
+    return local if local is not None else {}
 
 
 def save_board_verdicts(history: dict) -> None:
-    os.makedirs(DATA_DIR, exist_ok=True)
-    path = _verdict_path()
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(history, f, indent=4)
+    if not isinstance(history, dict):
+        history = {}
+    if not history:
+        prior = _read_local_board_verdicts()
+        if not prior:
+            prior_cloud = load_state_blob(BOARD_VERDICTS_FILE)
+            prior = prior_cloud if isinstance(prior_cloud, dict) else None
+        if prior:
+            logger.warning(
+                "Refusing to save empty board_verdicts.json over %d existing symbol(s).",
+                len(prior),
+            )
+            return
+
+    _cache_board_verdicts_local(history)
 
     client = get_blob_service_client()
     if not client:

@@ -74,8 +74,28 @@ class VerdictMemoryTests(unittest.TestCase):
         self.assertNotIn("LLY", saved)
         self.assertEqual(saved["META"][0]["date"], "20260529")
 
+    @patch("src.verdict_memory.load_state_blob")
+    def test_load_prefers_azure_over_empty_local(self, mock_cloud):
+        cloud = {"NVDA": [{"verdict": "Hold", "date": "20260527"}]}
+        mock_cloud.return_value = cloud
+        with patch.object(verdict_memory, "DATA_DIR", self.data_dir):
+            loaded = verdict_memory.load_board_verdicts()
+        self.assertEqual(loaded, cloud)
+        local_path = os.path.join(self.data_dir, "board_verdicts.json")
+        self.assertTrue(os.path.exists(local_path))
+
+    @patch("src.verdict_memory.load_state_blob", return_value=None)
+    def test_save_refuses_empty_over_existing_local(self, _mock_cloud):
+        existing = {"META": [{"verdict": "Pass", "date": "20260529"}]}
+        with patch.object(verdict_memory, "DATA_DIR", self.data_dir):
+            verdict_memory.save_board_verdicts(existing)
+            verdict_memory.save_board_verdicts({})
+            loaded = verdict_memory.load_board_verdicts()
+        self.assertIn("META", loaded)
+
+    @patch("src.verdict_memory.load_state_blob", return_value=None)
     @patch("src.verdict_memory.get_blob_service_client", return_value=None)
-    def test_save_and_load_round_trip(self, _mock_client):
+    def test_save_and_load_round_trip(self, _mock_client, _mock_cloud):
         with patch.object(verdict_memory, "DATA_DIR", self.data_dir):
             verdict_memory.save_board_verdicts({"AAPL": [{"verdict": "Pass", "date": "20260529"}]})
             loaded = verdict_memory.load_board_verdicts()

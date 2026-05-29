@@ -179,26 +179,86 @@ def fmt(val):
     except (ValueError, TypeError):
         return "0.00%"
 
-def get_color_for_return(ret):
-    if ret >= 20: return "#166534"
-    elif ret >= 10: return "#22c55e"
-    elif ret >= 0: return "#86efac"
-    elif ret <= -20: return "#991b1b"
-    elif ret <= -10: return "#ef4444"
-    else: return "#fca5a5"
+def _clamp01(t: float) -> float:
+    return max(0.0, min(1.0, t))
+
+
+def _lerp_hex(color_low: str, color_high: str, t: float) -> str:
+    """Blend two #RRGGBB colors; t=0 → low, t=1 → high."""
+    t = _clamp01(t)
+
+    def _rgb(hex_color: str) -> tuple[int, int, int]:
+        h = hex_color.lstrip("#")
+        return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+    r1, g1, b1 = _rgb(color_low)
+    r2, g2, b2 = _rgb(color_high)
+    return "#%02x%02x%02x" % (
+        int(round(r1 + (r2 - r1) * t)),
+        int(round(g1 + (g2 - g1) * t)),
+        int(round(b1 + (b2 - b1) * t)),
+    )
+
+
+def colors_for_metric(values: list[float]) -> list[str]:
+    """Gradual colors across the slice set — min→max spread shows disparity.
+
+    Uses a diverging ramp through neutral when the range crosses zero; otherwise
+    a single hue light→dark ramp (greens for non-negative, reds for non-positive).
+    """
+    if not values:
+        return []
+    vals = [float(v) for v in values]
+    vmin, vmax = min(vals), max(vals)
+    if vmin == vmax:
+        mid = "#6b7280" if vmin == 0 else (_lerp_hex("#dcfce7", "#14532d", 0.5) if vmin > 0 else _lerp_hex("#fee2e2", "#7f1d1d", 0.5))
+        return [mid for _ in vals]
+
+    neutral = "#e5e7eb"
+    if vmin < 0 < vmax:
+        colors = []
+        for v in vals:
+            if v >= 0:
+                t = v / vmax if vmax else 0.0
+                colors.append(_lerp_hex(neutral, "#14532d", t))
+            else:
+                t = v / vmin if vmin else 0.0
+                colors.append(_lerp_hex(neutral, "#7f1d1d", t))
+        return colors
+
+    if vmin >= 0:
+        low, high = "#dcfce7", "#14532d"
+    else:
+        low, high = "#fee2e2", "#7f1d1d"
+    span = vmax - vmin
+    return [_lerp_hex(low, high, (v - vmin) / span) for v in vals]
+
+
+def get_color_for_return(ret: float, *, vmin: float | None = None, vmax: float | None = None) -> str:
+    """Single return → color. With vmin/vmax, uses the same gradual scale as charts."""
+    try:
+        val = float(ret)
+    except (TypeError, ValueError):
+        val = 0.0
+    if vmin is not None and vmax is not None:
+        return colors_for_metric([vmin, vmax, val])[2]
+    return colors_for_metric([val])[0]
+
 
 def build_portfolio_pie_chart(sorted_ledger):
     labels = []
     data = []
-    colors = []
+    returns = []
     for sym, entry in sorted_ledger:
         if sym != "BRK_LINK" and entry.get('Total', 0) > 1000:
             labels.append(sym)
             data.append(int(entry['Total']))
-            colors.append(get_color_for_return(entry.get('Personal_Return_Pct', 0.0)))
-            
+            returns.append(entry.get('Personal_Return_Pct', 0.0) or 0.0)
+
     if not data:
         return ""
+
+    colors = colors_for_metric(returns)
         
     chart_config = {
         "type": "outlabeledPie",
@@ -229,7 +289,7 @@ def build_account_allocation_pie(account_holdings, account_returns):
         return ""
 
     rets = (account_returns or {}).get("returns", {})
-    labels, data, colors = [], [], []
+    labels, data, twelves = [], [], []
     for account in ["eTrade Taxable", "eTrade Roth IRA", "Fidelity 401K", "Fidelity Roth 401K"]:
         syms = account_holdings.get(account, {})
         val = sum(info.get("value", 0) for info in syms.values())
@@ -237,11 +297,12 @@ def build_account_allocation_pie(account_holdings, account_returns):
             continue
         labels.append(_ACCOUNT_PIE_LABELS.get(account, account))
         data.append(int(val))
-        twelve = rets.get(account, {}).get("12m", 0.0) or 0.0
-        colors.append(get_color_for_return(twelve))
+        twelves.append(rets.get(account, {}).get("12m", 0.0) or 0.0)
 
     if not data:
         return ""
+
+    colors = colors_for_metric(twelves)
 
     chart_config = {
         "type": "outlabeledPie",
@@ -269,32 +330,37 @@ def build_returns_rows(account_returns):
         return []
     order = ["Total", "eTrade Taxable", "eTrade Roth IRA", "Fidelity 401K", "Fidelity Roth 401K"]
     rets = account_returns["returns"]
+    names = [n for n in order if n in rets]
+    ytd_vals = [rets[n].get("ytd", 0.0) or 0.0 for n in names]
+    twelve_vals = [rets[n].get("12m", 0.0) or 0.0 for n in names]
+    ytd_colors = colors_for_metric(ytd_vals)
+    twelve_colors = colors_for_metric(twelve_vals)
     rows = []
-    for name in order:
-        if name not in rets:
-            continue
-        ytd = rets[name].get("ytd", 0.0) or 0.0
-        twelve = rets[name].get("12m", 0.0) or 0.0
+    for name, ytd, twelve, yc, tc in zip(names, ytd_vals, twelve_vals, ytd_colors, twelve_colors):
         rows.append({
             "name": name,
-            "ytd": ytd, "ytd_color": "#166534" if ytd >= 0 else "#991b1b",
-            "twelve": twelve, "twelve_color": "#166534" if twelve >= 0 else "#991b1b",
+            "ytd": ytd,
+            "ytd_color": yc,
+            "twelve": twelve,
+            "twelve_color": tc,
         })
     return rows
 
 def build_returns_bar_chart(sorted_ledger):
     labels = []
     data = []
-    colors = []
+    returns = []
     for sym, entry in sorted_ledger:
         if sym != "BRK_LINK" and not sym.startswith("922"):
-            ret = entry.get('Personal_Return_Pct', 0.0)
+            ret = entry.get('Personal_Return_Pct', 0.0) or 0.0
             labels.append(sym)
             data.append(round(ret, 2))
-            colors.append('rgba(22, 101, 52, 0.8)' if ret >= 0 else 'rgba(153, 27, 27, 0.8)')
-            
+            returns.append(ret)
+
     if not data:
         return ""
+
+    colors = colors_for_metric(returns)
 
     chart_config = {
         "type": "bar",

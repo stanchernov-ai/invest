@@ -42,6 +42,31 @@ class BriefingCopyTests(unittest.TestCase):
         self.assertFalse(reporting._debate_has_content("Short."))
 
 
+class ChartColorTests(unittest.TestCase):
+    def test_gradual_scale_spreads_similar_positive_returns(self):
+        colors = reporting.colors_for_metric([5.0, 12.0, 28.0, 41.0])
+        self.assertEqual(len(colors), 4)
+        self.assertNotEqual(colors[0], colors[-1])
+        self.assertNotEqual(colors[1], colors[2])
+
+    def test_diverging_scale_crosses_zero(self):
+        colors = reporting.colors_for_metric([-15.0, -3.0, 4.0, 20.0])
+        self.assertEqual(len(colors), 4)
+        self.assertNotEqual(colors[0], colors[-1])
+
+    def test_pie_uses_metric_colors_not_fixed_buckets(self):
+        ledger = [
+            ("A", {"Total": 5000, "Personal_Return_Pct": 8.0}),
+            ("B", {"Total": 6000, "Personal_Return_Pct": 22.0}),
+            ("C", {"Total": 7000, "Personal_Return_Pct": 35.0}),
+        ]
+        with patch.object(reporting, "get_quickchart_short_url", return_value="https://example.com/pie.png") as mock_url:
+            reporting.build_portfolio_pie_chart(ledger)
+        colors = mock_url.call_args[0][0]["data"]["datasets"][0]["backgroundColor"]
+        self.assertEqual(len(colors), 3)
+        self.assertNotEqual(colors[0], colors[-1])
+
+
 class BriefingHtmlTests(unittest.TestCase):
     def test_section_order_and_footer(self):
         html = reporting.generate_html_briefing(
