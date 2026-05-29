@@ -81,6 +81,36 @@ class TestComplianceAudit(unittest.TestCase):
         self.assertIn("ROUND 2", text)
         self.assertNotIn("noise", text)
 
+    def test_fails_plurality_buy_without_majority(self):
+        raw = {
+            "lynch": {
+                "portfolio_verdicts": [],
+                "watchlist_verdicts": [
+                    {"symbol": "AMZN", "verdict": "Buy", "conviction_score": 8, "analysis": "growth"},
+                ],
+            },
+            "livermore": {
+                "portfolio_verdicts": [],
+                "watchlist_verdicts": [
+                    {"symbol": "AMZN", "verdict": "Buy", "conviction_score": 7, "analysis": "tape"},
+                ],
+            },
+            "buffett": {
+                "portfolio_verdicts": [],
+                "watchlist_verdicts": [
+                    {"symbol": "AMZN", "verdict": "Pass", "conviction_score": 5, "analysis": "val"},
+                ],
+            },
+        }
+        chair = _chairman(
+            watchlist_positions=[{"symbol": "AMZN", "final_verdict": "Buy"}],
+            alpha_pick={"symbol": "AMZN", "champion_quote": "test"},
+        )
+        violations = audit_chairman_compliance(
+            chair, raw, all_symbols=["AMZN"], portfolio_symbols=set()
+        )
+        self.assertTrue(any("MAJORITY BUY MANDATE" in v for v in violations))
+
     def test_failure_summary_includes_violations(self):
         summary = format_compliance_failure_summary(
             violations=["HEDGE MANDATE: TLT missing"],

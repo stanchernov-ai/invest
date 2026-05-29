@@ -122,12 +122,23 @@ async def run_post_flight_qa(
     *,
     raw_board_messages: list[dict] | None = None,
     all_symbols: list[str] | None = None,
+    raw_verdicts: dict | None = None,
+    portfolio_symbols: set[str] | None = None,
 ):
     logger.info("Initiating Post Flight QA Audit.")
+
+    post_mortem_report = await run_post_mortem_qa(
+        raw_log,
+        chairman_json,
+        raw_verdicts=raw_verdicts,
+        all_symbols=all_symbols or [],
+        portfolio_symbols=portfolio_symbols,
+    )
+
     base_prompt = f"RAW DEBATE LOG:\n{raw_log}\n\nFINAL CHAIRMAN ALLOCATION:\n{chairman_json}"
     contents = [types.Content(role="user", parts=[types.Part.from_text(text=base_prompt)])]
 
-    parallel_keys = ["post_mortem_qa", "system_architect"]
+    parallel_keys = ["system_architect"]
     tasks = []
     for key in parallel_keys:
         info = agent_config["board_members"][key]
@@ -143,7 +154,7 @@ async def run_post_flight_qa(
 
     parallel_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    qa_reports = []
+    qa_reports = [post_mortem_report]
     for key, res in zip(parallel_keys, parallel_results):
         role_name = agent_config["board_members"][key]["role"]
         qa_reports.append(_parse_qa_result(role_name, res))
@@ -157,6 +168,71 @@ async def run_post_flight_qa(
     qa_reports.append(prompt_engineer_report)
 
     return qa_reports
+
+
+async def run_post_mortem_qa(
+    raw_log: str,
+    chairman_json: str,
+    *,
+    raw_verdicts: dict | None = None,
+    all_symbols: list[str] | None = None,
+    portfolio_symbols: set[str] | None = None,
+) -> dict:
+    """Post Mortem audit: deterministic vote alignment + procedural LLM pass."""
+    from src.qa.post_mortem_audit import (
+        audit_post_mortem_deterministic,
+        format_post_mortem_digest,
+        merge_post_mortem_reports,
+    )
+
+    role_name = agent_config["board_members"]["post_mortem_qa"]["role"]
+    try:
+        chairman = json.loads(chairman_json) if chairman_json else {}
+    except json.JSONDecodeError:
+        chairman = {}
+
+    violations = audit_post_mortem_deterministic(
+        chairman,
+        raw_verdicts,
+        all_symbols=all_symbols or [],
+        portfolio_symbols=portfolio_symbols,
+    )
+    digest = format_post_mortem_digest(
+        violations,
+        raw_verdicts,
+        all_symbols=all_symbols or [],
+        portfolio_symbols=portfolio_symbols,
+    )
+    prompt_text = (
+        f"{digest}\n\nRAW DEBATE LOG:\n{raw_log}\n\nFINAL CHAIRMAN ALLOCATION:\n{chairman_json}"
+    )
+    contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt_text)])]
+    info = agent_config["board_members"]["post_mortem_qa"]
+    config_params = {
+        "system_instruction": info["system_instruction"],
+        "temperature": 0.15,
+        "response_mime_type": "application/json",
+        "response_schema": QAAgentReport,
+    }
+
+    try:
+        res = await call_gemini_async(
+            info["model"],
+            contents,
+            types.GenerateContentConfig(**config_params),
+            agent_name="post_mortem_qa",
+        )
+        parsed = json.loads(res.text)
+        parsed["agent_role"] = role_name
+        merged = merge_post_mortem_reports(violations, parsed)
+        return reconcile_compliance(merged)
+    except Exception as exc:
+        logger.error(f"QA execution failed for {role_name}: {exc}")
+        if violations:
+            merged = merge_post_mortem_reports(violations, None)
+            merged["agent_role"] = role_name
+            return reconcile_compliance(merged)
+        return _execution_error_report(role_name, exc)
 
 
 def _parse_qa_result(role_name: str, res) -> dict:

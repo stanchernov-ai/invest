@@ -130,9 +130,12 @@ def audit_chairman_vote_alignment(
                     f"ORIGINATOR RULE: {sym} is Buy/Strong Buy in chairman JSON but has no Round 2 panel votes."
                 )
                 continue
-            if summary.bucket_counts.get("buy", 0) < 1:
+            buy_votes = summary.bucket_counts.get("buy", 0)
+            if buy_votes < MAJORITY_THRESHOLD:
                 violations.append(
-                    f"ORIGINATOR RULE: {sym} Buy/Strong Buy not backed by any panelist Buy vote in Round 2."
+                    f"MAJORITY BUY MANDATE: {sym} chairman Buy/Strong Buy requires "
+                    f"{MAJORITY_THRESHOLD}/5 panel Buy votes but only {buy_votes}/5 voted Buy "
+                    f"(plurality is not a majority)."
                 )
 
     alpha = chairman.get("alpha_pick") or {}

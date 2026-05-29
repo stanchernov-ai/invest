@@ -70,6 +70,26 @@ class TestPersonaAudit(unittest.TestCase):
         self.assertFalse(out["is_compliant"])
         self.assertTrue(any(f["category"] == "Rubber Stamp" for f in out["findings"]))
 
+    def test_verbatim_r1_copy_detected_in_persona_audit(self):
+        shared = "The portfolio is too concentrated in mega-cap tech without margin of safety."
+        messages = [
+            {
+                "content": (
+                    f"**[ROUND 1] Warren Buffett**:\n* **Portfolio Overview**: {shared}\n"
+                    "* **NVDA**: Hold (5/10).\n"
+                )
+            },
+            {
+                "content": (
+                    f"**[ROUND 2 REBUTTAL] Warren Buffett**:\n* **Rebuttal Summary**: {shared}\n"
+                    "* **NVDA**: Hold (5/10).\n"
+                )
+            },
+        ]
+        violations, stats = audit_debate_persona(messages, ["NVDA"])
+        self.assertIn("buffett", stats["verbatim_r1_copies"])
+        self.assertTrue(any("VERBATIM R1 COPY" in v for v in violations))
+
     def test_format_digest_includes_stats(self):
         text = format_persona_digest([], {"total_tickers": 5, "unanimous_tickers": 0, "unanimous_rate": 0.0})
         self.assertIn("PASS", text)

@@ -24,6 +24,28 @@ class PanelistPortfolioVerdict(BaseModel):
     portfolio_verdicts: list[OwnedAssetVerdict] = Field(description="Verdicts for EVERY ticker provided in the CURRENT PORTFOLIO list.")
     watchlist_verdicts: list[WatchlistAssetVerdict] = Field(description="Verdicts for EVERY ticker provided in the APPROVED WATCHLIST TARGETS list.")
 
+
+class PanelistRebuttalVerdict(BaseModel):
+    overall_portfolio_critique: str = Field(
+        description=(
+            "ROUND 2 REBUTTAL ONLY — 2-3 NEW sentences. Name at least one other panelist by name, "
+            "respond to a specific Round 1 argument (agree, disagree, or partially concede), and "
+            "explain any vote changes. FORBIDDEN: copying or lightly paraphrasing your Round 1 Portfolio Overview."
+        )
+    )
+    portfolio_verdicts: list[OwnedAssetVerdict] = Field(
+        description=(
+            "Final Round 2 verdicts for EVERY portfolio ticker. Each analysis MUST be NEW rebuttal "
+            "reasoning that cites a peer argument or new evidence — never paste Round 1 analysis verbatim."
+        )
+    )
+    watchlist_verdicts: list[WatchlistAssetVerdict] = Field(
+        description=(
+            "Final Round 2 verdicts for EVERY watchlist ticker. Each analysis MUST be NEW rebuttal "
+            "reasoning — never paste Round 1 analysis verbatim."
+        )
+    )
+
 class StateOfTheUnionQuote(BaseModel):
     board_member: str = Field(description="Panelist display name with star rating and stance, e.g. 'Warren Buffett (⭐⭐⭐ Bullish)'.")
     quote: str = Field(description="The panelist's overall_portfolio_critique — a 2-sentence portfolio-level view. MUST NOT be a per-ticker stock analysis.")
@@ -130,6 +152,17 @@ MUNGER_DOCTRINE = "THE MUNGER DOCTRINE: This is an aggressively positioned, tech
 RETAIL_EDGE_DOCTRINE = "RETAIL EDGE DOCTRINE: Stan is a nimble retail investor who deeply understands technology. He does not move markets and can enter/exit positions instantly without slippage. You are mandated to seek asymmetric upside to outperform the indices. High growth, high beta, and visionary tech leadership are acceptable. However, you must avoid fundamentally broken companies, dying businesses, or frauds."
 
 WATCHLIST_RULING = "WATCHLIST VS PORTFOLIO RULES: The data provided is split into two distinct sections. For assets in the 'CURRENT PORTFOLIO', you may recommend Strong Buy, Buy, Hold, Trim, or Sell. For assets in the 'APPROVED WATCHLIST TARGETS', you CANNOT recommend Hold, Trim, or Sell. You cannot hold or sell what you do not own. For watchlist assets, you must ONLY recommend Strong Buy, Buy, or Pass."
+
+ROUND_2_REBUTTAL_DIRECTIVE = (
+    "[ROUND 2 REBUTTAL — NON-NEGOTIABLE]:\n"
+    "* This is the REBUTTAL round, not a repeat of Round 1. Your `overall_portfolio_critique` and every "
+    "ticker `analysis` MUST be freshly written prose.\n"
+    "* FORBIDDEN: copying, lightly paraphrasing, or re-ordering your Round 1 Portfolio Overview or per-ticker analyses.\n"
+    "* REQUIRED: name at least ONE other panelist by name, cite their Round 1 argument, and state whether you "
+    "agree, disagree, or partially concede — with persona-specific reasoning.\n"
+    "* REQUIRED: if your verdict or conviction changed on any symbol, explain what peer argument or data point moved you.\n"
+    "* Pass symbols still need a one-sentence rebuttal rationale — do not spam identical 'Pass (5/10)' with no text."
+)
 
 CHAIRMAN_MANDATE = "You are the Executive Chairman. Your job is to listen to the board's debate, weigh the conviction scores, and make the final, unappealable decisions. ANTI-COWARDICE PROTOCOL: If any watchlist asset receives strong board backing, you MUST authorize the purchase. To fund it, you MUST liquidate the weakest portfolio asset. You are forbidden from defaulting to Hold out of fear. You must assign rich, detailed background context to the Champion and Dissenter quotes for every trade you authorize. SCRATCHPAD MANDATE: You MUST use the `chain_of_thought_scratchpad` field to explicitly calculate your capital flow before making decisions."
 

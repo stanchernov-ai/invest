@@ -105,6 +105,8 @@ async def run_deliver(run_id: str) -> dict:
             json.dumps(c_data),
             raw_board_messages=raw_board_messages,
             all_symbols=all_symbols,
+            raw_verdicts=raw_verdicts or None,
+            portfolio_symbols=set(prep.get("portfolio_holdings") or {}),
         )
 
         # Build every chart once; reuse for render + the deterministic health probe.

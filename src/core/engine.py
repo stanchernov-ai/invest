@@ -5,11 +5,12 @@ from pydantic import BaseModel
 from google.genai import types
 
 from src.core.schemas import (
-    BoardroomState, PanelistPortfolioVerdict, ChiefOfStaffSynthesis, 
+    BoardroomState, PanelistPortfolioVerdict, PanelistRebuttalVerdict, ChiefOfStaffSynthesis, 
     ChairmanMasterSynthesis, ComplianceReport, RedTeamReport, DATA_SCHEMA_BINDING, 
     TONE_OVERRIDE, MUNGER_DOCTRINE, CHAIRMAN_MANDATE, RETAIL_EDGE_DOCTRINE, 
-    WATCHLIST_RULING
+    WATCHLIST_RULING, ROUND_2_REBUTTAL_DIRECTIVE,
 )
+from src.core.rebuttal import build_round2_user_prompt
 from src.core.data_oracle import validate_price_feed
 from src.core.guardrails import apply_chairman_guardrails
 from src.core.state_of_union import build_state_of_union_quotes
@@ -110,7 +111,7 @@ class StateMachineOrchestrator:
                  
         return self.state
 
-    async def _run_agent(self, agent_key: str, context_msg: str, schema: type[BaseModel] = None) -> dict:
+    async def _run_agent(self, agent_key: str, context_msg: str, schema: type[BaseModel] = None, extra_instructions: list[str] | None = None) -> dict:
         member_info = agent_config["board_members"][agent_key]
         
         instructions = [
@@ -121,8 +122,10 @@ class StateMachineOrchestrator:
             MUNGER_DOCTRINE,
             RETAIL_EDGE_DOCTRINE,
             WATCHLIST_RULING,
-            TONE_OVERRIDE
+            TONE_OVERRIDE,
         ]
+        if extra_instructions:
+            instructions.extend(extra_instructions)
         system_prompt = "\n\n".join(instructions)
         prompt_text = f"{self.state.base_data_prompt}\n\n{context_msg}"
         
@@ -181,8 +184,15 @@ class StateMachineOrchestrator:
 
     async def execute_rebuttal_round(self) -> None:
         agents = ["buffett", "lynch", "livermore", "huang", "simons"]
-        history = "\n\n".join([m["content"] for m in self.state.messages])
-        tasks = [self._run_agent(a, f"Review opinions and issue final structured verdicts:\n\n{history}", schema=PanelistPortfolioVerdict) for a in agents]
+        tasks = [
+            self._run_agent(
+                a,
+                build_round2_user_prompt(a, self.state.messages),
+                schema=PanelistRebuttalVerdict,
+                extra_instructions=[ROUND_2_REBUTTAL_DIRECTIVE],
+            )
+            for a in agents
+        ]
         results = await asyncio.gather(*tasks)
         
         for agent_key, res in zip(agents, results):
@@ -191,17 +201,25 @@ class StateMachineOrchestrator:
             msg = f"**[ROUND 2 REBUTTAL] {role_name}**:\n"
             if res:
                 if res.get("overall_portfolio_critique"):
-                    msg += f"* **Portfolio Overview**: {res['overall_portfolio_critique']}\n"
+                    msg += f"* **Rebuttal Summary**: {res['overall_portfolio_critique']}\n"
                 for v in res.get('portfolio_verdicts', []):
                     v_sym = v.get("symbol", "Unknown")
                     v_erd = v.get("verdict", "Hold")
                     v_sc = v.get("conviction_score", 5)
-                    msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10).\n"
+                    v_ans = (v.get("analysis") or "").strip()
+                    if v_ans:
+                        msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10). {v_ans}\n"
+                    else:
+                        msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10).\n"
                 for v in res.get('watchlist_verdicts', []):
                     v_sym = v.get("symbol", "Unknown")
                     v_erd = v.get("verdict", "Pass")
                     v_sc = v.get("conviction_score", 5)
-                    msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10).\n"
+                    v_ans = (v.get("analysis") or "").strip()
+                    if v_ans:
+                        msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10). {v_ans}\n"
+                    else:
+                        msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10).\n"
             self.state.messages.append({"role": "assistant", "content": msg})
 
         self.state.raw_verdicts = dict(self.raw_verdicts)

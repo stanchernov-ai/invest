@@ -97,12 +97,14 @@ def _scan_forbidden_phrases(agent_key: str, text: str) -> list[str]:
 
 def audit_debate_persona(raw_messages: list[dict], all_symbols: list[str]) -> tuple[list[str], dict]:
     """Return (violation strings, stats dict) for the debate transcript."""
+    from src.core.rebuttal import extract_round_overview, is_verbatim_r1_copy
     from src.qa_pipeline import parse_board_matrix
 
     violations: list[str] = []
     matrix = parse_board_matrix(raw_messages or [], all_symbols or [])
     stats = _unanimous_ticker_stats(matrix)
     stats["persona_keyword_hits"] = {}
+    stats["verbatim_r1_copies"] = []
 
     if stats["total_tickers"] >= MIN_TICKERS_FOR_UNANIMITY:
         if stats["unanimous_rate"] >= UNANIMOUS_TICKER_RATE_THRESHOLD:
@@ -113,6 +115,15 @@ def audit_debate_persona(raw_messages: list[dict], all_symbols: list[str]) -> tu
             )
 
     for agent_key, marker in PANELIST_MARKERS.items():
+        r1 = extract_round_overview(raw_messages, agent_key, "1")
+        r2 = extract_round_overview(raw_messages, agent_key, "2")
+        if is_verbatim_r1_copy(r1, r2):
+            stats["verbatim_r1_copies"].append(agent_key)
+            violations.append(
+                f"VERBATIM R1 COPY ({marker}): Round 2 rebuttal summary duplicates Round 1 Portfolio Overview — "
+                f"debate logging failure; Prompt Engineer must FAIL."
+            )
+
         round2 = _extract_round2_text(raw_messages, agent_key)
         hits = _scan_forbidden_phrases(agent_key, round2)
         if hits:
@@ -138,6 +149,12 @@ def format_persona_digest(violations: list[str], stats: dict) -> str:
             lines.append(f"  {PANELIST_MARKERS.get(agent, agent)} forbidden phrases: {', '.join(hits)}")
     else:
         lines.append("  Forbidden cross-persona vocabulary: none detected in Round 2.")
+    verbatim = stats.get("verbatim_r1_copies") or []
+    if verbatim:
+        names = ", ".join(PANELIST_MARKERS.get(k, k) for k in verbatim)
+        lines.append(f"  Verbatim R1 copies in Round 2: {names}")
+    else:
+        lines.append("  Verbatim R1 copies in Round 2: none detected.")
     if not violations:
         lines.append("  Verdict: PASS — no deterministic persona collapse detected.")
         return "\n".join(lines)
