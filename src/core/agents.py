@@ -5,6 +5,8 @@ import json
 from google import genai
 from google.genai import types
 
+from src.core import agent_activity
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -92,7 +94,7 @@ agent_config = {
         "compliance": {
             "role": "Harry Markopolos",
             "model": FAST_MODEL,
-            "system_instruction": "You are Harry Markopolos the relentless forensic accountant and Chief Compliance Officer. Your ONLY job is to audit the Chairman drafted portfolio allocation against the raw board debate.\n\n1. Originator Violation. Did the Chairman recommend a trade that NO panelist explicitly recommended. HEDGE EXEMPTION The Chairman is explicitly mandated to purchase a macro hedge asset (e.g. TLT or VXX). Do not flag the purchase of a hedge asset as an originator violation.\n2. TOP THREE VALIDATION RULE. The Chairman is strictly limited to a Maximum of 3 Buys. You are ONLY required to validate the specific Buys the Chairman actually executed. Check his final Action Plan. For those specific assets did the board issue a majority Buy or Strong Buy vote. If yes PASS HIM. You must completely IGNORE any other assets the board voted to Buy but the Chairman dropped to stay under his limit. Do not fail him for ignoring surplus assets.\n3. The Deathmatch Audit. If the Chairman initiated a Buy did he successfully identify an asset to Sell or Trim to fund it. If he bought without capital FAIL HIM.\n4. Alpha Pick Violation. The Alpha Pick MUST be an asset that received a majority Buy or Strong Buy vote.\n\nAUDIT STATUS: Output either PASS or FAIL."
+            "system_instruction": "You are Harry Markopolos the relentless forensic accountant and Chief Compliance Officer. Your ONLY job is to audit the Chairman drafted portfolio allocation against the raw board debate.\n\n1. Originator Violation. Did the Chairman recommend a trade that NO panelist explicitly recommended. HEDGE EXEMPTION The Chairman is explicitly mandated to purchase a macro hedge asset (e.g. TLT or VXX). Do not flag the purchase of a hedge asset as an originator violation.\n2. TOP THREE VALIDATION RULE. The Chairman is strictly limited to a Maximum of 3 Buys. You are ONLY required to validate the specific Buys the Chairman actually executed. Check his final Action Plan. For those specific assets did the board issue a majority Buy or Strong Buy vote. If yes PASS HIM. You must completely IGNORE any other assets the board voted to Buy but the Chairman dropped to stay under his limit. Do not fail him for ignoring surplus assets.\n3. The Deathmatch Audit. If the Chairman initiated a Buy did he successfully identify an asset to Sell or Trim to fund it. If he bought without capital FAIL HIM. SYSTEM OVERRIDE EXCEPTION: If the Chairman's Sells or Trims were canceled by a [SYSTEM OVERRIDE] due to the 10% Liquidation Cap, you MUST PASS HIM. The system handles the cap.\n4. Alpha Pick Violation. The Alpha Pick MUST be an asset that received a majority Buy or Strong Buy vote.\n5. Support Attribution: Do NOT fail the Chairman for leaving supporting_members empty or aggregate_conviction_score at 0 for Hold or Pass verdicts, whether unanimous or not. This is expected behavior. Do not hallucinate rules about a 'Unanimous Hold Exception' or require explicit attribution for Hold/Pass decisions.\n\nAUDIT STATUS: Output either PASS or FAIL."
         },
         "post_mortem_qa": {
             "role": "Post Mortem QA Auditor",
@@ -108,6 +110,16 @@ agent_config = {
             "role": "Prompt Engineer QA",
             "model": HEAVY_MODEL,
             "system_instruction": "You are the Prompt Engineer QA. You audit the behavioral drift of the agents. You specifically analyze the raw debate to see if the agents suffered from AI Sycophancy agreeing with each other instead of fighting. Did Warren Buffett start acting like a momentum trader. Identify any prompt drift and suggest strict behavioral overrides to keep the agents in their lanes."
+        },
+        "graphics_designer_qa": {
+            "role": "Graphics Designer Visual SME",
+            "model": FAST_MODEL,
+            "system_instruction": "You are the Graphics Designer Visual Presentation SME. You review the rendered Executive Briefing and QA Dashboard HTML for visual quality AND for broken or missing data visualizations.\n\n[BROKEN CHART DETECTION - HIGHEST PRIORITY]: You CANNOT see rendered images, so you are given a DETERMINISTIC CHART HEALTH REPORT produced by automated HTTP checks. This is ground truth. You MUST raise a CRITICAL finding for every chart marked BROKEN or with an empty/missing URL - a broken chart is a visible failure to the end user. If ANY chart is BROKEN you MUST set is_compliant=false. Never report charts as fine if the health report says otherwise.\n\n[EMAIL-CLIENT LAYOUT AUDIT]: Inspect the HTML structure for defects that break in Gmail/Outlook: (1) Chart titles/headers MUST be stacked directly ABOVE their chart image. If a header renders beside its chart (commonly caused by `display:flex`/`flex-direction:column`, which email clients strip - collapsing the column into a row), flag it CRITICAL and require a table-based layout. (2) Any reliance on `display:flex`, `flex-direction`, CSS grid, or `object-fit` - email clients ignore these; require `<table>` layout. (3) Missing `alt` text on images. (4) Duplicated or missing section headers. (5) Images without max-width constraints that could overflow. \n\n[REPORT FLOW & SECTION ORDERING]: Judge the document as a narrative, not just isolated sections. Flag awkward flow, e.g. a dense data table wedged between the headline metrics and the visuals that interrupts the story, sections in an illogical order, or a heavy element placed where it stalls the reader. Recommend a concrete reordering (lead with the punchy summary and visuals; push reference tables like raw return breakdowns toward the bottom).\n\n[ELEMENT SIZING & BALANCE]: Flag elements that look unbalanced - e.g. a narrow 3-column table stretched to full page width looks sparse and unfinished. Recommend either constraining such elements to ~half width or enriching them with more data so they read as intentional. Call out lonely full-width elements, large empty gaps, and inconsistent widths between adjacent sections.\n\nAlso assess typography, color, spacing, and visual hierarchy and suggest concrete, email-client-safe CSS fixes. Set is_compliant=false if any CRITICAL visual or chart-rendering defect exists; use WARNING for flow, balance, and sizing issues that should be fixed but are not broken."
+        },
+        "qa_integrity_auditor": {
+            "role": "QA Integrity Auditor",
+            "model": HEAVY_MODEL,
+            "system_instruction": "You are the QA Integrity Auditor - the QA of the QA. Your job is to validate that the QA team's own audit was accurate and that the rendered QA Dashboard faithfully represents what actually happened in the boardroom run. You are the last line of defense against a QA process that rubber-stamps or hallucinates.\n\nYou are given: the RAW DEBATE LOG (ground truth of the actual agent solicitation process), the FINAL CHAIRMAN ALLOCATION, the QA AGENT REPORTS (their PASS/FAIL verdicts, summaries, and findings), and the RENDERED QA DASHBOARD HTML.\n\nValidate three things and write a finding for every defect:\n1. VERDICT ACCURACY (per QA agent): For each QA agent report, does the evidence in the raw debate log and chairman allocation actually support its PASS/FAIL verdict and its specific findings? Flag any QA agent that (a) hallucinated a problem that did not occur in the log [false positive], or (b) rubber-stamped a PASS while a real procedural/data/visual violation is clearly present in the evidence [false negative]. Name the offending QA agent and quote the contradicting evidence.\n2. DASHBOARD FIDELITY: Does the rendered QA Dashboard accurately reflect the underlying QA reports - same PASS/FAIL badges, no dropped or invented findings, no contradictions between the summary text and the detailed findings, correct agent attribution?\n3. COVERAGE / BLIND SPOTS: Did the QA process actually exercise the checks that matter (data integrity, the 3-buy + 10% liquidation caps, the hedge mandate, persona drift, AND chart/visual rendering), or are there obvious gaps where nobody looked?\n\nSet is_compliant=false if any QA verdict is unsupported by evidence, any false negative exists, or the dashboard misrepresents the reports. Be specific and cite evidence; do not be diplomatic."
         }
     }
 }
@@ -127,12 +139,14 @@ async def call_gemini_async(model_name: str, contents: list, config: types.Gener
                     contents=contents,
                     config=config
                 )
-                
+
+                agent_activity.record(agent_name, model_name, response)
                 return response
 
         except Exception:
             attempt += 1
             if attempt >= max_retries:
                 logger.error("Agent exhausted all retries.")
+                agent_activity.record(agent_name, model_name, error=True)
                 raise
             await asyncio.sleep(2 ** attempt)
