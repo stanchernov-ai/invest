@@ -1,36 +1,67 @@
 # SC Invest Boardroom — Action Tracker
 
 **Status:** Active  
-**Last Updated:** May 28, 2026 (EOD handoff)  
+**Last Updated:** May 28, 2026 (FMP data layer + P1 deploy)  
 
 This document tracks identified bugs, architectural improvements, and long-term backlog items for the SC Invest Boardroom pipeline. Items are broken down into manageable blocks with specific implementation details.
 
 ---
 
-## Session Handoff — May 28, 2026 EOD
+## Session Handoff — FMP / Market Data (pick up here)
 
-**Start here tomorrow.** Stan is waiting on the next pipeline run results to confirm everything works — no manual trigger was fired at end of session (another agent was still catching up).
+**Primary reference:** [`docs/fmp_data_dictionary.md`](fmp_data_dictionary.md) — endpoints, dead URLs, field names, excluded keys, validation commands, and the **action backlog**.
 
-### Deployed tonight
-* **Git commits on `origin/main`:** `4dc0b2e` (governance tooling — charts/QA/HR/finance/Azure fetch) then **`29b4101`** (benchmark scrub utility `tools/scrub_benchmarks.py`). Both trigger **Deploy to Azure Functions** on push. We did **not** manually invoke the boardroom function at EOD.
-* **Local WIP not committed:** `test_chart.py` (chart testing). **`tools/scrub_benchmarks.py` is now on main** (was parallel-agent WIP at handoff time).
-* **Doc updates (this EOD handoff):** `docs/action_tracker.md`, `docs/engineering_playbook.md`, `docs/tech_stack_and_subscriptions.md`, `.cursor/rules/action_tracker.mdc` — modified locally; commit when ready.
+**Guardrails (personas, layers, audit tags):** [`.cursorrules`](../.cursorrules) at repo root — not `docs/agent_guardrails.md` (pointer only).
 
-### Tomorrow morning — verify these first
-> **NOTE:** A major refactor landed late this session — the pipeline is now **split into 3 chained Azure Functions** (prepare → debate → deliver). See **Phase 0.1**. This is **not yet committed/deployed** — review the diff and deploy first.
+### What shipped (this commit → `origin/main` → Azure deploy)
 
-1. **GitHub Actions deploy** finished green (check Actions tab on `stanchernov-ai/invest` — `gh` CLI not available in local shell).
-2. **Next weekday run** — the **11:00 UTC** timer now starts only the **`prepare`** phase, which queue-chains to `debate` then `deliver`. Verify:
-   * Each phase finishes **under 10 min** (check `run_status.json` → `phase` + per-phase durations).
-   * Queue messages flow: `boardroom-debate-queue` then `boardroom-deliver-queue` get a `run_id` (Azure portal → Storage → Queues).
-   * Executive briefing email: charts render (headers **above** charts), line chart not broken, returns table at **bottom ~half width**, compact QA footer (agent + ✅/❌ only).
-   * **QA dashboard email** arrives from the `deliver` phase. Graphics QA row now reads "(deterministic)"; Integrity row may show a WARNING if it timed out (non-blocking).
-   * `api_telemetry_{run_id}.json` (merged) contains **`AGENT_ACTIVITY`** from all phases.
-3. **If a phase fails:** re-run just that phase via HTTP — `/api/debate?run_id=...` or `/api/deliver?run_id=...` (FUNCTION key) — no need to re-debate. Local full run: `python -m src.main`.
-3. **Optional local checks:**
-   * `.venv\Scripts\python.exe tools/fetch_azure_reports.py --list` then `--run-id YYYYMMDD_HHMMSS` for aligned artifacts.
-   * `.venv\Scripts\python.exe -m src.finance_oversight --fetch-latest` for subscription/plan-fit report.
-   * `.venv\Scripts\python.exe -m src.hr_review .cache\state\api_telemetry_*.json` once AGENT_ACTIVITY exists.
+| Area | Change |
+|------|--------|
+| **P0 — Dead APIs fixed** | `/stable/rating` → `grades-consensus`; `/stable/earning_calendar` → `earnings`. Consensus + next earnings + FCS work again. |
+| **P0 — Prompt enrichment** | `mega_prompt` now includes PEG, P/S, D/E, beta, ROE, FCF yield, sector, analyst consensus, RS vs QQQ, % off 52w high, macro TLT/VXX, market regime block. |
+| **P0 — key-metrics-ttm** | ROE + FCF yield parsed (call was previously wasted). |
+| **P1 — EOD dedupe** | `prefetch_eod_cache()` once per symbol (~1095d); metrics + TWR history share cache (~30 fewer EOD calls/run). |
+| **P1 — News dates** | Headlines: `[SYM] (YYYY-MM-DD): title`. |
+| **Tooling** | `tools/validate_fmp_fields.py`, `tests/test_fmp_client.py`, `tests/test_eod_cache.py`. |
+
+### Verify after deploy (next weekday run or manual prepare)
+
+1. **GitHub Actions** — `Deploy to Azure Functions` green on latest `main` push.
+2. **Prepare telemetry** (`api_telemetry_{run_id}_prepare.json`):
+   * `grades_consensus` / `earn` responses **non-empty** for equities (not `[]`).
+   * `EOD_CACHE` object present with `symbol_count`.
+   * `historical_metrics.response` shows `"points"` > 0; URL may say `eod_cache`.
+3. **Debate prompt** (checkpoint / raw log): `=== MARKET REGIME ===`, richer per-ticker KPI line, news with dates.
+4. **FCS** — should occasionally be non-zero when consensus Buy + upside >15% or earnings ≤21d (was often stuck at 0 before).
+5. **Local:** `.venv\Scripts\python.exe -m unittest tests.test_fmp_client tests.test_eod_cache -v`  
+   `.venv\Scripts\python.exe tools\validate_fmp_fields.py`
+
+### Next priorities (ordered — stay on this thread)
+
+1. **P2 — Relative strength & sector concentration** — portfolio sector weight table in prompt; optional deterministic Buffett PE>40 / P>S>10 conviction cap in code.
+2. **P2 — Mandate math** — `generate_dynamic_mandate()` should use real portfolio 3M/12M TWR from `account_returns`, not hardcoded `0.15`.
+3. **P2 — Macro batch quote** — `batch-quote?symbols=TLT,VXX` (verify Starter tier).
+4. **P3 — New FMP endpoints** — 10Y yield, estimate revisions (see dictionary §P3).
+
+### Do not retry (documented dead paths)
+
+* `GET /stable/rating`, `GET /stable/earning_calendar` (404)
+* `GET /stable/earnings-calendar?symbol=X` (global feed, 0 rows per symbol)
+* v3 `rating` / `earning_calendar` on Starter (403)
+* JSON keys: `mktCap` (use `marketCap`), `changesPercentage` (use `changePercentage`), ROE on `ratios-ttm` (use `key-metrics-ttm`)
+
+---
+
+## Session Handoff — May 28, 2026 EOD (archived)
+
+<details>
+<summary>Earlier EOD notes (three-phase pipeline deploy)</summary>
+
+* Three chained Azure Functions: prepare → debate → deliver (`1e6b2f8`).
+* Verify queue chain, phase durations, briefing email, merged telemetry with `AGENT_ACTIVITY`.
+* Local: `python -m src.main` or phase HTTP retriggers.
+
+</details>
 
 ### Confirmed monthly TCO (~$285/mo)
 | Service | $/mo | Source |
@@ -308,10 +339,15 @@ A team of focused reviewers, each producing a short scored report + prioritized 
 * **What runs today:** `function_app.py` timer **11:30 UTC weekdays** → `run_qa_review_team()` → emails QA digest. Fetches latest blobs from Azure; includes HR section when `AGENT_ACTIVITY` present in telemetry.
 * **Still open:** Cursor subagent/rules wrapper (3.2), weekly digest log in `docs/qa_reviews/`, orchestrating as a "QA Lead" skill.
 
-### 5.2 Opportunity Audit — Value per API Call — PLANNED
+### 5.2 Opportunity Audit — Value per API Call — IN PROGRESS
 * **Description:** Stan's concern: "leaving gold on the ground." Audit each agent and each paid data field to ensure we're using what we pay for.
-* **Examples to investigate:** FMP fields fetched but unused in prompts (e.g., `3y_cagr` always `N/A`, `de`/`ps` ratios, `beta` for Kelly sizing); the unused `POLYGON_API_KEY` app setting; watchlist data richness vs how agents use it; whether Munger audit / QA agent outputs are surfaced.
-* **Action:** Produce a coverage matrix (data field / agent capability → where consumed → value rating) and a prioritized list of high-value, low-effort additions.
+* **Done (2026-05-28):**
+  * **`docs/fmp_data_dictionary.md`** — stable endpoint/field reference, known bad URLs, fields to exclude, action backlog.
+  * **`tools/validate_fmp_fields.py`** — live probe script (re-run after FMP plan changes).
+  * **P0 code fix:** dead `/stable/rating` → `grades-consensus`; dead `/stable/earning_calendar` → `earnings`; parse `key-metrics-ttm` (ROE, FCF yield); empty-list yfinance fallback; extended `mega_prompt` (PEG/P/S/D/E, beta, sector, RS vs QQQ, macro TLT/VXX); dedupe SPY/QQQ fetches in prepare.
+  * **`tests/test_fmp_client.py`** — smoke tests (consensus + earnings populated for AAPL).
+* **P1 done (2026-05-28):** shared EOD prefetch in prepare (`prefetch_eod_cache`); news headlines include `publishedDate`.
+* **Still open (P2+):** mandate CAGR from TWR, Buffett deterministic caps, macro batch-quote — see `docs/fmp_data_dictionary.md`.
 
 ### 5.3 Azure Storage Housekeeping & Cost Control — PLANNED
 * **Description:** A dedicated "clean house" routine to delete older Azure files and keep monthly storage cost down. Stan wants this more deliberate than the current passive retention.

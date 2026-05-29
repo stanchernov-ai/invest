@@ -20,7 +20,7 @@ from src import storage_client
 from src.output import reporting
 from src.output import notifier
 from src.data.news_client import fetch_ticker_news
-from src.data.fmp_client import get_fmp_advanced_metrics, get_fmp_macro
+from src.data.fmp_client import get_fmp_advanced_metrics, get_fmp_macro, prefetch_eod_cache
 from src.core.schemas import generate_dynamic_mandate
 from src.core.engine import DataOracleReport
 from src.core.agents import call_gemini_async, agent_config, FAST_MODEL, FLASH_TOKEN_LIMIT
@@ -29,6 +29,40 @@ from src.config.settings import settings, DATA_DIR, now_local
 from src.logging_setup import configure_logging
 
 logger = configure_logging()
+
+_BENCHMARK_SYMBOLS = frozenset({"SPY", "QQQ"})
+
+
+def _rel_strength_3m(adv: dict, qqq_3m: float) -> str:
+    t = adv.get("3m_trend")
+    if t in (None, "N/A"):
+        return "N/A"
+    try:
+        return reporting.fmt(float(t) - float(qqq_3m))
+    except (ValueError, TypeError):
+        return "N/A"
+
+
+def _format_equity_kpi_line(adv: dict, qqq_3m: float) -> str:
+    """Single-line fundamentals block shared by portfolio and watchlist."""
+    rs = _rel_strength_3m(adv, qqq_3m)
+    return (
+        f"PE: {adv.get('fwd_pe', 'N/A')} | PEG: {adv.get('peg', 'N/A')} | P/S: {adv.get('ps', 'N/A')} | D/E: {adv.get('de', 'N/A')} | "
+        f"Beta: {adv.get('beta', 'N/A')} | ROE: {reporting.fmt(adv.get('roe', 'N/A'))} | FCF Yield: {reporting.fmt(adv.get('fcf_yield', 'N/A'))} | "
+        f"Sector: {adv.get('sector', 'N/A')} | Analyst: {adv.get('consensus', 'N/A')} | "
+        f"3M Trend: {reporting.fmt(adv.get('3m_trend', 'N/A'))} | vs QQQ 3M: {rs} | Off 52W High: {reporting.fmt(adv.get('pct_off_52w_high', 'N/A'))} | "
+        f"Rev Growth: {reporting.fmt(adv.get('rev_growth', 'N/A'))} | EPS Growth: {reporting.fmt(adv.get('eps_growth', 'N/A'))}"
+    )
+
+
+def _market_regime_block(macro_data: dict, portfolio_3m: float, qqq_3m: float, spy_3m: float) -> str:
+    tlt = macro_data.get("TLT", "N/A")
+    vxx = macro_data.get("VXX", "N/A")
+    return (
+        f"=== MARKET REGIME ===\n"
+        f"Portfolio 3M (TWR): {reporting.fmt(portfolio_3m)} | QQQ 3M: {reporting.fmt(qqq_3m)} | SPY 3M: {reporting.fmt(spy_3m)}\n"
+        f"Macro hedges — TLT: {reporting.fmt_dol(tlt) if tlt != 'N/A' else 'N/A'} | VXX: {reporting.fmt_dol(vxx) if vxx != 'N/A' else 'N/A'}\n\n"
+    )
 
 
 async def _run_data_oracle(base_data_prompt: str) -> dict:
@@ -108,19 +142,39 @@ async def run_prepare(run_id: str = None) -> dict:
             news_feed = await fetch_ticker_news(clean_symbols, settings.FMP_API_KEY, session)
             api_telemetry['FUNDAMENTAL_NEWS'] = news_feed
 
-            qqq_adv = await get_fmp_advanced_metrics("QQQ", settings.FMP_API_KEY, session, api_telemetry)
-            spy_adv = await get_fmp_advanced_metrics("SPY", settings.FMP_API_KEY, session, api_telemetry)
+            history_symbols = history.collect_symbol_universe(DATA_DIR)
+            eod_symbols = sorted(
+                set(clean_symbols) | history_symbols | _BENCHMARK_SYMBOLS | {"TLT", "VXX"}
+            )
+            logger.info(f"Prefetching shared EOD cache for {len(eod_symbols)} symbols.")
+            eod_cache = await prefetch_eod_cache(
+                eod_symbols, settings.FMP_API_KEY, session, max_concurrency=5
+            )
+            api_telemetry["EOD_CACHE"] = {
+                "symbol_count": len(eod_symbols),
+                "fmp_unique": len({s.replace('.', '-') for s in eod_symbols}),
+            }
 
+            qqq_adv = await get_fmp_advanced_metrics(
+                "QQQ", settings.FMP_API_KEY, session, api_telemetry, eod_cache=eod_cache
+            )
+            spy_adv = await get_fmp_advanced_metrics(
+                "SPY", settings.FMP_API_KEY, session, api_telemetry, eod_cache=eod_cache
+            )
+
+            symbols_to_fetch = [s for s in clean_symbols if s not in _BENCHMARK_SYMBOLS]
             adv_sem = asyncio.Semaphore(5)
+
             async def _fetch_adv(sym):
                 async with adv_sem:
-                    return await get_fmp_advanced_metrics(sym, settings.FMP_API_KEY, session, api_telemetry)
+                    return await get_fmp_advanced_metrics(
+                        sym, settings.FMP_API_KEY, session, api_telemetry, eod_cache=eod_cache
+                    )
 
-            tasks = [_fetch_adv(sym) for sym in clean_symbols]
-            results_list = await asyncio.gather(*tasks, return_exceptions=True)
+            results_list = await asyncio.gather(*[_fetch_adv(sym) for sym in symbols_to_fetch], return_exceptions=True)
 
-            advanced_data = {}
-            for sym, res in zip(clean_symbols, results_list):
+            advanced_data = {"QQQ": qqq_adv, "SPY": spy_adv}
+            for sym, res in zip(symbols_to_fetch, results_list):
                 if isinstance(res, Exception):
                     error_msg = f"FATAL ABORT: Advanced metrics corrupted for {sym}. Killing pipeline to prevent AI hallucination."
                     logger.error(error_msg)
@@ -131,7 +185,9 @@ async def run_prepare(run_id: str = None) -> dict:
                     return {"run_id": run_id, "status": "failed", "oracle": None}
                 advanced_data[sym] = res
 
-            account_returns = await history.build_account_returns(DATA_DIR, settings.FMP_API_KEY, session)
+            account_returns = await history.build_account_returns(
+                DATA_DIR, settings.FMP_API_KEY, session, eod_cache=eod_cache
+            )
 
         spy_price = spy_adv.get("current_price", 0.0)
         total_portfolio_value = 0.0
@@ -190,9 +246,16 @@ async def run_prepare(run_id: str = None) -> dict:
                 logger.warning("Could not persist portfolio_returns.json")
 
         live_qqq_trend = qqq_adv.get("3m_trend", 0.0)
+        live_spy_trend = spy_adv.get("3m_trend", 0.0)
+        try:
+            qqq_3m_float = float(live_qqq_trend) if live_qqq_trend not in (None, "N/A") else 0.0
+        except (ValueError, TypeError):
+            qqq_3m_float = 0.0
         portfolio_3m_trend = 0.0
         if account_returns and account_returns.get("returns"):
             portfolio_3m_trend = account_returns["returns"].get("Total", {}).get("3m", 0.0) or 0.0
+
+        regime_block = _market_regime_block(macro_data, portfolio_3m_trend, qqq_3m_float, live_spy_trend)
 
         tradeable_tickers = [sym for sym in master_ledger.keys() if sym != "BRK_LINK" and not sym.startswith("922")]
         sorted_ledger = sorted(master_ledger.items(), key=lambda x: x[1]["Total"], reverse=True)
@@ -209,14 +272,18 @@ async def run_prepare(run_id: str = None) -> dict:
             live_price = adv.get("current_price", data["Total"] / shares if shares > 0 else 0.0)
             pt = adv.get('price_target', 'N/A')
             implied_upside = f"{((float(pt) - live_price) / live_price) * 100:.2f}%" if pt != 'N/A' and live_price > 0 else "N/A"
+            earn_extra = ""
+            if adv.get("eps_estimated", "N/A") != "N/A":
+                earn_extra = f" | EPS Est: {adv.get('eps_estimated')}"
             line = (
                 f"### {sym} ###\n"
                 f"Position: {reporting.fmt_dol(data['Total'])} ({pct:.2f}% of portfolio)\n"
                 f"Purchase Date: {data.get('Purchase_Date', 'Unknown')}\n"
-                f"Current Price: {reporting.fmt_dol(live_price)} | Target Price: {reporting.fmt_dol(pt)} (Implied Upside: {implied_upside})\n"
-                f"3M Trend: {reporting.fmt(adv.get('3m_trend', 'N/A'))} | PE Ratio: {adv.get('fwd_pe', 'N/A')} | 3Y Return: {reporting.fmt(adv.get('3y_cagr', 'N/A'))}\n"
-                f"1Y Rev Growth: {reporting.fmt(adv.get('rev_growth', 'N/A'))} | 1Y EPS Growth: {reporting.fmt(adv.get('eps_growth', 'N/A'))}\n"
-                f"Forward Catalyst Score (FCS): {adv.get('fcs_score', 0)}/5 ({adv.get('fcs_rationale', 'No catalysts')}) | Next Earnings: {adv.get('next_earnings', 'Unknown')}\n"
+                f"Current Price: {reporting.fmt_dol(live_price)} | Target: {reporting.fmt_dol(pt)} (Upside: {implied_upside}) | PT Range: {reporting.fmt_dol(adv.get('target_low', 'N/A'))}–{reporting.fmt_dol(adv.get('target_high', 'N/A'))}\n"
+                f"3Y Return: {reporting.fmt(adv.get('3y_cagr', 'N/A'))}\n"
+                f"{_format_equity_kpi_line(adv, qqq_3m_float)}\n"
+                f"Forward Catalyst Score (FCS): {adv.get('fcs_score', 0)}/5 ({adv.get('fcs_rationale', 'No catalysts')}) | "
+                f"Next Earnings: {adv.get('next_earnings', 'Unknown')}{earn_extra}\n"
             )
             board_portfolio_lines.append(line)
 
@@ -230,14 +297,16 @@ async def run_prepare(run_id: str = None) -> dict:
             fcs_score_val = adv.get('fcs_score', 0)
             fcs_rationale_val = adv.get('fcs_rationale', '')
             next_earn_val = adv.get('next_earnings', 'Unknown')
-            fwd_pe_val = adv.get('fwd_pe', 'N/A')
             wl_lines.append(
-                f"* {sym}: Price: ${d['price']} | PE: {fwd_pe_val} | Target: {reporting.fmt_dol(pt)} (Upside: {implied_upside}) | 3M Trend: {reporting.fmt(adv.get('3m_trend', 'N/A'))} | Rev Growth: {reporting.fmt(adv.get('rev_growth', 'N/A'))} | EPS Growth: {reporting.fmt(adv.get('eps_growth', 'N/A'))} | FCS: {fcs_score_val}/5 ({fcs_rationale_val}) | Next Earnings: {next_earn_val}."
+                f"* {sym}: Price: ${d['price']} | Target: {reporting.fmt_dol(pt)} (Upside: {implied_upside}) | "
+                f"{_format_equity_kpi_line(adv, qqq_3m_float)} | "
+                f"FCS: {fcs_score_val}/5 ({fcs_rationale_val}) | Next Earnings: {next_earn_val}."
             )
         watchlist_str = "\n".join(wl_lines) if wl_lines else "None available."
 
         mega_prompt = (
             f"[CURRENT SYSTEM DATE: {now_local().strftime('%B %d, %Y')}]\n\n"
+            f"{regime_block}"
             f"=== LIVE MARKET HEADLINES ===\n{news_feed}\n\n"
             f"=== CURRENT PORTFOLIO ===\n{portfolio_str}\n\n"
             f"=== APPROVED WATCHLIST TARGETS ===\n{watchlist_str}\n"

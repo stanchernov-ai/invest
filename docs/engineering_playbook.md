@@ -37,9 +37,13 @@
 ## 3. Data & APIs
 
 ### FMP (Financial Modeling Prep)
+- **Canonical reference:** `docs/fmp_data_dictionary.md` — field map, **known bad URLs**, excluded keys, action backlog. Re-run `tools/validate_fmp_fields.py` after plan changes. (2026-05-28)
 - **Account = Starter tier, no bulk endpoints.** Many FMP endpoints were **deprecated in 2025**. *Validate any endpoint against this account before building on it.* (2026-05-28)
-- **Working EOD endpoint:** `stable/historical-price-eod/light` — used for 3M momentum and the TWR price series. (2026-05-28)
-- **Class-share symbol normalization:** FMP expects `BRK-B`, not `BRK.B`. *Apply `sym.replace(".", "-")` before FMP calls.* (2026-05-28)
+- **Dead stable URLs (404 — do not call):** `/stable/rating`, `/stable/earning_calendar`. Use `grades-consensus` + `earnings` instead. (2026-05-28)
+- **Shared EOD cache:** prepare calls `prefetch_eod_cache()` once (~1095d); `get_fmp_advanced_metrics` + `history.build_account_returns` slice the same series. *Don't add per-symbol EOD fetches without going through the cache.* (2026-05-28)
+- **Working EOD endpoint:** `stable/historical-price-eod/light` — 3M momentum, 3Y CAGR, TWR. (2026-05-28)
+- **Class-share symbol normalization:** FMP expects `BRK-B`, not `BRK.B`. *Use `to_fmp_symbol()` in `fmp_client`.* (2026-05-28)
+- **Empty `[]` ≠ yfinance fallback** for consensus/earnings when profile succeeded — code must hit alternate endpoints or lazy-load yfinance for those fields only. (2026-05-28)
 - **Cap concurrency** with `asyncio.Semaphore(5)` on FMP calls to avoid rate limits within the Azure window. (2026-05-28)
 
 ### yfinance / Yahoo

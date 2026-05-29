@@ -336,8 +336,10 @@ flowchart LR
 | `3m_trend` | FMP stable EOD (light) momentum % |
 | `3y_cagr` | Placeholder `"N/A"` (reserved) |
 | `rev_growth`, `eps_growth` | FMP financial-growth, else yfinance |
-| `consensus`, `price_target` | FMP rating + price-target-consensus |
-| `next_earnings` | Nearest future date from `earning_calendar` |
+| `consensus`, `price_target` | FMP grades-consensus + price-target-consensus |
+| `next_earnings`, `eps_estimated` | Nearest future row from `earnings` |
+| `roe`, `fcf_yield` | FMP key-metrics-ttm |
+| `sector`, `pct_off_52w_high` | profile + quote |
 | `beta` | Profile or yfinance |
 | `fcs_score`, `fcs_rationale` | Rule-based Forward Catalyst Score (see below) |
 
@@ -497,9 +499,9 @@ The metaphor layer (Buffett, Livermore, etc.) is not decorative: prompts encode 
 | Quote | `GET /stable/quote?symbol=` |
 | Key metrics TTM | `GET /stable/key-metrics-ttm?symbol=` |
 | Ratios TTM | `GET /stable/ratios-ttm?symbol=` |
-| Analyst rating | `GET /stable/rating?symbol=` |
+| Analyst consensus | `GET /stable/grades-consensus?symbol=` (replaces dead `/stable/rating`) |
 | Price target consensus | `GET /stable/price-target-consensus?symbol=` |
-| Earnings calendar | `GET /stable/earning_calendar?symbol=` |
+| Earnings (per symbol) | `GET /stable/earnings?symbol=` (replaces dead `/stable/earning_calendar`) |
 | Financial growth | `GET /stable/financial-growth?symbol=` |
 | 3M momentum | `GET /stable/historical-price-eod/light?symbol=&from=&to=` |
 | Macro hedge | `GET /stable/quote?symbol=TLT` and `VXX` |

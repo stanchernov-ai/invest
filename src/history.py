@@ -24,7 +24,7 @@ import datetime
 import asyncio
 
 from src.config.settings import DATA_DIR
-from src.data.fmp_client import fetch_price_series
+from src.data.fmp_client import fetch_price_series, eod_cache_lookup, slice_price_series, to_fmp_symbol
 from src.pipeline import clean_num, _get_col, build_account_holdings, ACCOUNT_ORDER, FIDELITY_ACCOUNT_MAP
 
 logger = logging.getLogger(__name__)
@@ -139,7 +139,25 @@ def _forward_fill_prices(series, global_dates):
     return aligned
 
 
-async def build_account_returns(data_dir=None, api_key=None, session=None, window_days=370):
+def collect_symbol_universe(data_dir=None) -> set:
+    """Tradeable symbols from current holdings + activity files (no network I/O)."""
+    data_dir = data_dir or DATA_DIR
+    holdings = build_account_holdings(data_dir)
+    events = parse_share_events(data_dir)
+    universe = set()
+    for acct in ACCOUNT_ORDER:
+        for sym, info in holdings.get(acct, {}).items():
+            if _is_tradeable_symbol(sym):
+                universe.add(sym)
+        for sym in events.get(acct, {}):
+            if _is_tradeable_symbol(sym):
+                universe.add(sym)
+    return universe
+
+
+async def build_account_returns(
+    data_dir=None, api_key=None, session=None, window_days=370, eod_cache=None
+):
     """Compute time-weighted YTD + trailing-12M returns per account and total.
 
     Returns a dict ready to persist/render, or None on hard failure. Never raises
@@ -170,27 +188,44 @@ async def build_account_returns(data_dir=None, api_key=None, session=None, windo
             logger.warning("History engine: no symbols to value.")
             return None
 
-        # Fetch benchmark indices first (before the heavier per-holding series) so
-        # starter-tier rate limits don't leave SPY/QQQ empty at the end.
-        spy_series = await fetch_price_series("SPY", api_key, session, start_str, end_str)
-        qqq_series = await fetch_price_series("QQQ", api_key, session, start_str, end_str)
+        def _series_for(sym: str) -> dict:
+            cached = eod_cache_lookup(eod_cache, sym)
+            if cached:
+                return slice_price_series(cached, start_str, end_str)
+            return {}
 
-        # Cap concurrency so the extra EOD calls don't trip FMP starter-tier rate
-        # limits (which would trigger long exponential backoff against the 10-min
-        # Azure Functions budget).
-        sem = asyncio.Semaphore(5)
-
-        async def _fetch(sym):
-            async with sem:
-                # FMP uses a hyphen for share-class tickers (e.g. BRK.B -> BRK-B).
-                fmp_sym = sym.replace(".", "-")
-                return await fetch_price_series(fmp_sym, api_key, session, start_str, end_str)
+        spy_series = _series_for("SPY")
+        qqq_series = _series_for("QQQ")
+        if not spy_series:
+            spy_series = await fetch_price_series("SPY", api_key, session, start_str, end_str)
+        if not qqq_series:
+            qqq_series = await fetch_price_series("QQQ", api_key, session, start_str, end_str)
 
         symbols = sorted(symbol_universe)
-        price_results = await asyncio.gather(*[_fetch(s) for s in symbols], return_exceptions=True)
         prices = {}
-        for sym, res in zip(symbols, price_results):
-            prices[sym] = res if isinstance(res, dict) else {}
+        missing = []
+        for sym in symbols:
+            sliced = _series_for(sym)
+            if sliced:
+                prices[sym] = sliced
+            else:
+                missing.append(sym)
+
+        if missing:
+            sem = asyncio.Semaphore(5)
+
+            async def _fetch(sym):
+                async with sem:
+                    return sym, await fetch_price_series(
+                        to_fmp_symbol(sym), api_key, session, start_str, end_str
+                    )
+
+            fetched = await asyncio.gather(*[_fetch(s) for s in missing], return_exceptions=True)
+            for item in fetched:
+                if isinstance(item, Exception):
+                    continue
+                sym, series = item
+                prices[sym] = series if isinstance(series, dict) else {}
 
         global_dates = sorted({d for series in prices.values() for d in series.keys() if start_str <= d <= end_str})
         if len(global_dates) < 2:
