@@ -7,6 +7,8 @@ globs: *
 
 Whenever you start a new conversation or session, your VERY FIRST action should be to read the `docs/action_tracker.md` file — especially the **"Session Handoff"** section at the top if present (current pickup point for in-progress work).
 
+For the full doc map (which file to read or update), see `docs/DOCUMENTATION.md`.
+
 This file acts as the central source of truth for the project, tracking:
 - Completed work
 - Ongoing bugs

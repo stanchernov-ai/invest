@@ -19,6 +19,7 @@ This document tracks identified bugs, architectural improvements, and long-term 
 | **P1 — `11ee4d9`** | `src/verdict_memory.py` — chairman **Pass** watchlist cooldown after compliance-approved deliver; removed dead `save_memory()` / `save_verdict_history()` |
 | **Scout fix** | `prepare.py` parses CSV before scout; `run_scout_pipeline(owned_tickers=…)` — dropped dead `ledger_state.json` read |
 | **Docs** | `agent_architecture.md` §3.6, `technical_solution.md` §1.3/§2.4, `engineering_playbook.md` verdict-memory entry |
+| **Post-deliver loop** | `docs/post_deliver_checklist.md` + `tools/run_retrospective.py` — candidate action items from QA + human review |
 
 ### Verdict memory rules (SSOT behavior)
 
@@ -32,6 +33,7 @@ This document tracks identified bugs, architectural improvements, and long-term 
 1. ~~**Commit + push P1**~~ **DONE** — `11ee4d9` on `main`; GitHub Actions deploy on push.
 2. **Validate on a real run:** after deliver, confirm `board_verdicts.json` in Azure state container updates with Pass entries.
 3. ~~**First human review** on a live run~~ **DONE** — run `20260529_095341`; blob + ledger confirmed.
+4. **After each deliver:** follow [`post_deliver_checklist.md`](post_deliver_checklist.md) → `tools/run_retrospective.py --run-id … --fetch --write-insights`.
 
 ### Open items (ordered — see also full backlog below)
 
@@ -58,11 +60,15 @@ This document tracks identified bugs, architectural improvements, and long-term 
 
 ## Documentation index
 
+> **Master index:** [`DOCUMENTATION.md`](DOCUMENTATION.md) — full map of all docs, SSOT rules, and when to update each file.
+
 | Document | Use when |
 |----------|----------|
+| [`DOCUMENTATION.md`](DOCUMENTATION.md) | Unsure which doc to read or update |
 | [`agent_architecture.md`](agent_architecture.md) | Agent diagrams, inventory, QA layers — **update when roster changes** |
 | [`technical_solution.md`](technical_solution.md) | System design, data layer, deploy |
 | [`engineering_playbook.md`](engineering_playbook.md) | Before retrying a rejected approach |
+| [`post_deliver_checklist.md`](post_deliver_checklist.md) | After every deliver — retrospective + backlog hygiene |
 | [`fmp_data_dictionary.md`](fmp_data_dictionary.md) | FMP endpoints and field map |
 | [`.cursorrules`](../.cursorrules) §0.5 | **Collaboration protocol** — ask when unsure; MCQ recommended-first + free-text last |
 | [`.cursorrules`](../.cursorrules) §1 | Azure `QA_REVIEW_*` app settings + correct hostname |

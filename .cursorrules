@@ -9,6 +9,8 @@
 2. Skim `docs/engineering_playbook.md` before retrying any rejected approach.
 3. Load `.cursor/agent_state/ecosystem_state.json` when auditing or resuming a blocked cycle.
 4. When adding or removing agents, update `docs/agent_architecture.md`.
+5. Unsure which doc to read or update? See `docs/DOCUMENTATION.md` (master index).
+6. Production agent roster and QA diagrams: `docs/agent_architecture.md` — not duplicated here.
 **Do not** treat terminal scrollback as state. Log durable findings to the state files in Section 3.
 
 ## 0.5 Collaboration Protocol
@@ -27,7 +29,17 @@ Stan and the agent work as a team. When intent, scope, trade offs, or implementa
 4. Last option is always free text for human override.
 5. Wait for answers before implementing.
 
-## 1. Core Directives and Failsafes
+## 0.6 Prioritization — easy wins first
+
+When recommending next work, backlog ordering, or MCQ options:
+
+* **Default sort:** highest **impact ÷ effort** first — small diffs that unlock a lot (context hygiene, dead-code removal, single-file fixes, doc SSOT clarity) before large refactors.
+* **Prefer:** reuse existing modules, deterministic Python over new prompts, changes provable with current tests, docs that reduce repeated agent reads.
+* **Defer unless blocking:** multi-file extractions, new abstractions, framework rewrites, or "nice architecture" without a near-term payoff.
+* **Label options** in §0.5 with impact/effort in plain language when trade-offs differ (e.g. "Quick win — 20 lines" vs "Large refactor — many files").
+* **Backlog writes:** add easy-win candidates to `action_tracker.md` before epics; mark effort (S/M/L) when proposing new items.
+
+---
 * **The Two Strike Rule.** No sub agent may autonomously iterate on the same file and problem more than twice. On strike three, hard stop, append a conflict record to `ecosystem_state.json`, and escalate to human.
 * **Supervisor Tie Break and Deadlock Timeout.** When the QA Validation and Refactoring Agents disagree, the Supervisor Agent decides once. If the Supervisor fails to resolve the conflict within one attempt, it must immediately drop a lock file, hard abort the loop, and wait for Stan. No infinite loops.
 * **Code over Prompts.** Rules protecting data integrity or financial limits must be deterministic Python, never prompt only.

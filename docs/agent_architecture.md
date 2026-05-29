@@ -9,10 +9,12 @@
 
 | Doc | Purpose |
 |-----|---------|
+| [`DOCUMENTATION.md`](DOCUMENTATION.md) | **Master index** — which doc to read or update |
 | [`.cursorrules`](../.cursorrules) | Guardrails, Cursor sub-agents, triggers, failsafes |
 | [`technical_solution.md`](technical_solution.md) | End-to-end system design, data layer, deploy |
 | [`engineering_playbook.md`](engineering_playbook.md) | Rejected approaches — read before retrying |
 | [`action_tracker.md`](action_tracker.md) | Backlog and Session Handoff |
+| [`post_deliver_checklist.md`](post_deliver_checklist.md) | After every deliver — retrospective + backlog hygiene |
 
 ---
 
@@ -23,7 +25,7 @@ Update **`docs/agent_architecture.md`** whenever you change any of the following
 | Change | What to update here |
 |--------|---------------------|
 | Add/remove/rename agent in `src/core/agents.py` | §3 runtime roster, §5 agent counts |
-| Add/remove Cursor rule in `.cursor/rules/` | §2 Cursor plane, §4 trigger table |
+| Add/remove Cursor rule in `.cursor/rules/` | §2 rule file table; `.cursorrules` if mandate/trigger changes |
 | New pipeline phase or job split | §3 production flow diagram |
 | QA agent or validation layer change | §6 QA stack, §7–§8 golden fixtures |
 | Agent promoted 🟡 → 🟢 (code-enforced) | §8 enforcement legend + roster notes |
@@ -87,50 +89,24 @@ flowchart TB
 
 ---
 
-## 2. Cursor dev agents
+## 2. Cursor dev plane
 
-Configured in `.cursor/rules/` and orchestrated per `.cursorrules` §4–§5.
+**Guardrails, sub-agent mandates, execution triggers, and invocation pattern:** [`.cursorrules`](../.cursorrules) §2–§5 — **do not duplicate here.**
 
-```mermaid
-flowchart LR
-    subgraph Triggers
-        SESSION[Session start]
-        EDIT[Edit src/**]
-        COMMIT[git commit]
-        PUSH[pre-push / PR]
-        POSTJOB[After pipeline run]
-        DAILY[Daily / on-demand]
-    end
+Thin persona triggers (implementation detail only):
 
-    subgraph Agents
-        BOOT[Bootstrap only]
-        REF2[Refactoring — advisory]
-        QA2[QA Validation]
-        API2[API Optimization]
-        DI2[Data Insight]
-        SUP2[Supervisor]
-    end
+| Rule file | Persona |
+|-----------|---------|
+| `.cursor/rules/action_tracker.mdc` | Session bootstrap → read `action_tracker.md` |
+| `.cursor/rules/refactoring_agent.mdc` | Refactoring Agent |
+| `.cursor/rules/qa_validation_agent.mdc` | QA Validation Agent |
+| `.cursor/rules/api_optimization_agent.mdc` | API Optimization Agent |
+| `.cursor/rules/data_insight_agent.mdc` | Data Insight Agent |
+| `.cursor/rules/supervisor_agent.mdc` | Supervisor Agent |
 
-    SESSION --> BOOT
-    EDIT --> REF2
-    COMMIT --> QA2
-    PUSH --> QA2 & SUP2
-    POSTJOB --> API2 & DI2 & SUP2
-    DAILY --> SUP2
-```
+**Blocking hook:** `scripts/pre_commit_check.py` · **Machine ledger:** `.cursor/agent_state/ecosystem_state.json` (see `.cursorrules` §3).
 
-| Agent | File | When | Blocking? |
-|-------|------|------|-----------|
-| **Action Tracker** | `action_tracker.mdc` | Every session | Read-only context |
-| **Refactoring** | `refactoring_agent.mdc` | Edits to `src/**`; pre-commit | Hook blocks |
-| **QA Validation** | `qa_validation_agent.mdc` | Pre-commit; pre-push | Hook blocks |
-| **API Optimization** | `api_optimization_agent.mdc` | Post-job only | Advisory |
-| **Data Insight** | `data_insight_agent.mdc` | Post-job only | Advisory |
-| **Supervisor** | `supervisor_agent.mdc` | pre_push, post_job, daily | Synthesis |
-
-**Task vehicles** (not personas): `explore`, `shell`, `generalPurpose`, `ci-investigator`.
-
-**Communication:** append-only `ecosystem_state.json` + human docs (`action_tracker.md`). Agents do not message each other directly.
+See §1 for how the Cursor plane connects to production and weekly QA.
 
 ---
 
@@ -525,4 +501,4 @@ Areas with **multiple owners** — track reductions in `action_tracker.md`:
 | May 29, 2026 | QA agent scorecard → `QA_SCORECARD` telemetry + `qa_scorecards[]` in ecosystem state |
 | May 29, 2026 | `data_oracle` → deterministic Python; debate skips duplicate run |
 | May 29, 2026 | Visual QA golden fixtures + `src/qa/visual_audit.py` |
-| May 29, 2026 | This document created as agent-diagram SSOT |
+| May 29, 2026 | `docs/DOCUMENTATION.md` master index; §2 trimmed — Cursor dev SSOT → `.cursorrules` only |
