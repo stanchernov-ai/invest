@@ -25,7 +25,7 @@
 | `ce577bf` | Dark green/red gain-loss palette on white (pies + TWR table); bar Y-axis `Return (%)`; hide bar legend |
 | `a91b05a` | Move **State of the Union** before Action Plan; CAGR `12.00%` not `12.00 percent` |
 | `41cc31d` | Remove pie chart top legends (`plugins.legend: false` boolean); taller pie canvas 600×420 |
-| *(pending push)* | Dark canvas line + bar charts; compact date labels; visible bar `%` datalabels |
+| `3f66433` | Dark canvas line + bar charts; compact `May '25` dates; bar `%` datalabels; handout doc |
 
 ### Validation runs
 
