@@ -63,6 +63,72 @@ class RunStatusTests(unittest.TestCase):
                 payload = json.load(f)
             self.assertEqual(payload["run_id"], "20260529_120049")
 
+    @patch.object(storage_client, "get_blob_service_client", return_value=None)
+    def test_mark_phase_queued_keeps_overall_running(self, _mock_client):
+        with patch.object(storage_client, "DATA_DIR", self.data_dir):
+            storage_client.begin_run_status("20260529_120049", "2026-05-29T12:00:49-07:00")
+            storage_client.mark_phase(
+                "20260529_120049",
+                "prepare",
+                "success",
+                finished_at="2026-05-29T12:05:00-07:00",
+            )
+            status = storage_client.mark_phase(
+                "20260529_120049",
+                "debate",
+                "queued",
+                started_at="2026-05-29T12:05:01-07:00",
+            )
+
+        self.assertEqual(status["status"], "running")
+        self.assertEqual(status["phase"], "debate")
+        self.assertEqual(status["debate"]["status"], "queued")
+
+    @patch.object(storage_client, "get_blob_service_client", return_value=None)
+    def test_abort_run_marks_terminal(self, _mock_client):
+        with patch.object(storage_client, "DATA_DIR", self.data_dir):
+            storage_client.begin_run_status("20260529_120049", "2026-05-29T12:00:49-07:00")
+            storage_client.mark_phase(
+                "20260529_120049",
+                "prepare",
+                "success",
+                finished_at="2026-05-29T12:05:00-07:00",
+            )
+            storage_client.mark_phase(
+                "20260529_120049",
+                "debate",
+                "queued",
+                started_at="2026-05-29T12:05:01-07:00",
+            )
+            status = storage_client.abort_run(
+                "20260529_120049",
+                reason="stale run",
+                finished_at="2026-05-29T12:50:00-07:00",
+            )
+
+        self.assertEqual(status["status"], "aborted")
+        self.assertEqual(status["debate"]["status"], "aborted")
+        self.assertIsNone(storage_client.is_run_in_flight())
+
+    @patch.object(storage_client, "get_blob_service_client", return_value=None)
+    @patch("src.config.settings.now_local")
+    def test_abort_stale_run_if_needed(self, mock_now, _mock_client):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        tz = ZoneInfo("America/Los_Angeles")
+        mock_now.return_value = datetime(2026, 5, 29, 12, 50, 0, tzinfo=tz)
+        with patch.object(storage_client, "DATA_DIR", self.data_dir):
+            storage_client.begin_run_status("20260529_120049", "2026-05-29T12:45:00-07:00")
+            self.assertIsNone(storage_client.abort_stale_run_if_needed(max_age_seconds=600))
+
+            storage_client.begin_run_status("20260529_110000", "2026-05-29T11:00:00-07:00")
+            aborted = storage_client.abort_stale_run_if_needed(max_age_seconds=600)
+
+        self.assertEqual(aborted["run_id"], "20260529_110000")
+        self.assertEqual(aborted["status"], "aborted")
+        self.assertIn("stale run", aborted["error"])
+
 
 if __name__ == "__main__":
     unittest.main()

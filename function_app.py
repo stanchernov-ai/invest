@@ -31,6 +31,38 @@ STATE_CONTAINER = "boardroom-state"
 PHASE_SOFT_TIMEOUT_SECONDS = 540
 
 
+def _enqueue_phase(run_id: str, phase: str) -> None:
+    """Record that the next phase was handed off to a Storage Queue."""
+    from src import storage_client
+    from src.config.settings import now_local
+
+    storage_client.mark_phase(run_id, phase, "queued", started_at=now_local().isoformat())
+
+
+def _guard_timer_prepare() -> bool:
+    """Abort stale runs, then skip timer kickoff if another run is still in flight."""
+    from src import storage_client
+
+    aborted = storage_client.abort_stale_run_if_needed()
+    if aborted:
+        logging.warning(
+            "Aborted stale run %s before timer prepare: %s",
+            aborted.get("run_id"),
+            aborted.get("error"),
+        )
+
+    in_flight = storage_client.is_run_in_flight()
+    if in_flight:
+        logging.warning(
+            "Timer prepare skipped — run %s still %s in phase %s.",
+            in_flight.get("run_id"),
+            in_flight.get("status"),
+            in_flight.get("phase"),
+        )
+        return False
+    return True
+
+
 def _new_run_id() -> str:
     from src.config.settings import now_local
     return now_local().strftime('%Y%m%d_%H%M%S')
@@ -61,7 +93,29 @@ def _run_phase(coro, run_id: str, phase: str) -> bool:
         return False
     except Exception as e:
         logging.error(f"[{phase.upper()}] Unhandled error: {e}")
+        try:
+            storage_client.mark_phase(run_id, phase, "failed",
+                                      finished_at=now_local().isoformat(),
+                                      error=str(e))
+        except Exception as mark_err:
+            logging.error(f"Could not record {phase} failure status: {mark_err}")
         return False
+
+
+# --------------------------------------------------------------------------- #
+# Stale-run watchdog — abort runs stuck in 'running' beyond the E2E ceiling.  #
+# --------------------------------------------------------------------------- #
+@app.timer_trigger(schedule="0 */15 * * * *", arg_name="watchdogTimer", run_on_startup=False, use_monitor=False)
+def boardroom_stale_run_watchdog(watchdogTimer: func.TimerRequest) -> None:
+    from src import storage_client
+
+    aborted = storage_client.abort_stale_run_if_needed()
+    if aborted:
+        logging.warning(
+            "Stale-run watchdog aborted run %s: %s",
+            aborted.get("run_id"),
+            aborted.get("error"),
+        )
 
 
 # --------------------------------------------------------------------------- #
@@ -123,9 +177,12 @@ def _kickoff_prepare(run_id: str) -> bool:
 @app.queue_output(arg_name="debateOut", queue_name=DEBATE_QUEUE, connection="AzureWebJobsStorage")
 def boardroom_prepare(myTimer: func.TimerRequest, debateOut: func.Out[str]) -> None:
     logging.info("Waking up the Board of Directors. Initiating PREPARE phase.")
+    if not _guard_timer_prepare():
+        return
     run_id = _new_run_id()
     if _kickoff_prepare(run_id):
         debateOut.set(run_id)
+        _enqueue_phase(run_id, "debate")
         logging.info(f"Prepare succeeded; enqueued debate for run {run_id}.")
 
 
@@ -134,6 +191,14 @@ def boardroom_prepare(myTimer: func.TimerRequest, debateOut: func.Out[str]) -> N
 def boardroom_prepare_http(req: func.HttpRequest, debateOut: func.Out[str]) -> func.HttpResponse:
     """Manual kickoff of the full chain. Rejects concurrent runs (409); re-runs after terminal states OK."""
     from src import storage_client
+
+    aborted = storage_client.abort_stale_run_if_needed()
+    if aborted:
+        logging.warning(
+            "Aborted stale run %s before HTTP prepare: %s",
+            aborted.get("run_id"),
+            aborted.get("error"),
+        )
 
     in_flight = storage_client.is_run_in_flight()
     if in_flight:
@@ -153,6 +218,7 @@ def boardroom_prepare_http(req: func.HttpRequest, debateOut: func.Out[str]) -> f
     ok = _run_phase(run_prepare(run_id=run_id), run_id, "prepare")
     if ok:
         debateOut.set(run_id)
+        _enqueue_phase(run_id, "debate")
         return func.HttpResponse(f"prepare ok; debate enqueued for {run_id}", status_code=202)
     return func.HttpResponse(f"prepare failed for {run_id}", status_code=500)
 
@@ -168,6 +234,7 @@ def boardroom_debate(msg: func.QueueMessage, deliverOut: func.Out[str]) -> None:
     logging.info(f"DEBATE phase triggered for run {run_id}.")
     if _run_phase(run_debate(run_id), run_id, "debate"):
         deliverOut.set(run_id)
+        _enqueue_phase(run_id, "deliver")
         logging.info(f"Debate succeeded; enqueued deliver for run {run_id}.")
 
 
@@ -180,6 +247,7 @@ def boardroom_debate_http(req: func.HttpRequest, deliverOut: func.Out[str]) -> f
         return func.HttpResponse("missing run_id", status_code=400)
     if _run_phase(run_debate(run_id), run_id, "debate"):
         deliverOut.set(run_id)
+        _enqueue_phase(run_id, "deliver")
         return func.HttpResponse(f"debate ok; deliver enqueued for {run_id}", status_code=202)
     return func.HttpResponse(f"debate failed for {run_id}", status_code=500)
 

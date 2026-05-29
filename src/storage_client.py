@@ -26,6 +26,9 @@ def _run_status_local_path(filename: str) -> str:
 # own Azure Function invocation with its own 10-minute ceiling.
 PHASES = ("prepare", "debate", "deliver")
 
+# End-to-end ceiling: 3 phases × 540s soft timeout + queue/hand-off slack.
+STALE_RUN_MAX_SECONDS = 45 * 60
+
 # Only these state singletons are pulled on a sync. Historical run artifacts
 # (api_telemetry_*.json, qa_dashboard_*, raw_debate_log_*, and the runs/ phase
 # checkpoints) are intentionally excluded — downloading every past telemetry
@@ -117,6 +120,71 @@ def is_run_in_flight() -> dict | None:
     if status and status.get("status") == "running":
         return status
     return None
+
+
+def _parse_iso_datetime(value: str | None):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+
+def abort_run(run_id: str, *, reason: str, finished_at: str) -> dict:
+    """Mark a run as aborted (terminal). Used when a watchdog detects a stale run."""
+    status = load_run_status_for_run(run_id) or {}
+    if status.get("run_id") != run_id:
+        status = _base_run_status(run_id, finished_at)
+
+    status["status"] = "aborted"
+    status["error"] = reason
+    status["finished_at"] = finished_at
+
+    phase = status.get("phase")
+    if phase in PHASES:
+        entry = status.get(phase) or {}
+        if entry.get("status") in (None, "running", "queued"):
+            entry["status"] = "aborted"
+            entry["finished_at"] = finished_at
+            entry["error"] = reason
+            status[phase] = entry
+
+    save_run_status_for_run(run_id, status)
+    current = load_run_status()
+    if not current or current.get("run_id") == run_id:
+        save_run_status(status)
+    return status
+
+
+def abort_stale_run_if_needed(max_age_seconds: int = STALE_RUN_MAX_SECONDS) -> dict | None:
+    """If the current pointer run has been non-terminal too long, mark it aborted."""
+    from src.config.settings import now_local
+
+    status = load_run_status()
+    if not status or status.get("status") != "running":
+        return None
+
+    run_id = status.get("run_id")
+    started = _parse_iso_datetime(status.get("started_at"))
+    if not run_id or started is None:
+        return None
+
+    now = now_local()
+    if started.tzinfo is None and now.tzinfo is not None:
+        started = started.replace(tzinfo=now.tzinfo)
+    elif started.tzinfo is not None and now.tzinfo is None:
+        now = now.replace(tzinfo=started.tzinfo)
+
+    age = (now - started).total_seconds()
+    if age <= max_age_seconds:
+        return None
+
+    reason = (
+        f"stale run: no terminal status after {int(age)}s "
+        f"(limit {max_age_seconds}s)"
+    )
+    return abort_run(run_id, reason=reason, finished_at=now.isoformat())
 
 def get_blob_service_client():
     if not settings.AZURE_CONN_STR:
@@ -248,9 +316,9 @@ def mark_phase(run_id: str, phase: str, phase_status: str, *,
                **extra) -> dict:
     """Update one phase's sub-status and the overall run status in one place.
 
-    Overall `status` becomes 'failed' if any phase fails, and 'success' only when
-    the deliver phase succeeds. Intermediate phase success keeps overall 'running'
-    so existing monitors (wait_for_run.py) wait for the full run."""
+    Overall `status` becomes 'failed' if any phase fails, 'aborted' when explicitly
+    aborted, and 'success' only when the deliver phase succeeds. Intermediate phase
+    success or 'queued' keeps overall 'running' so monitors wait for the full run."""
     status = load_run_status_for_run(run_id) or {}
     if status.get("run_id") != run_id:
         status = _base_run_status(run_id, started_at or finished_at or "")
@@ -271,6 +339,10 @@ def mark_phase(run_id: str, phase: str, phase_status: str, *,
     status["phase"] = phase
     if phase_status == "failed":
         status["status"] = "failed"
+        status["error"] = error
+        status["finished_at"] = finished_at
+    elif phase_status == "aborted":
+        status["status"] = "aborted"
         status["error"] = error
         status["finished_at"] = finished_at
     elif phase == "deliver" and phase_status == "success":
