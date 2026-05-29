@@ -85,6 +85,20 @@ class ChartColorTests(unittest.TestCase):
         self.assertEqual(len(colors), 3)
         self.assertNotEqual(colors[0], colors[-1])
 
+    def test_pie_charts_hide_legend_and_use_taller_canvas(self):
+        ledger = [
+            ("A", {"Total": 5000, "Personal_Return_Pct": 8.0}),
+            ("B", {"Total": 6000, "Personal_Return_Pct": 22.0}),
+        ]
+        with patch.object(reporting, "get_quickchart_short_url", return_value="https://example.com/pie.png") as mock_url:
+            reporting.build_portfolio_pie_chart(ledger)
+        opts = mock_url.call_args[0][0]["options"]
+        self.assertIs(opts["plugins"]["legend"], False)
+        self.assertFalse(opts["legend"]["display"])
+        self.assertFalse(opts["plugins"]["datalabels"]["display"])
+        self.assertEqual(mock_url.call_args[1]["width"], reporting.PIE_CHART_WIDTH)
+        self.assertEqual(mock_url.call_args[1]["height"], reporting.PIE_CHART_HEIGHT)
+
     def test_bar_chart_hides_legend_and_labels_y_axis(self):
         ledger = [
             ("AAPL", {"Personal_Return_Pct": 10.0}),

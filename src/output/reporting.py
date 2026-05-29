@@ -207,6 +207,38 @@ LOSS_RED_HIGH = "#b91c1c"    # lighter of the two reds (still saturated)
 LOSS_RED_LOW = "#450a0a"     # darker red
 CHART_LABEL_ON_SLICE = "#ffffff"
 CHART_LABEL_ON_AXIS = "#111827"
+PIE_CHART_WIDTH = 600
+PIE_CHART_HEIGHT = 420
+
+
+def _outlabeled_pie_options() -> dict:
+    """QuickChart outlabeledPie — legend must be boolean false, not {display: false}."""
+    return {
+        "plugins": {
+            "legend": False,
+            "datalabels": {"display": False},
+            "outlabels": {
+                "text": "%l %p",
+                "color": CHART_LABEL_ON_SLICE,
+                "stretch": 35,
+                "font": {"resizable": True, "minSize": 11, "maxSize": 16, "weight": "bold"},
+            },
+        },
+        "legend": {"display": False},
+        "layout": {"padding": {"top": 8, "bottom": 8, "left": 8, "right": 8}},
+    }
+
+
+def _render_outlabeled_pie_chart(labels, data, colors):
+    chart_config = {
+        "type": "outlabeledPie",
+        "data": {
+            "labels": labels,
+            "datasets": [{"backgroundColor": colors, "data": data}],
+        },
+        "options": _outlabeled_pie_options(),
+    }
+    return get_quickchart_short_url(chart_config, width=PIE_CHART_WIDTH, height=PIE_CHART_HEIGHT)
 
 
 def colors_for_metric(values: list[float]) -> list[str]:
@@ -272,26 +304,8 @@ def build_portfolio_pie_chart(sorted_ledger):
         return ""
 
     colors = colors_for_metric(returns)
-        
-    chart_config = {
-        "type": "outlabeledPie",
-        "data": {
-            "labels": labels,
-            "datasets": [{"backgroundColor": colors, "data": data}]
-        },
-        "options": {
-            "plugins": {
-                "legend": {"display": False},
-                "outlabels": {
-                    "text": "%l %p",
-                    "color": CHART_LABEL_ON_SLICE,
-                    "stretch": 35,
-                    "font": {"resizable": True, "minSize": 11, "maxSize": 16, "weight": "bold"},
-                }
-            }
-        }
-    }
-    return get_quickchart_short_url(chart_config)
+
+    return _render_outlabeled_pie_chart(labels, data, colors)
 
 _ACCOUNT_PIE_LABELS = {
     "eTrade Taxable": "eTrade",
@@ -322,25 +336,7 @@ def build_account_allocation_pie(account_holdings, account_returns):
 
     colors = colors_for_metric(twelves)
 
-    chart_config = {
-        "type": "outlabeledPie",
-        "data": {
-            "labels": labels,
-            "datasets": [{"backgroundColor": colors, "data": data}]
-        },
-        "options": {
-            "plugins": {
-                "legend": {"display": False},
-                "outlabels": {
-                    "text": "%l %p",
-                    "color": CHART_LABEL_ON_SLICE,
-                    "stretch": 35,
-                    "font": {"resizable": True, "minSize": 11, "maxSize": 16, "weight": "bold"},
-                }
-            }
-        }
-    }
-    return get_quickchart_short_url(chart_config)
+    return _render_outlabeled_pie_chart(labels, data, colors)
 
 def build_returns_rows(account_returns):
     """Flatten the history-engine output into display rows (Total first)."""
