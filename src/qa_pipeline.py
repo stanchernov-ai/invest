@@ -15,7 +15,7 @@ import asyncio
 from google.genai import types
 
 from src.core.schemas import QAAgentReport
-from src.core.agents import call_gemini_async, agent_config, FAST_MODEL, FLASH_TOKEN_LIMIT
+from src.core.agents import call_gemini_async, agent_config, FAST_MODEL, HEAVY_MODEL, FLASH_TOKEN_LIMIT
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,9 @@ QA_INTEGRITY_TIMEOUT_SECONDS = 90
 GRAPHICS_QA_TIMEOUT_SECONDS = 120
 # Cap HTML passed to the Graphics Designer — the artifact is the saved blob, not templates.
 GRAPHICS_BRIEFING_HTML_CHAR_LIMIT = 45000
+INTEGRITY_BRIEFING_HTML_CHAR_LIMIT = 8000
+# Dashboard excerpt for LLM context only — section/finding presence is deterministic ground truth.
+INTEGRITY_DASHBOARD_HTML_CHAR_LIMIT = 12000
 
 
 def reconcile_compliance(report: dict) -> dict:
@@ -213,6 +216,10 @@ async def run_graphics_designer_qa(
         "You are reviewing the FINAL Executive Briefing artifact — the exact HTML document "
         "saved to Azure and emailed to the investor. This is NOT Python source, Jinja templates, "
         "or intermediate pipeline code.\n\n"
+        "AUDIENCE: Stan, a sophisticated retail portfolio manager — expects institutional-quality "
+        "daily briefings comparable to a top-tier sell-side morning note or family-office board pack, "
+        "NOT an internal engineering or QA report.\n\n"
+        "Also flag if this briefing would feel embarrassing forwarded to an LP, advisor, or C-level peer.\n\n"
         f"DETERMINISTIC CHART HEALTH (ground truth — never override a BROKEN chart to OK):\n{health_text}\n\n"
         f"Images attached below were extracted from this HTML (same URLs the email client loads).\n"
         f"Embedded images fetched: {len(visual_assets)}\n\n"
@@ -277,6 +284,7 @@ async def run_graphics_designer_qa(
 
 async def run_qa_integrity_audit(qa_reports, raw_log: str, chairman_json: str,
                                  qa_dashboard_html: str, *,
+                                 executive_briefing_html: str = "",
                                  model_override: str = None,
                                  timeout_seconds: int = QA_INTEGRITY_TIMEOUT_SECONDS):
     """The QA-of-the-QA: deterministic pre-checks plus LLM verdict validation.
@@ -284,11 +292,22 @@ async def run_qa_integrity_audit(qa_reports, raw_log: str, chairman_json: str,
     Deterministic layer (dashboard fidelity, coverage, self-contradiction) runs
     first via src/qa/integrity_audit.py. The LLM pass adds debate-log accuracy
     checks. Golden fixtures: tests/fixtures/integrity_qa/.
+
+    executive_briefing_html lets the integrity auditor validate Graphics Designer
+    findings against the actual investor artifact (avoids false 'missing HTML' claims).
     """
-    from src.qa.integrity_audit import build_deterministic_integrity_report, merge_integrity_reports
+    from src.qa.integrity_audit import (
+        build_deterministic_integrity_report,
+        build_evidence_context,
+        format_evidence_digest,
+        merge_integrity_reports,
+        sanitize_llm_integrity_findings,
+    )
 
     logger.info("Initiating QA Integrity Audit (QA-of-the-QA).")
     deterministic = build_deterministic_integrity_report(qa_reports, qa_dashboard_html)
+    evidence_ctx = build_evidence_context(qa_reports, qa_dashboard_html, executive_briefing_html)
+    evidence_digest = format_evidence_digest(evidence_ctx, deterministic)
 
     reports_digest = json.dumps([
         {
@@ -300,16 +319,22 @@ async def run_qa_integrity_audit(qa_reports, raw_log: str, chairman_json: str,
         for r in qa_reports
     ], default=str)
 
+    briefing_excerpt = (executive_briefing_html or "")[:INTEGRITY_BRIEFING_HTML_CHAR_LIMIT]
+    dashboard_excerpt = (qa_dashboard_html or "")[:INTEGRITY_DASHBOARD_HTML_CHAR_LIMIT]
     qa_prompt = (
+        f"{evidence_digest}\n\n"
         f"RAW DEBATE LOG (ground truth of what actually happened):\n{raw_log[:25000]}\n\n"
         f"FINAL CHAIRMAN ALLOCATION:\n{chairman_json[:8000]}\n\n"
-        f"QA AGENT REPORTS (the conclusions you must independently verify):\n{reports_digest[:15000]}\n\n"
-        f"RENDERED QA DASHBOARD HTML (what the human will actually see):\n{qa_dashboard_html[:10000]}"
+        f"QA AGENT REPORTS (verdicts to verify — do not re-parse dashboard HTML):\n{reports_digest[:15000]}\n\n"
+        f"EXECUTIVE BRIEFING HTML EXCERPT (validate Graphics Designer claims here):\n"
+        f"{briefing_excerpt or '[not provided]'}\n\n"
+        f"QA DASHBOARD HTML EXCERPT (may be truncated — trust EVIDENCE DIGEST above for fidelity):\n"
+        f"{dashboard_excerpt or '[empty]'}"
     )
     contents = [types.Content(role="user", parts=[types.Part.from_text(text=qa_prompt)])]
 
     info = agent_config["board_members"]["qa_integrity_auditor"]
-    model = model_override or FAST_MODEL
+    model = model_override or info.get("model") or HEAVY_MODEL
     config_params = {
         "system_instruction": info["system_instruction"],
         "temperature": 0.15,
@@ -326,6 +351,16 @@ async def run_qa_integrity_audit(qa_reports, raw_log: str, chairman_json: str,
         )
         parsed_res = json.loads(res.text)
         parsed_res["agent_role"] = info["role"]
+        if parsed_res.get("findings"):
+            parsed_res["findings"] = sanitize_llm_integrity_findings(
+                parsed_res["findings"], evidence_ctx
+            )
+        else:
+            parsed_res["findings"] = []
+        if not parsed_res["findings"]:
+            parsed_res["is_compliant"] = True
+            suffix = " LLM pass: no substantiated QA accuracy issues after evidence filter."
+            parsed_res["summary"] = (parsed_res.get("summary") or "").strip() + suffix
         return merge_integrity_reports(deterministic, reconcile_compliance(parsed_res))
     except asyncio.TimeoutError:
         logger.warning(f"QA Integrity Audit timed out after {timeout_seconds}s; emitting non-blocking WARNING.")

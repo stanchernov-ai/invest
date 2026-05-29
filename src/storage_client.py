@@ -235,24 +235,6 @@ def mark_phase(run_id: str, phase: str, phase_status: str, *,
     return status
 
 
-def save_memory(data):
-    client = get_blob_service_client()
-    json_str = json.dumps(data, indent=4)
-
-    filepath = os.path.join(DATA_DIR, "board_verdicts.json")
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    with open(filepath, "w") as f:
-        f.write(json_str)
-
-    if client:
-        try:
-            blob_client = client.get_blob_client(container=STATE_CONTAINER, blob="board_verdicts.json")
-            blob_client.upload_blob(json_str, overwrite=True)
-            logger.info("Memory seamlessly uploaded to Azure Blob Storage.")
-        except Exception:
-            logger.error("Failed to save memory to Azure.")
-
-
 def load_state_blob(filename: str):
     """Load a JSON or text blob from STATE_CONTAINER (Azure first, local OUTPUT_DIR fallback)."""
     client = get_blob_service_client()

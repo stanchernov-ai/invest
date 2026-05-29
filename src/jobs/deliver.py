@@ -19,6 +19,7 @@ from src.core import agent_activity
 from src.config.settings import now_local
 from src.logging_setup import configure_logging
 from src import qa_pipeline
+from src import verdict_memory
 
 logger = configure_logging()
 
@@ -127,7 +128,8 @@ async def run_deliver(run_id: str) -> dict:
             qa_reports, run_id, review_url=review_url
         )
         integrity_report = await qa_pipeline.run_qa_integrity_audit(
-            qa_reports, raw_log_combined, json.dumps(c_data), interim_qa_dashboard_html
+            qa_reports, raw_log_combined, json.dumps(c_data), interim_qa_dashboard_html,
+            executive_briefing_html=briefing_for_visual_qa,
         )
         qa_reports.append(integrity_report)
 
@@ -181,6 +183,14 @@ async def run_deliver(run_id: str) -> dict:
         storage_client.save_run_status(status)
 
         storage_client.execute_retention_policy(14)
+
+        # Watchlist Pass cooldown — only after compliance-approved debate (Markopolos gate).
+        verdict_memory.persist_chairman_watchlist_passes(
+            c_data,
+            run_id,
+            is_approved=bool(debate.get("is_approved")),
+        )
+
         logger.info(f"[DELIVER] Completed for run {run_id} in {round((finished - started).total_seconds(), 1)}s.")
         return {"run_id": run_id, "status": "success"}
 

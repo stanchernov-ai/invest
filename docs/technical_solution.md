@@ -68,13 +68,17 @@ flowchart TB
 
 | Path | Role |
 |------|------|
-| `function_app.py` | Azure Functions entry: timer trigger, distributed lock, invokes `main_batch` |
+| `function_app.py` | Azure Functions entry: timer + queue chain → `prepare` → `debate` → `deliver` |
 | `host.json` | Functions host config (10-minute timeout, App Insights sampling) |
 | `requirements.txt` | Python dependencies |
-| `src/main.py` | End-to-end batch orchestration: data prep → debate → reports → email |
-| `src/pipeline.py` | Native CSV parsing, master ledger, verdict history persistence |
+| `src/main.py` | Local E2E entry: `orchestrate.run_all()` (all three phases in-process) |
+| `src/jobs/prepare.py` | Job 1 — data prep, oracle gate, prepare checkpoint |
+| `src/jobs/debate.py` | Job 2 — board engine, debate checkpoint |
+| `src/jobs/deliver.py` | Job 3 — render, post-flight QA, email, verdict memory |
+| `src/pipeline.py` | Native CSV parsing, master ledger, account holdings |
 | `src/scout.py` | Autonomous watchlist builder (Yahoo trending + FMP fallback) |
-| `src/storage_client.py` | Azure Blob sync, report upload, 14-day retention |
+| `src/verdict_memory.py` | Cross-run `board_verdicts.json` — Pass cooldown after compliant deliver |
+| `src/storage_client.py` | Azure Blob sync, checkpoints, report upload, 14-day retention |
 | `src/core/engine.py` | State-machine debate pipeline (`StateMachineOrchestrator`, `AppWrapper`) |
 | `src/core/agents.py` | Agent personas, Gemini client, async API wrapper with semaphore |
 | `src/core/schemas.py` | Pydantic contracts for structured agent I/O and dynamic mandate |
@@ -86,8 +90,9 @@ flowchart TB
 | `src/data/knowledge/` | Personal reference notes (not in repo) |
 | `src/output/reporting.py` | Jinja2 HTML briefing + QuickChart visualizations |
 | `src/output/notifier.py` | SMTP delivery of executive briefing |
-| `logs/` | Local run logs (not part of runtime contract) |
 | `docs/` | Technical documentation (this file) |
+
+**Gitignored generated artifacts (not source):** `logs/`, `src/output/*.md`, `qa_*_latest.*`, `tools/*_probe_results.json`, `.cache/` — see `.gitignore` (commit `3eda93d`).
 
 **Runtime filesystem conventions**
 
@@ -117,36 +122,37 @@ Production runs still read/write runtime copies under `/tmp/data` and Azure `boa
 
 > **Agent diagrams, inventory, and QA layers:** see [`agent_architecture.md`](agent_architecture.md) (keep updated when the roster changes). This section covers sequence and contracts.
 
-### 2.1 End-to-End Batch Flow (`main_batch`)
+### 2.1 End-to-End Flow (split jobs + local orchestrate)
 
-The batch runner is the **single orchestration spine**. It does not use LangGraph or a third-party workflow engine; debate logic lives in a custom `StateMachineOrchestrator` exposed through `AppWrapper.astream()` for incremental yields.
+Production runs as **three Azure Functions** chained by Storage Queues (`function_app.py`). Local dev uses `python -m src.main` → `orchestrate.run_all()`. Debate logic lives in `StateMachineOrchestrator` exposed through `AppWrapper.astream()`.
 
 ```mermaid
 sequenceDiagram
-    participant M as main_batch
+    participant FA as function_app / orchestrate
+    participant PREP as prepare
+    participant DEB as debate
+    participant DEL as deliver
     participant S as storage_client
     participant P as pipeline
     participant SC as scout
-    participant FMP as fmp_client / news_client
-    participant E as StateMachineOrchestrator
-    participant R as reporting / notifier
+    participant VM as verdict_memory
 
-    M->>S: sync_inputs_from_cloud()
+    FA->>PREP: run_prepare(run_id)
+    PREP->>S: sync_inputs_from_cloud()
+    PREP->>P: process_portfolios()
     alt no daily_target_list.json
-        M->>SC: run_scout_pipeline()
+        PREP->>SC: run_scout_pipeline(owned_tickers)
     end
-    M->>P: process_portfolios()
-    M->>FMP: macro, news, per-ticker metrics (parallel)
-    Note over M: Abort if any ticker metrics fail
-    M->>M: Revalue ledger with live prices, build mega_prompt
-    M->>E: app.astream(initial_state)
-    E-->>M: oracle / full_board / synthesize / compliance
-    alt oracle invalid or compliance failed
-        M-->>M: Exit without briefing
-    end
-    M->>R: HTML briefing, save blobs, email
-    M->>E: run_post_flight_qa (3 QA agents)
-    M->>S: telemetry + retention policy
+    PREP->>S: save_checkpoint(prepare)
+    FA->>DEB: run_debate(run_id)
+    DEB->>S: load_checkpoint(prepare)
+    Note over DEB: compliance gate → is_approved
+    DEB->>S: save_checkpoint(debate)
+    FA->>DEL: run_deliver(run_id)
+    DEL->>S: load checkpoints
+    Note over DEL: post-flight QA + email
+    DEL->>VM: persist Pass watchlist if is_approved
+    DEL->>S: retention policy
 ```
 
 **Phase 0 — Input hydration**
@@ -266,12 +272,15 @@ Yields keyed stages for observability:
 
 ### 2.4 Scout Sub-Pipeline
 
-Runs when watchlist file is absent:
+Runs when `daily_target_list.json` is absent in `DATA_DIR`:
 
-1. Load `ledger_state.json` and `board_verdicts.json` from `/tmp/data`.
-2. Scrape Yahoo Finance trending tickers (or FMP technology screener fallback).
-3. Exclude owned symbols and symbols in **cooldown** after recent `Pass` verdicts (7–14 days).
-4. Write up to 15 entries to `daily_target_list.json` with placeholder price `1.0` (updated later by FMP in `main_batch`).
+1. `prepare` syncs state from Azure, then **parses brokerage CSVs** (`process_portfolios`).
+2. Scout loads `board_verdicts.json` (Pass cooldown) and receives **`owned_tickers`** from the CSV master ledger (not `ledger_state.json`).
+3. Scrape Yahoo Finance trending tickers (or FMP technology screener fallback).
+4. Exclude owned symbols and symbols in **cooldown** after recent chairman **Pass** verdicts (7 days; 14 when `unanimous_pass` — reserved, not yet wired).
+5. Write up to 15 entries to `daily_target_list.json` with placeholder price `0.0` (live prices filled in prepare via FMP).
+
+**Verdict memory write** (deliver): `src/verdict_memory.py` appends chairman watchlist **Pass** entries to `board_verdicts.json` only when `debate.is_approved` (Markopolos compliance passed). Post-flight QA does not gate persistence.
 
 ### 2.5 Data Contracts (Pydantic)
 
@@ -368,7 +377,7 @@ Returns `{"TLT": price, "VXX": price}` for macro hedge sizing context. Failures 
 | File | Purpose |
 |------|---------|
 | `daily_target_list.json` | Rich watchlist example (symbol, name, reason, price, trends, CAGR) — production watchlist is written to `/tmp/data` by Scout or synced from blob |
-| `board_verdicts.json` | Empty `{}` placeholder; runtime history lives in `/tmp/data` and `boardroom-state` |
+| `board_verdicts.json` | Append-only Pass history per symbol; repo seed `{}`; runtime + Azure `boardroom-state` |
 
 ### 2.7 Outputs and Observability
 
@@ -447,9 +456,9 @@ Email subject: `SC Invest: Executive Boardroom Briefing - {date}`.
 | **`3y_cagr` not populated** | `get_fmp_advanced_metrics` always returns `"N/A"` for 3Y CAGR though sample `daily_target_list.json` includes CAGR from another pipeline. | Wire FMP historical growth or drop unused field from prompts. |
 | **`GEMINI_API_KEY` not in `Settings.validate()`** | Runtime fails inside agents if unset, but validation message is incomplete. | Add to `validate()` alongside FMP/Azure/email. |
 | **Munger audit results discarded** | `execute_munger_audit` runs panelists but does not update `state.munger_overrides` or chairman input. | Persist audit JSON and inject into chairman prompt when concentration triggers. |
-| **Placeholder / static data in pipeline** | `sector_weights` and `dummy_qqq_trend` in `process_portfolios()` appear unused or stale vs live FMP trend in `main_batch`. | Remove dead fields or wire real sector breakdown from FMP. |
-| **Hard-coded `/tmp` paths** | Fine for Azure Functions Linux; awkward for local Windows dev. | Configurable `DATA_DIR` / `OUTPUT_DIR` env vars. |
-| **Scout price placeholder `1.0`** | Oracle would fail if scout ran without subsequent FMP refresh; `main_batch` fixes prices when FMP succeeds. | Fail fast in scout or require FMP before oracle. |
+| **Placeholder / static data in pipeline** | ~~`sector_weights` / `dummy_qqq_trend`~~ removed from `process_portfolios()`. | Wire real sector breakdown from FMP if needed. |
+| **Hard-coded `/tmp` paths** | ~~Awkward for local Windows dev.~~ | **Done** — `BOARDROOM_DATA_DIR` / `BOARDROOM_OUTPUT_DIR` in `settings.py`. |
+| **Scout price placeholder** | Scout writes `price: 0.0`; FMP fills before oracle. | Fail fast in scout if FMP unavailable before oracle (optional). |
 | **No workflow framework** | Custom state machine is readable but lacks checkpoint/resume, visual debugging, or per-step metrics. | Acceptable at current scale; consider LangGraph or durable functions if steps multiply. |
 | **Chairman loop cost** | Up to 3× (chairman + compliance) full Pro/Flash calls on rejection. | Cache board verdicts; tighten compliance schema to reduce rework. |
 | **Email as sole alert channel** | No Slack/webhook on oracle abort or compliance failure. | Optional failure notification path. |
@@ -468,7 +477,7 @@ The metaphor layer (Buffett, Livermore, etc.) is not decorative: prompts encode 
 | Variable | Used by |
 |----------|---------|
 | `GEMINI_API_KEY` | `src/core/agents.py` (now validated in `Settings.validate()`) |
-| `FMP_API_KEY` | Scout fallback, `main_batch` market data |
+| `FMP_API_KEY` | Scout fallback, prepare market data |
 | `BOARDROOM_DATA_DIR` *(optional)* | Overrides working data directory (`DATA_DIR`) |
 | `BOARDROOM_OUTPUT_DIR` *(optional)* | Overrides report output directory (`OUTPUT_DIR`) |
 | `AZURE_STORAGE_CONNECTION_STRING` | `storage_client`, `function_app` lock |
@@ -487,7 +496,9 @@ The metaphor layer (Buffett, Livermore, etc.) is not decorative: prompts encode 
 
 - Orchestrator entry: `src/core/engine.py` — `StateMachineOrchestrator`, `AppWrapper`
 - Agent registry: `src/core/agents.py` — `agent_config`, `call_gemini_async`
-- Batch entry: `src/main.py` — `main_batch`, `run_post_flight_qa`
+- Batch entry: `src/main.py` — `orchestrate.run_all()`; production: `function_app.py` queue chain
+- Post-flight QA: `src/qa_pipeline.py` + `src/jobs/deliver.py`
+- Verdict memory: `src/verdict_memory.py` (deliver, compliance-gated)
 - Scheduled entry: `function_app.py` — `boardroom_daily_run`
 - CSV ingestion: `src/pipeline.py` — `process_portfolios`, `parse_broker_csv`
 - Market data: `src/data/fmp_client.py` — `get_fmp_advanced_metrics`, `get_fmp_macro`, `fetch_momentum_trend`

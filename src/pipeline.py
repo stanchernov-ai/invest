@@ -267,28 +267,3 @@ def build_account_holdings(data_dir=None):
             bucket["shares"] += shares
 
     return holdings
-
-def save_verdict_history(new_verdicts):
-    data_dir = DATA_DIR
-    os.makedirs(data_dir, exist_ok=True)
-    verdict_path = os.path.join(data_dir, "board_verdicts.json")
-    
-    current_history = {}
-    if os.path.exists(verdict_path):
-        try:
-            with open(verdict_path, "r") as f:
-                current_history = json.load(f)
-        except Exception:
-            pass
-
-    for sym, verdict_data in new_verdicts.items():
-        if sym not in current_history:
-            current_history[sym] = []
-        current_history[sym].append(verdict_data)
-
-    try:
-        with open(verdict_path, "w") as f:
-            json.dump(current_history, f, indent=4)
-        logger.info("Verdict history successfully persisted to local storage.")
-    except Exception:
-        logger.error("Failed to persist verdict history.")

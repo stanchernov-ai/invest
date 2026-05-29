@@ -27,7 +27,7 @@ Update **`docs/agent_architecture.md`** whenever you change any of the following
 | New pipeline phase or job split | §3 production flow diagram |
 | QA agent or validation layer change | §6 QA stack, §7–§8 golden fixtures |
 | Agent promoted 🟡 → 🟢 (code-enforced) | §8 enforcement legend + roster notes |
-| Weekly standing QA roles in `qa_review.py` | §3 weekly plane |
+| Cross-run state / scout cooldown change | §3.6 verdict memory |
 
 **Do not duplicate** guardrail prose here — edit `.cursorrules` only.  
 **Do not duplicate** FMP/API details — see `fmp_data_dictionary.md`.
@@ -142,9 +142,11 @@ Registry: `src/core/agents.py` → `agent_config["board_members"]`.
 flowchart LR
     subgraph PREP["PREPARE — data only"]
         SYNC[Blob sync + CSV ledger]
+        SCOUT[scout — watchlist if missing]
         FMP[FMP / news / TWR]
         ORACLE[data_oracle<br/>🟢 Python price gate]
-        SYNC --> FMP --> ORACLE
+        SYNC --> CSV[CSV ledger] --> SCOUT
+        SCOUT --> FMP --> ORACLE
     end
 
     subgraph DEB["DEBATE — decisions"]
@@ -172,8 +174,9 @@ flowchart LR
         GFX[graphics_designer_qa<br/>🟢 deterministic + 🟡 multimodal LLM]
         INT[qa_integrity_auditor 🟡]
         EMAIL[HTML briefing + QA dashboard → email]
+        MEM[verdict_memory 🟢 Pass cooldown]
 
-        QA3 --> CHARTS --> GFX --> INT --> EMAIL
+        QA3 --> CHARTS --> GFX --> INT --> EMAIL --> MEM
     end
 
     PREP -->|prepare.json| DEB
@@ -233,6 +236,42 @@ Runs **30 min after** the daily pipeline (11:30 UTC weekdays). **7 LLM roles + H
 |--------|---------|
 | `src/hr_review.py` | KEEP / MERGE / CUT roster analysis from `AGENT_ACTIVITY` |
 | `src/finance_oversight.py` | Subscription / plan-fit audit |
+
+### 3.6 Cross-run state — verdict memory & scout
+
+Watchlist targeting uses **persistent JSON** synced through Azure `boardroom-state`, not in-repo generated markdown.
+
+```mermaid
+flowchart LR
+    subgraph Prepare
+        SYNC[sync_inputs_from_cloud]
+        CSV[pipeline.process_portfolios]
+        SC[scout.run_scout_pipeline]
+        SYNC --> CSV
+        CSV -->|no daily_target_list| SC
+    end
+
+    subgraph Deliver
+        COMP[debate.is_approved]
+        VM[verdict_memory.persist_chairman_watchlist_passes]
+        COMP -->|Pass watchlist only| VM
+    end
+
+    BLOB[(board_verdicts.json)]
+    SC -->|read cooldown| BLOB
+    VM -->|append Pass| BLOB
+```
+
+| Module | Role |
+|--------|------|
+| `src/verdict_memory.py` | Load/append/save `board_verdicts.json` — **Pass** entries only, gated on compliance-approved debate |
+| `src/scout.py` | Builds `daily_target_list.json` from trending tickers minus **owned** (CSV ledger) and **Pass cooldown** |
+| `src/jobs/prepare.py` | CSV parse **before** scout; passes `owned_tickers=master_ledger.keys()` |
+| `src/jobs/deliver.py` | Calls verdict memory at end of successful deliver |
+
+**Removed (May 2026 refactor cleanup):** `storage_client.save_memory()`, `pipeline.save_verdict_history()`, scout's dead `ledger_state.json` read.
+
+**Repo hygiene (AI context):** run artifacts (`src/output/*.md`, `logs/`, `qa_*_latest.*`) are gitignored — see `.gitignore` and commit `3eda93d`.
 
 ---
 

@@ -90,17 +90,17 @@ async def run_prepare(run_id: str = None) -> dict:
     try:
         storage_client.sync_inputs_from_cloud()
 
+        master_ledger, total_portfolio_value = pipeline.process_portfolios()
+        account_holdings = pipeline.build_account_holdings()
+
         target_path = os.path.join(DATA_DIR, "daily_target_list.json")
         if not os.path.exists(target_path):
-            scout.run_scout_pipeline()
+            scout.run_scout_pipeline(owned_tickers=master_ledger.keys())
         try:
             with open(target_path, "r") as f:
                 watchlist_data = json.load(f)
         except Exception:
             watchlist_data = {}
-
-        master_ledger, total_portfolio_value = pipeline.process_portfolios()
-        account_holdings = pipeline.build_account_holdings()
 
         keys_to_delete = [sym for sym, data in master_ledger.items() if data["Total"] < 50.0]
         for k in keys_to_delete:

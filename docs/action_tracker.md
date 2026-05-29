@@ -7,6 +7,53 @@ This document tracks identified bugs, architectural improvements, and long-term 
 
 ---
 
+## Session Handoff — May 29, 2026 (architecture cleanup — pick up here)
+
+> **Stan — start here next session.** Repo hygiene + cross-run verdict memory restored. P1 code is implemented locally; commit + deploy when ready.
+
+### Shipped (architecture thread)
+
+| Area | Detail |
+|------|--------|
+| **P0 — committed `3eda93d`** | Removed tracked run artifacts (~6.4k lines); `.gitignore` now excludes `logs/`, `src/output/*.md`, `qa_*_latest.*`, probe JSON, scratch files |
+| **P1 — local (not yet committed)** | `src/verdict_memory.py` — chairman **Pass** watchlist cooldown after compliance-approved deliver; removed dead `save_memory()` / `save_verdict_history()` |
+| **Scout fix** | `prepare.py` parses CSV before scout; `run_scout_pipeline(owned_tickers=…)` — dropped dead `ledger_state.json` read |
+| **Docs** | `agent_architecture.md` §3.6, `technical_solution.md` §1.3/§2.4, `engineering_playbook.md` verdict-memory entry |
+
+### Verdict memory rules (SSOT behavior)
+
+1. **Write:** end of successful **deliver**, only when `debate.is_approved` (Markopolos compliance passed).
+2. **What:** chairman watchlist **`Pass`** only → append to `board_verdicts.json` (local `DATA_DIR` + Azure `boardroom-state`).
+3. **Read:** scout at prepare start (after `sync_inputs_from_cloud`) — 7-day Pass cooldown (`unanimous_pass` reserved; always `false` for now).
+4. **Not gated on:** post-flight QA (graphics/integrity) — intentional simplicity; revisit if needed.
+
+### First steps next session
+
+1. **Commit + push P1** (`verdict_memory`, scout/prepare/deliver, tests) → GitHub Actions deploy.
+2. **Validate on a real run:** after deliver, confirm `board_verdicts.json` in Azure state container updates with Pass entries.
+3. **First human review** on a live run (still open — see below).
+
+### Open items (ordered — see also full backlog below)
+
+| Priority | Item |
+|----------|------|
+| **P0** | **Commit + deploy P1** verdict memory + scout fix |
+| **P1** | **First human review on a real run** — email link + `qa_human_review_{run_id}.json` |
+| **P2** | Split `reporting.py` + extract prompts from `agents.py` (AI context window) |
+| **P2** | Split `action_tracker.md` — handoff block vs archived sessions |
+| **P2** | Root `README.md` + `docs/qa_layers.md` one-pager |
+| **P2** | Wire post-job Cursor agents (`api_audit`, `data_insights`, `supervisor_summaries`) |
+| **P2** | Relative strength + sector weights in prepare; Buffett PE/P/S caps in Python |
+| **P3** | Consolidate `load_dotenv()` to `settings.py` only; rotate/gitignore `ecosystem_state.json` noise |
+| **P3** | Optional: block verdict memory on post-flight QA CRITICAL; panel `unanimous_pass` for 14-day cooldown |
+
+### Not in repo (by design — gitignored)
+
+* Generated outputs under `src/output/*.md`, `qa_*_latest.*`, `logs/`, probe JSON
+* `.cursor/agent_state/ecosystem_state.json` (local pre-commit ledger noise)
+
+---
+
 ## Documentation index
 
 | Document | Use when |
@@ -20,9 +67,9 @@ This document tracks identified bugs, architectural improvements, and long-term 
 
 ---
 
-## Session Handoff — May 29, 2026 (pick up here)
+## Session Handoff — May 29, 2026 (agent/QA — detail)
 
-> **Stan — start here next session.** Agent/QA hardening + human review UI deployed. No pipeline was manually triggered during this session.
+> Historical detail for the agent/QA hardening session. **Current pickup:** architecture cleanup handoff above.
 
 ### Shipped this session (on `main`)
 
@@ -68,11 +115,6 @@ This document tracks identified bugs, architectural improvements, and long-term 
 | **P2** | Buffett PE/P/S caps in Python (`.cursorrules` P0). |
 | **P3** | Weekly scorecard digest email; per-finding human review; consolidate overlapping QA weekly roles. |
 | ~~**P3**~~ | ~~Promote chairman financial limits to full Python validators.~~ **DONE (May 29, 2026)** — `src/core/guardrails.py`: max 3 buys, 10% cap, wash-sale. |
-
-### Not committed (local only)
-
-* `test_chart.py`, `tools/fmp_field_probe_results.json`
-* `.cursor/agent_state/ecosystem_state.json` (local pre-commit ledger noise)
 
 ### Reference (FMP / market data — still active backlog)
 

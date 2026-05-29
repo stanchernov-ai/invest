@@ -8,7 +8,13 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from src.output import reporting
-from src.qa.integrity_audit import build_deterministic_integrity_report, extract_dashboard_statuses
+from src.qa.integrity_audit import (
+    build_deterministic_integrity_report,
+    build_evidence_context,
+    extract_dashboard_audit_sections,
+    extract_dashboard_statuses,
+    sanitize_llm_integrity_findings,
+)
 from src.qa.scorecard import build_qa_scorecard
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "integrity_qa"
@@ -74,6 +80,55 @@ class TestIntegrityQAGoldenFixtures(unittest.TestCase):
         statuses = extract_dashboard_statuses(case["dashboard_html"])
         self.assertTrue(statuses.get("Post Mortem QA Auditor"))
 
+    def test_generated_dashboard_has_all_audit_sections(self):
+        case = next(c for c in self.cases if c["id"] == "good_alignment")
+        titles = extract_dashboard_audit_sections(case["dashboard_html"])
+        self.assertTrue(any("Post Mortem" in t for t in titles))
+        self.assertTrue(any("Graphics Designer" in t for t in titles))
+        report = build_deterministic_integrity_report(case["qa_reports"], case["dashboard_html"])
+        section_findings = [
+            f for f in report["findings"]
+            if f.get("category") == "Dashboard Fidelity" and "no audit section" in (f.get("description") or "").lower()
+        ]
+        self.assertEqual(section_findings, [])
+
+
+class TestIntegrityEvidenceSanitizer(unittest.TestCase):
+    def test_drops_false_missing_briefing_claim(self):
+        ctx = build_evidence_context([], "", "<html>briefing</html>")
+        findings = sanitize_llm_integrity_findings([{
+            "severity": "CRITICAL",
+            "category": "Evidence Gap",
+            "description": "Executive briefing HTML was not provided as part of the input.",
+            "recommendation": "Provide HTML.",
+        }], ctx)
+        self.assertEqual(findings, [])
+
+    def test_drops_false_missing_graphics_section_claim(self):
+        ctx = {
+            "briefing_provided": True,
+            "briefing_char_count": 1000,
+            "agent_sections": {"Graphics Designer Visual SME": True},
+            "findings_rendered": {"Graphics Designer Visual SME": [True, True]},
+        }
+        findings = sanitize_llm_integrity_findings([{
+            "severity": "CRITICAL",
+            "category": "Dashboard Fidelity",
+            "description": "The dashboard entirely omits the Graphics Designer Visual SME audit section.",
+            "recommendation": "Fix dashboard.",
+        }], ctx)
+        self.assertEqual(findings, [])
+
+    def test_keeps_substantive_verdict_accuracy_finding(self):
+        ctx = build_evidence_context([], "", "")
+        findings = sanitize_llm_integrity_findings([{
+            "severity": "CRITICAL",
+            "category": "Verdict Accuracy",
+            "description": "Post Mortem QA rubber-stamped PASS but chairman JSON lists 4 buys.",
+            "recommendation": "Fail post mortem.",
+        }], ctx)
+        self.assertEqual(len(findings), 1)
+
 
 class TestQAScorecard(unittest.TestCase):
     def test_build_scorecard_from_reports(self):
@@ -98,9 +153,13 @@ class TestIntegrityQALLMGate(unittest.IsolatedAsyncioTestCase):
         case = _load_fixture(next(e for e in _load_manifest() if e["id"] == "dashboard_mismatch"))
         with patch("src.qa_pipeline.call_gemini_async", new_callable=AsyncMock) as mock_llm:
             report = await run_qa_integrity_audit(
-                case["qa_reports"], "debate log", "{}", case["dashboard_html"]
+                case["qa_reports"], "debate log", "{}", case["dashboard_html"],
+                executive_briefing_html="<html><h1>Invest AI: Executive Briefing</h1></html>",
             )
         mock_llm.assert_called_once()
+        prompt = mock_llm.call_args[0][1][0].parts[0].text
+        self.assertIn("Executive briefing HTML: PROVIDED", prompt)
+        self.assertIn("Do NOT report it as missing", prompt)
         self.assertFalse(report["is_compliant"])
         self.assertTrue(any(f.get("category") == "Dashboard Fidelity" for f in report["findings"]))
 

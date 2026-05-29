@@ -12,11 +12,239 @@ EXPECTED_QA_ROLES = (
     "Post Mortem QA Auditor",
     "Systems Architect QA",
     "Prompt Engineer QA",
+    "Graphics Designer Visual SME",
 )
 
 
 def _normalize_role(name: str) -> str:
     return re.sub(r"\s+", " ", (name or "").strip().lower())
+
+
+def extract_dashboard_audit_sections(dashboard_html: str) -> list[str]:
+    """Return h2 section titles from the QA dashboard (e.g. 'Post Mortem QA Auditor Audit')."""
+    if not (dashboard_html or "").strip():
+        return []
+    soup = BeautifulSoup(dashboard_html, "html.parser")
+    return [h2.get_text(strip=True) for h2 in soup.find_all("h2") if h2.get_text(strip=True)]
+
+
+def _role_in_section_title(role: str, section_title: str) -> bool:
+    """Fuzzy match agent role to a dashboard audit section heading."""
+    norm_role = _normalize_role(role)
+    norm_title = _normalize_role(section_title.replace(" audit", ""))
+    if not norm_role or not norm_title:
+        return False
+    return norm_role in norm_title or norm_title in norm_role
+
+
+def audit_dashboard_sections(qa_reports: list[dict], dashboard_html: str) -> list[dict]:
+    """Verify each QA report has a dedicated audit section in the dashboard HTML."""
+    findings: list[dict] = []
+    sections = extract_dashboard_audit_sections(dashboard_html)
+    if not sections and qa_reports:
+        return findings  # handled by audit_dashboard_fidelity
+
+    for report in qa_reports or []:
+        role = report.get("agent_role", "")
+        if "integrity" in _normalize_role(role):
+            continue
+        if any(_role_in_section_title(role, sec) for sec in sections):
+            continue
+        findings.append({
+            "severity": "CRITICAL",
+            "category": "Dashboard Fidelity",
+            "description": (
+                f"QA dashboard has no audit section for '{role}'. "
+                f"Expected an h2 like '{role} Audit'."
+            ),
+            "recommendation": "Regenerate the dashboard from the full qa_reports list.",
+        })
+    return findings
+
+
+def audit_findings_rendered(qa_reports: list[dict], dashboard_html: str) -> list[dict]:
+    """Verify non-trivial finding descriptions appear in the rendered dashboard body."""
+    findings: list[dict] = []
+    html_norm = re.sub(r"\s+", " ", (dashboard_html or "").lower())
+
+    for report in qa_reports or []:
+        role = report.get("agent_role", "")
+        if "integrity" in _normalize_role(role):
+            continue
+        for idx, finding in enumerate(report.get("findings") or []):
+            desc = (finding.get("description") or "").strip()
+            if len(desc) < 24:
+                continue
+            needle = re.sub(r"\s+", " ", desc[:72]).lower()
+            if needle not in html_norm:
+                findings.append({
+                    "severity": "CRITICAL",
+                    "category": "Dashboard Fidelity",
+                    "description": (
+                        f"Finding #{idx + 1} for '{role}' is absent from the rendered dashboard HTML "
+                        f"(missing text prefix: {desc[:72]!r}…)."
+                    ),
+                    "recommendation": "Ensure generate_qa_dashboard_html renders all finding descriptions.",
+                })
+    return findings
+
+
+def build_evidence_context(
+    qa_reports: list[dict],
+    dashboard_html: str,
+    executive_briefing_html: str,
+) -> dict:
+    """Structured ground truth passed to the LLM integrity pass."""
+    briefing = (executive_briefing_html or "").strip()
+    sections = extract_dashboard_audit_sections(dashboard_html)
+    agent_sections: dict[str, bool] = {}
+    findings_rendered: dict[str, list[bool]] = {}
+
+    for report in qa_reports or []:
+        role = report.get("agent_role", "")
+        if "integrity" in _normalize_role(role):
+            continue
+        agent_sections[role] = any(_role_in_section_title(role, sec) for sec in sections)
+        flags: list[bool] = []
+        html_norm = re.sub(r"\s+", " ", (dashboard_html or "").lower())
+        for finding in report.get("findings") or []:
+            desc = (finding.get("description") or "").strip()
+            if len(desc) < 24:
+                flags.append(True)
+                continue
+            needle = re.sub(r"\s+", " ", desc[:72]).lower()
+            flags.append(needle in html_norm)
+        findings_rendered[role] = flags
+
+    return {
+        "briefing_provided": bool(briefing),
+        "briefing_char_count": len(briefing),
+        "dashboard_char_count": len(dashboard_html or ""),
+        "dashboard_section_titles": sections,
+        "agent_sections": agent_sections,
+        "findings_rendered": findings_rendered,
+    }
+
+
+def format_evidence_digest(ctx: dict, deterministic: dict) -> str:
+    """Human-readable ground truth the LLM must not contradict."""
+    lines = [
+        "DETERMINISTIC PRE-CHECK SUMMARY (authoritative):",
+        deterministic.get("summary", ""),
+    ]
+    for f in deterministic.get("findings") or []:
+        lines.append(
+            f"  - [{f.get('severity')}] {f.get('category')}: {f.get('description')}"
+        )
+
+    lines.append("")
+    lines.append("EVIDENCE AVAILABILITY (authoritative):")
+    if ctx.get("briefing_provided"):
+        lines.append(
+            f"  - Executive briefing HTML: PROVIDED ({ctx.get('briefing_char_count', 0)} chars). "
+            "Do NOT report it as missing."
+        )
+    else:
+        lines.append("  - Executive briefing HTML: NOT PROVIDED (skip Graphics HTML cross-check).")
+
+    lines.append(f"  - QA dashboard HTML: {ctx.get('dashboard_char_count', 0)} chars total.")
+    lines.append("  - Dashboard audit sections detected:")
+    for title in ctx.get("dashboard_section_titles") or []:
+        lines.append(f"      • {title}")
+
+    lines.append("  - Per-agent section + finding render status:")
+    for role, present in (ctx.get("agent_sections") or {}).items():
+        flags = ctx.get("findings_rendered", {}).get(role, [])
+        missing = sum(1 for ok in flags if not ok)
+        status = "section OK" if present else "SECTION MISSING"
+        finding_note = f", {missing} finding(s) not in HTML" if missing else ", all findings rendered"
+        lines.append(f"      • {role}: {status}{finding_note}")
+
+    lines.append("")
+    lines.append(
+        "RULE: Do NOT re-audit dashboard badge matching or section presence — "
+        "deterministic pre-check already did. Focus on debate-log/chairman verdict accuracy "
+        "and Graphics Designer finding validation against the briefing excerpt."
+    )
+    return "\n".join(lines)
+
+
+def _claims_missing_briefing(description: str) -> bool:
+    desc = (description or "").lower()
+    briefing_terms = (
+        "executive briefing",
+        "briefing html",
+        "investor-facing artifact",
+        "investor briefing",
+        "rendered html dashboard",
+    )
+    missing_terms = (
+        "not provided",
+        "was not included",
+        "not included",
+        "missing",
+        "could not be validated",
+        "un-auditable",
+        "without this",
+        "absent from the input",
+        "was not provided",
+    )
+    return any(t in desc for t in briefing_terms) and any(m in desc for m in missing_terms)
+
+
+def _claims_missing_dashboard_section(description: str, agent_sections: dict[str, bool]) -> bool:
+    desc = (description or "").lower()
+    omit_terms = ("omit", "omits", "omitted", "missing section", "not presented", "no section", "entirely omitted")
+    if not any(t in desc for t in omit_terms):
+        return False
+    for role, present in (agent_sections or {}).items():
+        if not present:
+            continue
+        norm = _normalize_role(role)
+        if norm in desc or norm.split("(")[0].strip() in desc:
+            return True
+    return False
+
+
+def _claims_finding_truncated(description: str, findings_rendered: dict[str, list[bool]]) -> bool:
+    desc = (description or "").lower()
+    if "truncat" not in desc and "incomplete" not in desc:
+        return False
+    for role, flags in (findings_rendered or {}).items():
+        if flags and all(flags):
+            norm = _normalize_role(role)
+            if norm in desc or norm.split("(")[0].strip() in desc:
+                return True
+    return False
+
+
+def sanitize_llm_integrity_findings(
+    findings: list[dict],
+    ctx: dict,
+) -> list[dict]:
+    """Drop LLM findings that contradict deterministic evidence context."""
+    cleaned: list[dict] = []
+    for finding in findings or []:
+        desc = finding.get("description") or ""
+        cat = (finding.get("category") or "").lower()
+
+        if ctx.get("briefing_provided") and _claims_missing_briefing(desc):
+            continue
+        if _claims_missing_dashboard_section(desc, ctx.get("agent_sections") or {}):
+            continue
+        if _claims_finding_truncated(desc, ctx.get("findings_rendered") or {}):
+            continue
+        # Deterministic layer owns dashboard badge/section checks — ignore LLM duplicates.
+        if cat == "dashboard fidelity" and ctx.get("agent_sections"):
+            if _claims_missing_dashboard_section(desc, ctx.get("agent_sections") or {}):
+                continue
+            if "truncat" in desc.lower() and any(
+                all(flags) for flags in (ctx.get("findings_rendered") or {}).values() if flags
+            ):
+                continue
+
+        cleaned.append(finding)
+    return cleaned
 
 
 def extract_dashboard_statuses(dashboard_html: str) -> dict[str, bool]:
@@ -145,6 +373,8 @@ def build_deterministic_integrity_report(qa_reports: list[dict], dashboard_html:
     findings.extend(audit_qa_coverage(qa_reports))
     findings.extend(audit_qa_report_quality(qa_reports))
     findings.extend(audit_dashboard_fidelity(qa_reports, dashboard_html))
+    findings.extend(audit_dashboard_sections(qa_reports, dashboard_html))
+    findings.extend(audit_findings_rendered(qa_reports, dashboard_html))
 
     has_critical = any(str(f.get("severity", "")).upper() == "CRITICAL" for f in findings)
     crit = sum(1 for f in findings if str(f.get("severity", "")).upper() == "CRITICAL")

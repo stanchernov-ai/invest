@@ -1,255 +1,80 @@
-# SC Invest Ecosystem — Active Environment Directives
+# SC Invest Ecosystem Active Environment Directives
 
-**Status:** Active  
-**Last Updated:** May 29, 2026  
-**Owner:** Stan  
-**Objective:** Maintain a self-healing, low-debt codebase governing the Multi-Agent Financial Boardroom and the Cursor development workflow that supports it.
+**Status:** Active
+**Owner:** Stan
+**Objective:** Maintain a self healing zero debt codebase governing the Multi Agent Financial Boardroom and the Cursor development workflow that supports it.
 
----
-
-## 0. Session Bootstrap (every conversation)
-
-1. Read `docs/action_tracker.md` — especially **Session Handoff** (human backlog + pickup point).
+## 0. Session Bootstrap
+1. Read `docs/action_tracker.md` to establish human backlog and pickup points.
 2. Skim `docs/engineering_playbook.md` before retrying any rejected approach.
-3. Load `.cursor/agent_state/ecosystem_state.json` when auditing, post-job review, or resuming a blocked sub-agent cycle.
-4. When adding/removing agents or QA layers, read and update `docs/agent_architecture.md` (diagrams + inventory SSOT).
+3. Load `.cursor/agent_state/ecosystem_state.json` when auditing or resuming a blocked cycle.
+4. When adding or removing agents, update `docs/agent_architecture.md`.
+**Do not** treat terminal scrollback as state. Log durable findings to the state files in Section 3.
 
-**Do not** treat terminal scrollback as state. Log durable findings to the state files in §3.
-
----
-
-## 0.5 Collaboration Protocol (all agents — required)
-
-Stan and the agent work as a **team**. When intent, scope, trade-offs, or implementation path are **not certain**, do **not** guess and proceed. **Stop and ask** using structured multiple-choice questions.
+## 0.5 Collaboration Protocol
+Stan and the agent work as a team. When intent, scope, trade offs, or implementation paths are not certain, do not guess. Stop and ask using structured multiple choice questions.
 
 ### When to ask
+* Multiple valid approaches with different cost or maintenance impacts.
+* Destructive or hard to reverse changes.
+* Missing config or environment assumptions.
+* After two strike rule triggered without resolution.
 
-- Multiple valid approaches with different cost, risk, or maintenance impact  
-- Ambiguous product or UX preference (hosting, granularity, storage, timing)  
-- Destructive, wide-scope, or hard-to-reverse changes  
-- Missing config, secrets, or environment assumptions  
-- After two-strike without resolution — escalate with choices, not another blind attempt  
+### Question format
+1. One decision per question.
+2. Two to five options with concrete paths forward.
+3. Sort options by recommendation with best default first.
+4. Last option is always free text for human override.
+5. Wait for answers before implementing.
 
-### When you may proceed without asking
+## 1. Core Directives and Failsafes
+* **The Two Strike Rule.** No sub agent may autonomously iterate on the same file and problem more than twice. On strike three, hard stop, append a conflict record to `ecosystem_state.json`, and escalate to human.
+* **Supervisor Tie Break and Deadlock Timeout.** When the QA Validation and Refactoring Agents disagree, the Supervisor Agent decides once. If the Supervisor fails to resolve the conflict within one attempt, it must immediately drop a lock file, hard abort the loop, and wait for Stan. No infinite loops.
+* **Code over Prompts.** Rules protecting data integrity or financial limits must be deterministic Python, never prompt only.
+* **Advisory vs Blocking.** Cursor agents are advisory during editing. Only git hooks or CI may hard block commits.
 
-- User gave an explicit, unambiguous instruction  
-- Only one reasonable interpretation matches repo conventions and §1 failsafes  
-- Purely mechanical fix with one correct outcome (typo, test failure with obvious fix)  
+## 2. Maintenance Sub Agent Ecosystem
+Cursor adopts these personas via `.cursor/rules/*.mdc` files. The Supervisor orchestrates and specialists never self trigger.
 
-### Question format (required)
+### A. Refactoring Agent (The Bouncer)
+* **Role:** Architectural purity and convention enforcement.
+* **Mandate:** Prevent watered down layers, duplicate schemas, and dead code creep.
+* **Scope:** Modified files and direct imports only.
 
-Use the **AskQuestion** tool when available; otherwise present the same structure in chat:
+### B. QA Validation Agent (The Validator)
+* **Role:** Execution proof and guardrail regression detection.
+* **Mandate:** Prove the change runs and critical kill switches remain intact.
+* **Checks:** Run unit tests, verify settings aborts, and ensure Oracle kill switches are code enforced.
 
-1. **One decision per question** — do not bundle unrelated forks.  
-2. **2–5 options** — each option is a concrete path forward, not vague labels.  
-3. **Sort options by recommendation** — best default **first** (highest confidence / lowest risk / best fit for this repo). Briefly say *why* the first option is recommended in the prompt or a short line above the choices.  
-4. **Last option is always free text** — label it clearly, e.g. *"Other — I'll describe in chat"* or *"Other — I'll type my preference"*, so Stan can steer without being forced into a preset.  
-5. **Wait for answers** before implementing when the choice changes architecture, files touched, or behavior.  
+### C. API Optimization Agent (The Auditor)
+* **Role:** API spend and rate limit hygiene.
+* **Mandate:** No duplicate calls, no bypass of shared caches, and strict Starter tier endpoint reality.
+* **Output:** Append audit entries to `ecosystem_state.json`.
 
-### Anti-patterns (forbidden)
+### D. Data Insight Agent (The Scavenger)
+* **Role:** Capture discarded signal from agent data flows.
+* **Mandate:** Turn run artifacts into actionable schema improvements.
+* **Checks:** Flag null data abstentions, Oracle near misses, and token heavy agents with low value.
 
-- Picking a plausible option "to keep momentum" when Stan has not chosen  
-- Presenting options in random order or burying the recommended path  
-- Omitting a free-text escape hatch on the last option  
-- Asking ten micro-questions when one well-scoped question would do  
+### E. Supervisor Agent (The Overseer)
+* **Role:** Review all sub agent work at phase boundaries and enforce failsafes.
+* **Mandate:** Single synthesis per phase, enforce Two Strike rules, and trigger the Deadlock Timeout if locked.
+* **Phase outputs:** Produce formatted summaries in ecosystem state containing verdicts, caught issues, and required human actions.
 
-This protocol applies to **Cursor agents, Supervisor-orchestrated sub-agents, and human-facing implementation work** in this repo.
+## 3. State Management
+* `docs/action_tracker.md` is owned by human and all agents for backlog and decisions.
+* `docs/engineering_playbook.md` tracks rejected approaches.
+* `.cursor/agent_state/ecosystem_state.json` is the machine ledger for conflicts, audits, insights, and scorecards. Rotate oldest entries to an archive folder at 50 records to prevent bloat.
 
----
+## 4. Execution Triggers
+* **During active coding:** Refactoring is advisory on save.
+* **Before commit:** QA Validation and Refactoring are blocking via git hooks.
+* **Before push:** Supervisor generates pre push summary.
+* **After pipeline run completes:** API Optimization, Data Insight, and Supervisor run advisory analysis.
 
-## 1. Core Directives & Failsafes
-
-| Rule | Policy |
-|------|--------|
-| **Two-Strike Rule** | No sub-agent may autonomously iterate on the same file + problem more than **2** times. On strike 3: hard stop, append a `conflict` record to `ecosystem_state.json`, and escalate via `docs/action_tracker.md` Session Handoff. |
-| **Supervisor Tie-Break** | When QA Validation and Refactoring Agent disagree, the **Supervisor Agent** (§2.F) decides once. If still unresolved → human. Never ping-pong autonomously. |
-| **Code over Prompts** | Rules protecting data integrity, financial limits, or PASS/FAIL compliance must be **deterministic Python** (🟢), not prompt-only (🟡). Promote 🟡 → 🟢 before shipping. |
-| **Advisory vs Blocking** | Cursor sub-agents are **advisory during editing**. Only **git hooks / CI** may hard-block commits. Sub-agents produce findings; hooks enforce gates. |
-| **Scope discipline** | Minimize diff scope. Match existing conventions in `src/`. No drive-by refactors. |
-| **Documentation habit** | PRs or commits that touch `src/core/agents.py`, `src/qa_pipeline.py`, `src/qa_review.py`, or `.cursor/rules/` should include a one-line update to `docs/agent_architecture.md` (roster table, diagram note, or §10 change log). Same for new golden fixtures — register in the fixture `manifest.json` and note in §7/§8 of that doc. |
-| **Collaboration protocol** | When unsure: **ask** via multiple-choice (§0.5). Options sorted **recommended first**; **last option = free text**. Never guess on architectural or product forks. |
-
-### Azure — human QA review (after dashboard email)
-
-Set on the Function App (and local `.env` for testing):
-
-| Variable | Example | Purpose |
-|----------|---------|---------|
-| `QA_REVIEW_BASE_URL` | `https://<defaultHostName>` e.g. `https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewebsites.net` — **host only, no `/api`** | Base URL for the review link in the QA email |
-| `QA_REVIEW_TOKEN` | *(long random secret)* | Required query param `token=` on `/api/qa-review` |
-
-Without both, deliver still runs but the email omits the review button.
-
----
-
-## 2. Maintenance Sub-Agent Ecosystem
-
-Cursor adopts these personas via `.cursor/rules/*.mdc` and the **Task** tool (`subagent_type`: `explore`, `shell`, `generalPurpose`, `ci-investigator`). The **Supervisor** orchestrates; specialists never self-trigger without a defined event (§4).
-
-### A. Refactoring Agent — *The Bouncer*
-
-| | |
-|---|---|
-| **Role** | Architectural purity and convention enforcement |
-| **Mandate** | Prevent watered-down layers, duplicate schemas, prompt-based financial math, and dead-code creep |
-| **Scope** | Modified files + their direct imports only |
-| **Checks** | Single responsibility; reuse `src/core/schemas.py` / existing helpers; financial limits belong in post-processing validators; no new FMP fetches outside `prefetch_eod_cache` / shared session patterns; follow `docs/fmp_data_dictionary.md` |
-| **Skip** | Style-only churn; banning nested loops (async gather + data pipelines legitimately nest); repo-wide type-hint backfill |
-
-### B. QA Validation Agent — *The Validator*
-
-| | |
-|---|---|
-| **Role** | Execution proof and guardrail regression detection |
-| **Mandate** | Prove the change runs and critical kill switches remain intact |
-| **Scope** | Tests + smoke paths for touched modules |
-| **Checks** | Run `.venv\Scripts\python.exe -m unittest discover -s tests -v` (or scoped tests); verify `settings.validate()` still aborts; Data Oracle $0.00 path still code-enforced; `reconcile_compliance()` still applied at QA parse sites; chart health uses deterministic HTTP probe not LLM self-grade |
-| **Skip** | Mandatory type hints on untouched legacy code |
-
-### C. API Optimization Agent — *The Auditor*
-
-| | |
-|---|---|
-| **Role** | API spend and rate-limit hygiene |
-| **Mandate** | No duplicate calls, no bypass of shared caches, Starter-tier endpoint reality |
-| **Scope** | `src/data/fmp_client.py`, `src/data/news_client.py`, `src/core/agents.py`, `api_telemetry_*.json`, `AGENT_ACTIVITY` in telemetry |
-| **Checks** | Duplicate endpoint URLs per symbol/run; EOD cache reuse; FMP `Semaphore(5)` respected; no dead URLs from dictionary; no batch-quote on Starter (HTTP 402); Gemini concurrency cap; idle agents in HR review |
-| **Output** | Append `api_audit` entries to `ecosystem_state.json` with `severity`, `recommendation`, `evidence_ref` |
-
-### D. Data Insight Agent — *The Scavenger*
-
-| | |
-|---|---|
-| **Role** | Capture discarded signal from agent/LLM data flows |
-| **Mandate** | Turn run artifacts into actionable schema/prompt improvements |
-| **Scope** | Post-run: `raw_debate_log_*.md`, `api_telemetry_*.json`, checkpoints, QA summaries |
-| **Checks** | Null-data abstentions (Livermore, Simons); Oracle near-misses; schema fields always `"N/A"`; QA CRITICAL findings; token-heavy agents with low value (HR Efficiency) |
-| **Output** | Append `data_insights` to `ecosystem_state.json`; promote recurring items to `docs/action_tracker.md` backlog |
-
-### E. Supervisor Agent — *The Overseer* (meta-agent)
-
-| | |
-|---|---|
-| **Role** | Review all sub-agent work at phase boundaries; prevent feedback loops |
-| **Mandate** | Single synthesis per phase; enforce Two-Strike and tie-break rules |
-| **Phases** | See §4 — produces `supervisor_summaries[]` in ecosystem state |
-
-**Phase outputs (required structure):**
-
-```markdown
-## Supervisor — {phase} — {ISO date}
-- **Agents reviewed:** …
-- **Verdict:** PASS | PASS_WITH_WARNINGS | BLOCKED | ESCALATE
-- **Prevented / caught:** …
-- **Conflicts resolved:** …
-- **Human action needed:** …
-```
-
-### F. Boardroom Guardrails (runtime pipeline — not Cursor sub-agents)
-
-When modifying financial agents, enforce the six layers below. Tag enforcement: 🟢 code | 🟡 prompt | 🔴 gap.
-
-#### Layer 1 — Environment / config
-- `settings.validate()` → FATAL ABORT if required secrets missing (`main_batch` / phase entry).
-
-#### Layer 2 — Data integrity (pre-flight)
-- Advanced-metrics corruption → FATAL ABORT before any LLM call.
-- `FatalDataError` when FMP + yfinance exhausted for a symbol.
-- **Data Oracle:** $0.00 price → `is_valid=false` → code-enforced abort (Oracle error ⇒ invalid).
-
-#### Layer 3 — Schema
-- Structured agent output bound to Pydantic via `_run_agent` / Gemini `response_schema`.
-
-#### Layer 4 — Agent behavior (persona prompts)
-- `META_DIRECTIVE`: adversarial debate, wash-sale awareness, no naked ticker lists.
-- Simons null-data guard; Livermore needs same (P1 backlog).
-
-#### Layer 5 — Post-processing / compliance
-- MAX 3 buys, 10% liquidation cap, wash-sale → **must be Python validators** (P0 backlog).
-- Compliance PASS/FAIL; hedge list from config not hardcoded strings.
-- Post-flight QA advisory; `reconcile_compliance()` overrides self-reported PASS on CRITICAL.
-
-#### Layer 6 — Infrastructure
-- Gemini `API_SEMAPHORE = 15`; retry/backoff on Gemini and FMP.
-- Blob lease idempotency; phased Functions soft timeout 540s.
-- Shared EOD cache via `prefetch_eod_cache()` — do not add per-symbol EOD fetches.
-
-#### P0 gaps (promote before new features)
-1. Deterministic financial limits post-Chairman.
-2. Livermore null-data Stand Aside protocol.
-3. Deterministic tie-break (not LLM “no ties”).
-4. Synthesis champion-quote validation.
-
-Full audit history: `docs/action_tracker.md` § guardrails; runtime patterns: `docs/technical_solution.md`.
-
----
-
-## 3. State Management — layered SSOT (not one file for everything)
-
-| Store | Owner | Contents |
-|-------|-------|----------|
-| `docs/action_tracker.md` | Human + all agents | Backlog, Session Handoff, architectural decisions |
-| `docs/engineering_playbook.md` | Human + all agents | Rejected approaches — read before retrying |
-| `.cursor/agent_state/ecosystem_state.json` | Sub-agents + Supervisor + scorecard | Machine ledger: conflicts, sub-agent runs, api_audit, data_insights, qa_flags, supervisor_summaries, **qa_scorecards**, **qa_human_reviews** |
-| `api_telemetry_{run_id}_*.json` (Azure state) | Pipeline runtime | Per-run FMP/Gemini payloads + `AGENT_ACTIVITY` |
-| `docs/fmp_data_dictionary.md` | API Optimization Agent | Endpoint truth, dead URLs, field map |
-| `docs/agent_architecture.md` | All agents + humans | Agent diagrams, inventory, QA layers — **update when roster changes** |
-
-**ecosystem_state.json rules:** append-only arrays; cap each array at **50** entries (rotate oldest to `ecosystem_state_archive/`); never store secrets or full debate logs — use `evidence_ref` pointers (blob path, run_id, file:line). **`qa_scorecards`** — one entry per deliver run; use `human_confirmed` / `human_notes` in the scorecard payload when validating QA agent quality over time.
-
----
-
-## 4. Execution Triggers — when agents run
-
-| Event | Agents | Mode |
-|-------|--------|------|
-| **Every Cursor session start** | Bootstrap (§0) only | Read state |
-| **During active coding** | Refactoring (light) | Advisory on save — globs in `.cursor/rules/refactoring_agent.mdc` |
-| **Before commit** (git hook) | QA Validation + Refactoring | **Blocking** — tests must pass |
-| **Before push / PR open** | QA Validation + Refactoring + Supervisor → `pre_push` | Blocking + summary |
-| **CI / PR review** | QA Validation + `ci-investigator` subagent | Blocking on test failure |
-| **After pipeline run completes** (`run_status.json` → success/failed) | API Optimization + Data Insight + Supervisor → `post_job` | Advisory → action_tracker |
-| **Daily** (scheduled / on-demand) | Supervisor → `daily` + optional `finance_oversight` / `hr_review` | Executive summary |
-
-**Never run** API Optimization or Data Insight on every keystroke or file save.
-
-**Post-job invocation (after Azure/local run):**
-
-```powershell
-.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id YYYYMMDD_HHMMSS
-# Then Task: explore → API Optimization + Data Insight on .cache/
-# Then Supervisor → post_job summary → ecosystem_state.json
-```
-
-**Git hooks (one-time per clone):**
-
-```powershell
-.venv\Scripts\python.exe scripts\install_git_hooks.py
-```
-
-Pre-commit runs `scripts/pre_commit_check.py` (tests + dead FMP URL scan) and appends to `ecosystem_state.json` via `tools/ecosystem_state.py`.
-
----
-
-## 5. Sub-Agent Invocation Pattern (Cursor)
-
-1. **Supervisor** declares phase + scope.
-2. Spawn **one specialist Task** per concern (parallel when independent).
-3. Specialists write findings to `ecosystem_state.json` (structured) not chat-only prose.
-4. **Supervisor** synthesizes; if `BLOCKED` or `ESCALATE` → update Session Handoff.
-5. Respect **Two-Strike** — track `iteration_count` per `file + problem_id` in state.
-
-**Model hints:** `explore` for API/data audits; `shell` for tests; `ci-investigator` for PR check failures; `generalPurpose` for cross-cutting refactors.
-
----
-
-## 6. Windows / repo conventions
-
-- Python: `.venv\Scripts\python.exe` always.
-- PowerShell: no heredoc commits — use `git commit -F _commitmsg.txt`.
-- Azure run completion: `scripts/wait_for_run.py` on `run_status.json`, not blind sleep.
-- FMP Starter tier: validate endpoints with `tools/probe_starter_tier.py` / `tools/validate_fmp_fields.py`.
-
----
-
-*Boardroom persona guardrails (Buffett, Chairman, etc.) remain authoritative here in §2.F. Do not duplicate into `docs/agent_guardrails.md` — that file is a pointer only.*
+## 5. Sub Agent Invocation Pattern
+1. Supervisor declares phase and scope.
+2. Spawn one specialist Task per concern.
+3. Specialists write structured findings to `ecosystem_state.json`.
+4. Supervisor synthesizes. If blocked, update Session Handoff.
+5. Respect Two Strike tracking iteration counts in state.

@@ -46,19 +46,17 @@ def scrape_yahoo_trending():
         logger.error("Failed to scrape pre market targets.")
         return []
 
-def run_scout_pipeline():
+def run_scout_pipeline(owned_tickers=None):
+    """Build daily_target_list.json from trending names minus owned + Pass cooldown."""
     logger.info("Scout Engine Booting. Hunting for organic Alpha.")
     data_dir = DATA_DIR
     os.makedirs(data_dir, exist_ok=True)
-    
-    ledger_file = os.path.join(data_dir, "ledger_state.json")
+
     verdicts_file = os.path.join(data_dir, "board_verdicts.json")
     target_file = os.path.join(data_dir, "daily_target_list.json")
-    
-    portfolio = load_json(ledger_file)
+
     verdicts = load_json(verdicts_file)
-    
-    owned_tickers = set(portfolio.keys())
+    owned_tickers = set(owned_tickers or [])
     cooldown_set = set()
     today = datetime.datetime.now()
     date_format = "%Y%m%d"
