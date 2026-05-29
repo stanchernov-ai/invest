@@ -386,6 +386,7 @@ flowchart TB
 | `build_deterministic_visual_report()` | `src/qa/visual_audit.py` | Merges chart + HTML checks before optional LLM |
 | `build_deterministic_integrity_report()` | `src/qa/integrity_audit.py` | Dashboard fidelity, QA coverage, self-contradiction |
 | `build_qa_scorecard()` | `src/qa/scorecard.py` | Per-agent findings + tokens; → `QA_SCORECARD` telemetry |
+| `execute_retrospective()` | `src/qa/retrospective.py` | Post-deliver candidate actions; idempotent marker per run_id |
 
 ### QA agent scorecard
 

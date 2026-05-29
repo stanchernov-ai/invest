@@ -19,7 +19,7 @@ This document tracks identified bugs, architectural improvements, and long-term 
 | **P1 — `11ee4d9`** | `src/verdict_memory.py` — chairman **Pass** watchlist cooldown after compliance-approved deliver; removed dead `save_memory()` / `save_verdict_history()` |
 | **Scout fix** | `prepare.py` parses CSV before scout; `run_scout_pipeline(owned_tickers=…)` — dropped dead `ledger_state.json` read |
 | **Docs** | `agent_architecture.md` §3.6, `technical_solution.md` §1.3/§2.4, `engineering_playbook.md` verdict-memory entry |
-| **Post-deliver loop** | `docs/post_deliver_checklist.md` + `tools/run_retrospective.py` — candidate action items from QA + human review |
+| **Post-deliver loop** | `docs/post_deliver_checklist.md` + `src/qa/retrospective.py` — auto after deliver; idempotent per run_id |
 
 ### Verdict memory rules (SSOT behavior)
 
@@ -33,7 +33,7 @@ This document tracks identified bugs, architectural improvements, and long-term 
 1. ~~**Commit + push P1**~~ **DONE** — `11ee4d9` on `main`; GitHub Actions deploy on push.
 2. **Validate on a real run:** after deliver, confirm `board_verdicts.json` in Azure state container updates with Pass entries.
 3. ~~**First human review** on a live run~~ **DONE** — run `20260529_095341`; blob + ledger confirmed.
-4. **After each deliver:** follow [`post_deliver_checklist.md`](post_deliver_checklist.md) → `tools/run_retrospective.py --run-id … --fetch --write-insights`.
+4. **After each deliver:** follow [`post_deliver_checklist.md`](post_deliver_checklist.md) — retrospective runs automatically; review `retrospective_{run_id}.md` in Azure.
 
 ### Open items (ordered — see also full backlog below)
 
@@ -273,7 +273,7 @@ Full API reference + dead URLs: **`docs/fmp_data_dictionary.md`**. Guardrails: *
   * **QA Integrity auditor → Flash + hard 90s timeout** (`qa_pipeline.run_qa_integrity_audit`). On timeout it emits a non-blocking WARNING instead of killing the run or false-failing QA.
   * Post-flight trio (post-mortem / systems architect / prompt engineer) unchanged, still parallel.
 * **Chaining:** **Azure Storage Queues** (non-blocking). `prepare` → `boardroom-debate-queue` → `debate` → `boardroom-deliver-queue` → `deliver`. Each queue message carries the `run_id`. Queues auto-created by the output binding. Timer (11:00 UTC weekdays) starts `prepare` only.
-* **Manual/recovery entrypoints:** HTTP routes `/api/prepare`, `/api/debate?run_id=...`, `/api/deliver?run_id=...` (FUNCTION auth) to force a run or **re-run a single phase** after a fix without re-debating. Local end-to-end: `python -m src.main` (runs all three in-process via `src/jobs/orchestrate.py`).
+* **Manual/recovery entrypoints:** HTTP routes `/api/prepare`, `/api/debate?run_id=...`, `/api/deliver?run_id=...`, `/api/retrospective?run_id=...` (FUNCTION auth) to force a run, **re-run a single phase**, or re-run retrospective. Local end-to-end: `python -m src.main` (runs all three in-process via `src/jobs/orchestrate.py`).
 * **run_status is now phased:** single `run_status.json` with `phase` + per-phase `{status, started_at, finished_at, duration_seconds, error}` sub-objects. Overall `status` stays `running` until `deliver` succeeds (so `wait_for_run.py` still works) and flips to `failed` on any phase failure. Each phase also self-aborts at a **540s soft timeout** so a host kill records `failed` instead of a stale `running`.
 * **Sync fix:** `sync_inputs_from_cloud()` now pulls only a curated state allowlist (`board_verdicts`, `portfolio_history`, `portfolio_returns`, `run_status`) instead of **every** historical `api_telemetry_*.json` — removes tens of seconds + cold-start FMP rate-limit pressure.
 * **Telemetry:** each phase writes `api_telemetry_{run_id}_{phase}.json`; `deliver` merges all three (summing per-agent activity) into the canonical `api_telemetry_{run_id}.json` so HR/finance consumers keep working.

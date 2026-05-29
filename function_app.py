@@ -1,5 +1,6 @@
 import azure.functions as func
 import logging
+import json
 import os
 import sys
 import asyncio
@@ -188,6 +189,29 @@ def boardroom_deliver_http(req: func.HttpRequest) -> func.HttpResponse:
     if _run_phase(run_deliver(run_id), run_id, "deliver"):
         return func.HttpResponse(f"deliver ok for {run_id}", status_code=200)
     return func.HttpResponse(f"deliver failed for {run_id}", status_code=500)
+
+
+# --------------------------------------------------------------------------- #
+# Post-deliver retrospective (manual re-run; also runs at end of deliver).     #
+# --------------------------------------------------------------------------- #
+@app.route(route="retrospective", auth_level=func.AuthLevel.FUNCTION)
+def boardroom_retrospective_http(req: func.HttpRequest) -> func.HttpResponse:
+    from src.qa.retrospective import execute_retrospective
+    run_id = (req.params.get("run_id") or "").strip()
+    if not run_id:
+        return func.HttpResponse("missing run_id", status_code=400)
+    force = (req.params.get("force") or "").lower() in ("1", "true", "yes")
+    try:
+        result = execute_retrospective(run_id, force=force, write_local_insights=False)
+        return func.HttpResponse(json.dumps(result, indent=2), status_code=200,
+                                 mimetype="application/json")
+    except FileNotFoundError as exc:
+        return func.HttpResponse(str(exc), status_code=404)
+    except ValueError as exc:
+        return func.HttpResponse(str(exc), status_code=400)
+    except Exception as exc:
+        logging.error(f"Retrospective HTTP failed: {exc}")
+        return func.HttpResponse(str(exc), status_code=500)
 
 
 # --------------------------------------------------------------------------- #

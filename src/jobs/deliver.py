@@ -191,6 +191,22 @@ async def run_deliver(run_id: str) -> dict:
             is_approved=bool(debate.get("is_approved")),
         )
 
+        # Post-deliver retrospective (idempotent per run_id; non-blocking).
+        try:
+            from src.qa.retrospective import execute_retrospective
+            retro = execute_retrospective(
+                run_id,
+                qa_reports=qa_reports,
+                qa_scorecard=qa_scorecard,
+                write_local_insights=False,
+            )
+            logger.info(
+                "[DELIVER] Retrospective %s for %s (%s candidates).",
+                retro.get("status"), run_id, retro.get("candidate_count", 0),
+            )
+        except Exception as retro_exc:
+            logger.error(f"[DELIVER] Retrospective failed (non-blocking): {retro_exc}")
+
         logger.info(f"[DELIVER] Completed for run {run_id} in {round((finished - started).total_seconds(), 1)}s.")
         return {"run_id": run_id, "status": "success"}
 

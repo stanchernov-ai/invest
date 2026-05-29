@@ -42,6 +42,7 @@ ARTIFACT_FAMILIES = {
     "api_telemetry_": STATE_CONTAINER,
     "qa_reports_": STATE_CONTAINER,
     "qa_human_review_": STATE_CONTAINER,
+    "retrospective_": REPORT_CONTAINER,
 }
 
 # Always-current singletons worth grabbing alongside a run.
