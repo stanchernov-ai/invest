@@ -3,6 +3,7 @@ import urllib.parse
 import requests
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from jinja2 import Template
 import logging
@@ -10,6 +11,10 @@ import logging
 from src.output.briefing_enrichment import enrich_chairman_for_briefing_sync, _is_generic_synthesis
 
 logger = logging.getLogger(__name__)
+
+# Insertion point for post-render QA summary (deliver injects after integrity audit).
+QA_SUMMARY_ANCHOR = "<!-- QA_SUMMARY_ANCHOR -->"
+_CHART_PARALLEL_WORKERS = 4
 
 def get_quickchart_short_url(chart_config, width=600, height=300, background_color="white"):
     # Prefer the short-URL endpoint: the inline GET fallback encodes the entire
@@ -70,12 +75,16 @@ def audit_chart_health(chart_urls):
         "pie_chart_url": "Unrealized Gains (pie)",
         "account_pie_url": "12M Return by Account (pie)",
     }
-    health = []
-    for key, name in labels.items():
-        url = (chart_urls or {}).get(key, "")
+    urls = chart_urls or {}
+
+    def _probe_one(item):
+        key, name = item
+        url = urls.get(key, "")
         ok, detail = _probe_image_url(url)
-        health.append({"name": name, "ok": ok, "detail": detail, "url": url})
-    return health
+        return {"name": name, "ok": ok, "detail": detail, "url": url}
+
+    with ThreadPoolExecutor(max_workers=_CHART_PARALLEL_WORKERS) as pool:
+        return list(pool.map(_probe_one, labels.items()))
 
 
 def format_chart_health(health):
@@ -722,12 +731,42 @@ def build_benchmark_line_chart(history_data):
 def build_briefing_charts(sorted_ledger, account_holdings, account_returns, history_data):
     """Build every briefing chart URL once so callers can both render and health-check
     the exact same images (avoids regenerating differing short URLs)."""
-    return {
-        "pie_chart_url": build_portfolio_pie_chart(sorted_ledger),
-        "account_pie_url": build_account_allocation_pie(account_holdings, account_returns),
-        "bar_chart_url": build_returns_bar_chart(sorted_ledger),
-        "line_chart_url": build_benchmark_line_chart(history_data),
+    builders = {
+        "pie_chart_url": lambda: build_portfolio_pie_chart(sorted_ledger),
+        "account_pie_url": lambda: build_account_allocation_pie(account_holdings, account_returns),
+        "bar_chart_url": lambda: build_returns_bar_chart(sorted_ledger),
+        "line_chart_url": lambda: build_benchmark_line_chart(history_data),
     }
+    results = {}
+
+    def _build_one(item):
+        key, builder = item
+        return key, builder()
+
+    with ThreadPoolExecutor(max_workers=_CHART_PARALLEL_WORKERS) as pool:
+        for key, url in pool.map(_build_one, builders.items()):
+            results[key] = url
+    return results
+
+
+def _qa_summary_box_html(qa_summary_text: str) -> str:
+    return (
+        '<div class="qa-box">\n'
+        '                <strong style="color:#4b5563;">Automated QA Audit</strong>\n'
+        '                <span style="color:#9ca3af;">&mdash; see the QA Audit Dashboard for details on any &#10060;.</span><br><br>\n'
+        f"                {qa_summary_text}\n"
+        "            </div>"
+    )
+
+
+def inject_qa_summary_into_briefing(html: str, qa_summary_text: str) -> str:
+    """Append the QA audit strip to a briefing rendered without qa_summary_text."""
+    if not qa_summary_text:
+        return html.replace(QA_SUMMARY_ANCHOR, "")
+    box = _qa_summary_box_html(qa_summary_text)
+    if QA_SUMMARY_ANCHOR in html:
+        return html.replace(QA_SUMMARY_ANCHOR, box)
+    return html.replace("</body>", f"{box}\n    </body>", 1)
 
 
 def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None, account_returns=None, advanced_data=None, chart_urls=None, raw_verdicts=None, portfolio_symbols=None):
@@ -1011,6 +1050,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 <span style="color:#9ca3af;">&mdash; see the QA Audit Dashboard for details on any &#10060;.</span><br><br>
                 {{ qa_summary_text }}
             </div>
+            {% else %}
+            <!-- QA_SUMMARY_ANCHOR -->
             {% endif %}
         </div>
     </body>
