@@ -10,7 +10,10 @@ from datetime import datetime
 class OwnedAssetVerdict(BaseModel):
     symbol: str = Field(description="The ticker symbol from the CURRENT PORTFOLIO list.")
     analysis: str = Field(description="The unvarnished mathematical and strategic rationale. STRICT LIMIT: 2 sentences maximum.")
-    verdict: str = Field(description="MUST BE EXACTLY ONE OF: Strong Buy, Buy, Hold, Trim, or Sell.")
+    verdict: str = Field(
+        description="MUST BE EXACTLY ONE OF: Strong Buy, Buy, Strong Sell, Sell. "
+        "No Hold or Trim — unclear board splits resolve to Hold in execution."
+    )
     conviction_score: int = Field(description="Confidence level from 1 to 10.")
 
 class WatchlistAssetVerdict(BaseModel):
@@ -65,7 +68,9 @@ class TradeNarrative(BaseModel):
 
 class ChairmanPortfolioSynthesis(BaseModel):
     symbol: str = Field(description="The ticker symbol.")
-    final_verdict: str = Field(description="MUST BE EXACTLY ONE OF: Strong Buy, Buy, Hold, Trim, Sell, or Pass.")
+    final_verdict: str = Field(
+        description="MUST BE EXACTLY ONE OF: Strong Buy, Buy, Strong Sell, Sell, Hold, Trim, or Pass."
+    )
     synthesis: str = Field(description="A detailed strategic justification for this decision.")
     narrative: TradeNarrative = Field(description="The opposing arguments from the board members.")
     supporting_members: list[str] = Field(description="List of board members who explicitly supported this action.")
@@ -151,7 +156,17 @@ MUNGER_DOCTRINE = "THE MUNGER DOCTRINE: This is an aggressively positioned, tech
 
 RETAIL_EDGE_DOCTRINE = "RETAIL EDGE DOCTRINE: Stan is a nimble retail investor who deeply understands technology. He does not move markets and can enter/exit positions instantly without slippage. You are mandated to seek asymmetric upside to outperform the indices. High growth, high beta, and visionary tech leadership are acceptable. However, you must avoid fundamentally broken companies, dying businesses, or frauds."
 
-WATCHLIST_RULING = "WATCHLIST VS PORTFOLIO RULES: The data provided is split into two distinct sections. For assets in the 'CURRENT PORTFOLIO', you may recommend Strong Buy, Buy, Hold, Trim, or Sell. For assets in the 'APPROVED WATCHLIST TARGETS', you CANNOT recommend Hold, Trim, or Sell. You cannot hold or sell what you do not own. For watchlist assets, you must ONLY recommend Strong Buy, Buy, or Pass."
+WATCHLIST_RULING = (
+    "MANDATE VOTING (Phase C — Round 2 JSON is authoritative):\n"
+    "* PORTFOLIO (owned): vote ONLY Strong Buy, Buy, Strong Sell, or Sell. "
+    "Never Hold or Trim in panel JSON — execution Hold is applied in Python when neither side reaches 3/5.\n"
+    "* WATCHLIST: vote ONLY Strong Buy, Buy, or Pass.\n"
+    "* ≥3/5 on buy-side (Strong Buy + Buy) → buy mandate; ≥3/5 on sell-side (Strong Sell + Sell) → reduce mandate; "
+    "otherwise portfolio → Hold, watchlist → Pass.\n"
+    "* Use conviction_score to express intensity; Strong Buy / Strong Sell signal highest conviction."
+)
+
+MANDATE_VOTING_RULES = WATCHLIST_RULING
 
 ROUND_2_REBUTTAL_DIRECTIVE = (
     "[ROUND 2 REBUTTAL — NON-NEGOTIABLE]:\n"

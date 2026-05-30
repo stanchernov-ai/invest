@@ -7,9 +7,14 @@
 
 ## 1. Board decides; code executes
 
-Panel Round 2 JSON is ground truth. Final verdicts come from `vote_engine` + `guardrails` + `chairman_alignment` whenever votes are majority-deterministic. LLM chairman is **exception**, not default — tie-breaks and ambiguous funding only.
+Panel Round 2 JSON is ground truth. Final verdicts come from `vote_engine` + `guardrails` whenever the full panel voted.
 
-**Code:** `can_determine_allocation()`, `build_chairman_allocation()`, `mandate_verdict()`.
+**Phase C mandate voting (Round 2 panel JSON):**
+- **Portfolio:** Strong Buy · Buy · Strong Sell · Sell only (no Hold/Trim in votes).
+- **Watchlist:** Strong Buy · Buy · Pass only.
+- **≥3/5 buy-side** → buy mandate (Strong Buy when ≥3 Strong Buy votes); **≥3/5 sell-side** → reduce mandate (Strong Sell when ≥3 Strong Sell votes).
+- **Otherwise** → Hold (portfolio) / Pass (watchlist) in execution — no chairman tie-break.
+- Max-3 equity buys ranked by conviction (Strong Buy weighted above Buy).
 
 ---
 

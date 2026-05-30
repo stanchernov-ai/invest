@@ -36,8 +36,8 @@
 
 | Pri | Effort | Item | Principle |
 |-----|--------|------|-----------|
-| **P1** | S | Commit + prod validate Phase B + cleanup | §1, §3 |
-| **P1** | S | ~~No LLM debate retry on compliance fail~~ **DONE** (local) | §2 |
+| **P1** | M | ~~Phase C binary mandate votes~~ **DONE** (local) — Strong Buy/Sell schema, buy_side/sell_side counts |
+| **P1** | S | Commit + prod validate Phase B/C on `152151` | §1, §3 |
 | **P1** | S | ~~Skip Markopolos when `allocation_source=vote_engine`~~ **DONE** (local) | §3 |
 | **P1** | M | Round 2 rebuttal quality — verbatim R1 in R2 | §5 |
 | **P1** | M | Post Mortem vote verification vs `raw_verdicts` | §5 |

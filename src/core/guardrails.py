@@ -14,7 +14,7 @@ LIQUIDATION_CAP_PCT = 0.10
 WASH_SALE_DAYS = 30
 
 BUY_VERDICTS = frozenset({"BUY", "STRONG BUY"})
-SELL_VERDICTS = frozenset({"SELL", "TRIM"})
+SELL_VERDICTS = frozenset({"SELL", "STRONG SELL", "TRIM"})
 HEDGE_SYMBOLS = frozenset({"TLT", "VXX"})
 
 _DATE_FORMATS = (

@@ -93,7 +93,7 @@ class TestPostMortemAudit(unittest.TestCase):
             portfolio_symbols=set(),
         )
         self.assertIn("AMZN", digest)
-        self.assertIn("buy=3", digest)
+        self.assertIn("buy_side=3", digest)
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ from src.core.guardrails import (
 from src.core.vote_engine import (
     MAJORITY_THRESHOLD,
     build_vote_summaries,
+    mandate_verdict,
     verdict_bucket,
 )
 
@@ -59,11 +60,20 @@ def _narrative_mentions_hedge(chairman: dict) -> bool:
     return any(k in text for k in (" HEDGE", "TLT", "VXX", "MANDATORY NON-CORRELATED"))
 
 
-def _chairman_aligns_with_majority(final_verdict: str, majority_bucket: str) -> bool:
-    cb = verdict_bucket(final_verdict)
-    if majority_bucket == "reduce":
-        return cb == "reduce"
-    return cb == majority_bucket
+def _chairman_aligns_with_mandate(final_verdict: str, expected_mandate: str) -> bool:
+    final = _normalize_verdict(final_verdict)
+    expected = _normalize_verdict(expected_mandate)
+    if final == expected:
+        return True
+    if expected in BUY_VERDICTS and final in BUY_VERDICTS:
+        return True
+    if expected in ("SELL", "STRONG SELL", "TRIM") and final in ("SELL", "STRONG SELL", "TRIM"):
+        return True
+    if expected == "HOLD" and final == "HOLD":
+        return True
+    if expected == "PASS" and final == "PASS":
+        return True
+    return False
 
 
 def _is_surplus_majority_buy_demotion(
@@ -72,12 +82,10 @@ def _is_surplus_majority_buy_demotion(
     chairman: dict,
     majority_bucket: str,
 ) -> bool:
-    """Pass/Hold on a 3/5 Buy when max equity buy slots are already filled."""
-    if majority_bucket != "buy":
+    """Pass/Hold on a 3/5 buy-side when max equity buy slots are already filled."""
+    if summary.buy_side_count() < MAJORITY_THRESHOLD:
         return False
     if _normalize_verdict(pos.get("final_verdict", "")) in BUY_VERDICTS:
-        return False
-    if summary.bucket_counts.get("buy", 0) < MAJORITY_THRESHOLD:
         return False
     return count_equity_buys(chairman) >= MAX_DAILY_BUYS
 
@@ -121,18 +129,20 @@ def audit_chairman_vote_alignment(
             summary = summaries.get(sym)
             if not summary:
                 continue
-            mb = summary.majority_bucket()
-            if mb is None:
-                continue
+            expected = mandate_verdict(summary)
             final = pos.get("final_verdict", "")
-            if _has_valid_majority_override(pos, mb):
+            mb = "buy" if summary.buy_side_count() >= MAJORITY_THRESHOLD else (
+                "reduce" if summary.sell_side_count() >= MAJORITY_THRESHOLD else None
+            )
+            if _has_valid_majority_override(pos, mb or ""):
                 continue
-            if _is_surplus_majority_buy_demotion(pos, summary, chairman, mb):
+            if _is_surplus_majority_buy_demotion(pos, summary, chairman, mb or ""):
                 continue
-            if not _chairman_aligns_with_majority(final, mb):
+            if not _chairman_aligns_with_mandate(final, expected):
                 violations.append(
-                    f"MAJORITY VOTE ALIGNMENT: {sym} board majority is {mb} "
-                    f"({summary.bucket_counts.get(mb, 0)}/5) but chairman final_verdict is {final}."
+                    f"MAJORITY VOTE ALIGNMENT: {sym} board mandate is {expected} "
+                    f"(buy_side={summary.buy_side_count()}/5, sell_side={summary.sell_side_count()}/5) "
+                    f"but chairman final_verdict is {final}."
                 )
 
     for section in ("portfolio_positions", "watchlist_positions"):
@@ -148,7 +158,7 @@ def audit_chairman_vote_alignment(
                     f"ORIGINATOR RULE: {sym} is Buy/Strong Buy in chairman JSON but has no Round 2 panel votes."
                 )
                 continue
-            buy_votes = summary.bucket_counts.get("buy", 0)
+            buy_votes = summary.buy_side_count()
             if buy_votes < MAJORITY_THRESHOLD:
                 violations.append(
                     f"MAJORITY BUY MANDATE: {sym} chairman Buy/Strong Buy requires "
@@ -159,7 +169,7 @@ def audit_chairman_vote_alignment(
     alpha = chairman.get("alpha_pick") or {}
     alpha_sym = (alpha.get("symbol") or "").strip()
     any_majority_buy = any(
-        s.bucket_counts.get("buy", 0) >= MAJORITY_THRESHOLD for s in summaries.values()
+        s.buy_side_count() >= MAJORITY_THRESHOLD for s in summaries.values()
     )
     if alpha_sym and any_majority_buy:
         alpha_summary = summaries.get(alpha_sym)
@@ -167,10 +177,10 @@ def audit_chairman_vote_alignment(
             violations.append(
                 f"ALPHA PICK: {alpha_sym} has no Round 2 panel votes."
             )
-        elif alpha_summary.bucket_counts.get("buy", 0) < MAJORITY_THRESHOLD:
+        elif alpha_summary.buy_side_count() < MAJORITY_THRESHOLD:
             violations.append(
                 f"ALPHA PICK: {alpha_sym} requires majority Buy support "
-                f"({alpha_summary.bucket_counts.get('buy', 0)}/{MAJORITY_THRESHOLD} panelists)."
+                f"({alpha_summary.buy_side_count()}/{MAJORITY_THRESHOLD} panelists)."
             )
 
     return violations

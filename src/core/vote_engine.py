@@ -29,12 +29,27 @@ AGENT_DISPLAY = {
 
 Bucket = Literal["buy", "reduce", "hold", "pass"]
 
+BUY_SIDE_VERDICTS = frozenset({"STRONG BUY", "BUY"})
+SELL_SIDE_VERDICTS = frozenset({"STRONG SELL", "SELL", "TRIM"})
+
+
+def panel_verdict_side(verdict: str, section: Literal["portfolio", "watchlist"]) -> Literal["buy", "sell", "pass", "neutral"]:
+    """Map panel Round 2 vote to buy-side, sell-side, pass (watchlist), or neutral."""
+    v = _normalize_verdict(verdict)
+    if v in BUY_SIDE_VERDICTS:
+        return "buy"
+    if v in SELL_SIDE_VERDICTS:
+        return "sell"
+    if v == "PASS":
+        return "pass" if section == "watchlist" else "neutral"
+    return "neutral"
+
 
 def verdict_bucket(verdict: str) -> Bucket:
     v = _normalize_verdict(verdict)
     if v in BUY_VERDICTS:
         return "buy"
-    if v in ("SELL", "TRIM"):
+    if v in SELL_SIDE_VERDICTS:
         return "reduce"
     if v == "PASS":
         return "pass"
@@ -68,6 +83,24 @@ class SymbolVoteSummary:
         for verdict, _conviction in self.votes.values():
             counts[verdict_bucket(verdict)] += 1
         self.bucket_counts = counts
+
+    def buy_side_count(self) -> int:
+        return sum(
+            1 for v, _ in self.votes.values()
+            if panel_verdict_side(v, self.section) == "buy"
+        )
+
+    def sell_side_count(self) -> int:
+        return sum(
+            1 for v, _ in self.votes.values()
+            if panel_verdict_side(v, self.section) == "sell"
+        )
+
+    def pass_count(self) -> int:
+        return sum(
+            1 for v, _ in self.votes.values()
+            if panel_verdict_side(v, self.section) == "pass"
+        )
 
     @property
     def panel_count(self) -> int:
@@ -103,17 +136,8 @@ class SymbolVoteSummary:
                 or self.bucket_counts.get("reduce", 0) >= MAJORITY_THRESHOLD)
 
     def needs_chairman_judgment(self) -> bool:
-        """True when vote math alone cannot pick a final verdict (ties / insufficient votes)."""
-        if self.panel_count < MAJORITY_THRESHOLD:
-            return True
-        mb = self.majority_bucket()
-        if mb is None:
-            return True
-        # Perfect 2-2 split on two buckets (e.g. buy vs pass with 1 hold).
-        top_two = sorted(self.bucket_counts.values(), reverse=True)
-        if len(top_two) >= 2 and top_two[0] == top_two[1] == 2:
-            return True
-        return False
+        """Phase C: mandates are always Python-resolvable when the full panel voted."""
+        return self.panel_count < MAJORITY_THRESHOLD
 
 
 def build_vote_summaries(
@@ -166,60 +190,91 @@ def detect_unicorn_trades(summaries: dict[str, SymbolVoteSummary]) -> list[dict]
 def detect_sell_candidates(summaries: dict[str, SymbolVoteSummary]) -> list[str]:
     return [
         sym for sym, summary in summaries.items()
-        if summary.bucket_counts.get("reduce", 0) > 0
+        if summary.sell_side_count() >= MAJORITY_THRESHOLD
+        and summary.section == "portfolio"
     ]
 
 
-def can_determine_allocation(summaries: dict[str, SymbolVoteSummary]) -> bool:
-    """Skip chairman Pro when every symbol has enough panel votes for Python allocation.
+def _buy_rank_score(summary: SymbolVoteSummary) -> int:
+    """Rank max-3 candidates: Strong Buy votes weighted above Buy."""
+    score = 0
+    for verdict, conviction in summary.votes.values():
+        v = _normalize_verdict(verdict)
+        if v == "STRONG BUY":
+            score += int(conviction) + 100
+        elif v == "BUY":
+            score += int(conviction)
+    return score
 
-    Includes 3/5 majorities, max-3 demotions, and conservative 2/2 tie-breaks via
-    ``mandate_verdict`` — one ambiguous symbol must not force chairman Pro for all."""
+
+def _mandate_from_buy_votes(summary: SymbolVoteSummary) -> str:
+    strong = sum(
+        1 for v, _ in summary.votes.values() if _normalize_verdict(v) == "STRONG BUY"
+    )
+    if strong >= MAJORITY_THRESHOLD:
+        return "Strong Buy"
+    return "Buy"
+
+
+def _mandate_from_sell_votes(summary: SymbolVoteSummary) -> str:
+    strong = sum(
+        1 for v, _ in summary.votes.values() if _normalize_verdict(v) == "STRONG SELL"
+    )
+    if strong >= MAJORITY_THRESHOLD:
+        return "Strong Sell"
+    regular = sum(
+        1 for v, _ in summary.votes.values()
+        if _normalize_verdict(v) in ("SELL", "TRIM")
+    )
+    return "Sell" if regular >= MAJORITY_THRESHOLD else "Trim"
+
+
+def mandate_verdict(summary: SymbolVoteSummary) -> str:
+    """Phase C mandate: ≥3/5 buy-side or sell-side; else Hold (portfolio) / Pass (watchlist)."""
+    buys = summary.buy_side_count()
+    sells = summary.sell_side_count()
+
+    if summary.section == "watchlist":
+        if buys >= MAJORITY_THRESHOLD:
+            return _mandate_from_buy_votes(summary)
+        return "Pass"
+
+    if buys >= MAJORITY_THRESHOLD and buys > sells:
+        return _mandate_from_buy_votes(summary)
+    if sells >= MAJORITY_THRESHOLD and sells > buys:
+        return _mandate_from_sell_votes(summary)
+    return "Hold"
+
+
+def can_determine_allocation(summaries: dict[str, SymbolVoteSummary]) -> bool:
+    """Skip chairman Pro when every symbol has a full panel vote (Phase C mandates in Python)."""
     if not summaries:
         return False
     return all(summary.panel_count >= MAJORITY_THRESHOLD for summary in summaries.values())
 
 
 def can_bypass_chairman(summaries: dict[str, SymbolVoteSummary]) -> bool:
-    """Alias for ``can_determine_allocation`` (Phase B expanded bypass)."""
+    """Alias for ``can_determine_allocation``."""
     return can_determine_allocation(summaries)
 
 
-def mandate_verdict(summary: SymbolVoteSummary) -> str:
-    """Map vote summary to chairman final_verdict when deterministic."""
-    if summary.is_unanimous("buy"):
-        verdicts = [_normalize_verdict(v) for v, _ in summary.votes.values()]
-        return "Strong Buy" if all(v == "STRONG BUY" for v in verdicts) else "Buy"
-    if summary.is_unanimous("reduce"):
-        verdicts = [_normalize_verdict(v) for v, _ in summary.votes.values()]
-        return "Sell" if any(v == "SELL" for v in verdicts) else "Trim"
-    if summary.is_unanimous("pass"):
-        return "Pass"
-    if summary.is_unanimous("hold"):
-        return "Hold"
-
-    mb = summary.majority_bucket()
-    if mb == "buy":
-        return "Buy"
-    if mb == "reduce":
-        return "Trim"
-    if mb == "pass":
-        return "Pass"
-
-    # No 3/5 majority — conservative tie-break (e.g. AVGO 2 Trim / 2 Hold).
-    top_two = sorted(summary.bucket_counts.values(), reverse=True)
-    if len(top_two) >= 2 and top_two[0] == top_two[1] == 2:
-        return "Hold" if summary.section == "portfolio" else "Pass"
-
-    return "Hold"
-
-
 def _supporting_for_mandate(summary: SymbolVoteSummary, final_verdict: str) -> tuple[list[str], int]:
-    target = verdict_bucket(final_verdict)
+    final = _normalize_verdict(final_verdict)
     members: list[str] = []
     conviction_sum = 0
     for agent_key, (verdict, conviction) in summary.votes.items():
-        if verdict_bucket(verdict) == target:
+        side = panel_verdict_side(verdict, summary.section)
+        v = _normalize_verdict(verdict)
+        matched = False
+        if final in BUY_VERDICTS and side == "buy":
+            matched = True
+        elif final in ("STRONG SELL", "SELL", "TRIM") and side == "sell":
+            matched = True
+        elif final == "PASS" and side == "pass":
+            matched = True
+        elif final == "HOLD" and side == "neutral":
+            matched = True
+        if matched:
             members.append(AGENT_DISPLAY.get(agent_key, agent_key))
             conviction_sum += conviction
     return members, conviction_sum
@@ -244,23 +299,21 @@ def format_vote_digest(
     portfolio_symbols = portfolio_symbols or set()
     lines = [
         "DETERMINISTIC VOTE DIGEST (Round 2 JSON — authoritative; do not re-count from prose):",
-        f"Majority threshold: {MAJORITY_THRESHOLD}/{PANEL_SIZE} panelists. Trim + Sell = reduce exposure.",
+        f"Phase C mandate: ≥{MAJORITY_THRESHOLD}/{PANEL_SIZE} buy-side (Strong Buy+Buy) or "
+        f"sell-side (Strong Sell+Sell); else Hold/Pass. Strong Buy/Sell rank above Buy/Sell.",
         "",
     ]
     for sym in sorted(summaries.keys(), key=lambda s: (s not in portfolio_symbols, s)):
         s = summaries[sym]
-        counts = s.bucket_counts
-        mb = s.majority_bucket()
-        mandate = mandate_verdict(s) if not s.needs_chairman_judgment() else "CHAIRMAN REQUIRED"
+        mandate = mandate_verdict(s)
         uni = ""
         if s.is_actionable_unanimous():
             uni = " [ACTIONABLE UNANIMOUS 5/5]"
         elif s.is_unanimous():
             uni = " [UNANIMOUS]"
         lines.append(
-            f"  {sym}: buy={counts.get('buy', 0)} reduce={counts.get('reduce', 0)} "
-            f"hold={counts.get('hold', 0)} pass={counts.get('pass', 0)} "
-            f"majority={mb or 'none'} → mandate={mandate}{uni}"
+            f"  {sym}: buy_side={s.buy_side_count()}/5 sell_side={s.sell_side_count()}/5 "
+            f"pass={s.pass_count()}/5 → mandate={mandate}{uni}"
         )
     deterministic = can_determine_allocation(summaries)
     lines.append("")
@@ -294,7 +347,7 @@ def _pick_alpha_pick_from_chairman(
             if _normalize_verdict(pos.get("final_verdict", "")) not in BUY_VERDICTS:
                 continue
             summary = summaries.get(sym)
-            if summary and summary.bucket_counts.get("buy", 0) < MAJORITY_THRESHOLD:
+            if summary and summary.buy_side_count() < MAJORITY_THRESHOLD:
                 continue
             conviction = int(pos.get("aggregate_conviction_score") or 0)
             candidates.append((conviction, sym))
@@ -319,10 +372,9 @@ def _pick_alpha_pick(
     """Legacy helper — prefer ``_pick_alpha_pick_from_chairman`` after max-3 cap."""
     candidates: list[tuple[int, str]] = []
     for sym, summary in summaries.items():
-        if summary.bucket_counts.get("buy", 0) < MAJORITY_THRESHOLD:
+        if summary.buy_side_count() < MAJORITY_THRESHOLD:
             continue
-        _, conviction = _supporting_for_mandate(summary, "Buy")
-        candidates.append((conviction, sym))
+        candidates.append((_buy_rank_score(summary), sym))
     candidates.sort(key=lambda x: (-x[0], x[1]))
     if not candidates:
         sym = next(iter(summaries.keys()), "N/A")
@@ -352,10 +404,11 @@ def apply_max_three_buys(
             if _normalize_verdict(pos.get("final_verdict", "")) not in BUY_VERDICTS:
                 continue
             conviction = int(pos.get("aggregate_conviction_score") or 0)
+            ranked_score = conviction
             if summaries and sym in summaries:
-                _, conviction = _supporting_for_mandate(summaries[sym], "Buy")
-                pos["aggregate_conviction_score"] = conviction
-            ranked.append((conviction, section_key, pos))
+                ranked_score = _buy_rank_score(summaries[sym])
+                pos["aggregate_conviction_score"] = ranked_score
+            ranked.append((ranked_score, section_key, pos))
 
     ranked.sort(key=lambda item: (-item[0], item[2].get("symbol", "")))
     kept_symbols = {item[2]["symbol"] for item in ranked[:max_buys]}
@@ -423,8 +476,8 @@ def build_chairman_allocation(
             "final_verdict": final,
             "synthesis": (
                 "[VOTE ENGINE] Deterministic mandate from Round 2 panel votes "
-                f"(buy={summary.bucket_counts.get('buy', 0)}/5, "
-                f"reduce={summary.bucket_counts.get('reduce', 0)}/5)."
+                f"(buy_side={summary.buy_side_count()}/5, "
+                f"sell_side={summary.sell_side_count()}/5)."
             ),
             "narrative": _default_narrative(members[0] if members else "Board"),
             "supporting_members": members,
@@ -451,7 +504,8 @@ def build_chairman_allocation(
         "capital_flow_audit": {
             "liquidated_tickers": [
                 sym for sym, s in summaries.items()
-                if sym in portfolio_symbols and mandate_verdict(s) in ("Trim", "Sell")
+                if sym in portfolio_symbols
+                and _normalize_verdict(mandate_verdict(s)) in ("TRIM", "SELL", "STRONG SELL")
             ],
             "target_tickers": target_tickers,
         },
