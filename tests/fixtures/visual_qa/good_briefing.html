@@ -2,9 +2,24 @@
 <html>
 <head>
   <style>
-    .chart-title { color: #2563eb; font-weight: 600; margin: 0 0 10px 0; }
-    .chart-container { border: 1px solid #e5e7eb; padding: 10px; }
-    .chart-img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+    :root {
+      --bg-canvas: #121212;
+      --bg-container: #1e1e1e;
+      --brand-sage: #95b8a2;
+      --border-subtle: #3f3f46;
+    }
+    body { background-color: #121212; color: #a1a1aa; }
+    .container { background-color: #1e1e1e; padding: 20px; border: 1px solid #3f3f46; }
+    h1 { color: #95b8a2; }
+    .chart-title { color: #95b8a2; font-weight: 600; margin: 0 0 10px 0; }
+    .chart-container { border: 1px solid #3f3f46; padding: 10px; background-color: #27272a; }
+    .chart-img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+      filter: invert(0.9) hue-rotate(180deg) grayscale(0.6);
+    }
   </style>
 </head>
 <body>
@@ -19,7 +34,7 @@
           </div>
         </td>
         <td valign="top" width="50%">
-          <div class="chart-title">Personal Return by Asset</div>
+          <div class="chart-title">Performance vs. Benchmark</div>
           <div class="chart-container">
             <img class="chart-img" src="https://quickchart.io/chart/render/def456" alt="Portfolio Returns Bar Chart">
           </div>

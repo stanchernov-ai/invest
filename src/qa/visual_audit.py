@@ -6,6 +6,8 @@ QA persona. Golden fixtures in tests/fixtures/visual_qa/ regression-test them.
 import re
 from bs4 import BeautifulSoup
 
+from src.output.briefing_style import BG_CANVAS, BRAND_SAGE, CHART_IMG_FILTER
+
 # Patterns that break in Gmail/Outlook (from graphics_designer_qa mandate).
 _EMAIL_UNSAFE_CSS = re.compile(
     r"(display\s*:\s*flex|flex-direction|display\s*:\s*grid|object-fit)",
@@ -23,6 +25,36 @@ def _style_blocks(html: str) -> list[str]:
     return blocks
 
 
+def audit_briefing_theme(html: str) -> list[dict]:
+    """Verify the dark premium palette SSOT is present in the saved briefing artifact."""
+    findings: list[dict] = []
+    if not (html or "").strip():
+        return findings
+
+    if BG_CANVAS not in html and "--bg-canvas" not in html:
+        findings.append({
+            "severity": "WARNING",
+            "category": "Brand Palette",
+            "description": f"Dark canvas color {BG_CANVAS} not found in briefing CSS.",
+            "recommendation": "Use src/output/briefing_style.py executive_briefing_css() in the template.",
+        })
+    if BRAND_SAGE not in html:
+        findings.append({
+            "severity": "WARNING",
+            "category": "Brand Palette",
+            "description": f"Matte sage accent {BRAND_SAGE} not found in briefing CSS.",
+            "recommendation": "Headings and chart titles should use --brand-sage.",
+        })
+    if ".chart-img" in html and CHART_IMG_FILTER not in html:
+        findings.append({
+            "severity": "CRITICAL",
+            "category": "Chart Presentation",
+            "description": "Briefing defines .chart-img but is missing the dark-mode chart filter.",
+            "recommendation": f"Apply filter: {CHART_IMG_FILTER}",
+        })
+    return findings
+
+
 def audit_briefing_html(html: str) -> list[dict]:
     """Return structured findings for the saved/emailed briefing HTML artifact."""
     findings: list[dict] = []
@@ -35,6 +67,7 @@ def audit_briefing_html(html: str) -> list[dict]:
         }]
 
     soup = BeautifulSoup(html, "html.parser")
+    findings.extend(audit_briefing_theme(html))
 
     for idx, block in enumerate(_style_blocks(html)):
         if _EMAIL_UNSAFE_CSS.search(block):

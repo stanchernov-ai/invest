@@ -1,11 +1,12 @@
 # Briefing Charts & Layout — Session Handoff
 
 **Status:** Active  
-**Last updated:** May 29, 2026 (EOD — chart palette + layout sprint)  
+**Last updated:** May 30, 2026 (EOD — layout + three-layer Action Plan)  
 **SSOT for:** QuickChart configuration, briefing section order, gain/loss color rules, and validation runs for executive briefing visuals.
 
-**Code:** `src/output/reporting.py`  
-**Tests:** `tests/test_reporting_briefing.py` (14 tests)
+**Code:** `src/output/reporting.py` (chart builders) · **`src/output/briefing_style.py`** (HTML palette SSOT)  
+**Style doc:** [`briefing_style.md`](briefing_style.md)  
+**Tests:** `tests/test_reporting_briefing.py`, `tests/test_briefing_style.py`
 
 ---
 
@@ -18,22 +19,34 @@
 
 ---
 
-## What shipped (May 29, 2026)
+## What shipped
+
+### May 29, 2026 — chart palette sprint
 
 | Commit | Summary |
 |--------|---------|
-| `ce577bf` | Dark green/red gain-loss palette on white (pies + TWR table); bar Y-axis `Return (%)`; hide bar legend |
+| `ce577bf` | Dark green/red gain-loss palette on white (pies); bar Y-axis `Return (%)`; hide bar legend |
 | `a91b05a` | Move **State of the Union** before Action Plan; CAGR `12.00%` not `12.00 percent` |
 | `41cc31d` | Remove pie chart top legends (`plugins.legend: false` boolean); taller pie canvas 600×420 |
 | `3f66433` | Dark canvas line + bar charts; compact `May '25` dates; bar `%` datalabels; handout doc |
+
+### May 30, 2026 — briefing layout + Action Plan
+
+| Commit | Summary |
+|--------|---------|
+| `e044bde` | Section order: pies → SoTU → Action Plan (metric box + charts unchanged) |
+| `04af83d` | Remove Symbol/Action summary table; remove **Time-Weighted Returns table** (returns data still feeds mandate + charts) |
+| `cfe55fd`, `380427f` | Three-layer Action Plan per symbol: **Strategic Context** (Flash) + **Champion** + **Dissent** (R2 JSON) |
+
+**Enrichment code:** `src/output/briefing_enrichment.py` — wired in `src/jobs/deliver.py` before `generate_html_briefing`.
 
 ### Validation runs
 
 | Run ID | Pipeline | Charts / QA notes |
 |--------|----------|-------------------|
-| `20260529_144833` | **success** — canonical pre-chart-fix | Graphics **FAIL** — light green pies, unreadable labels |
-| `20260529_152151` | **success** — post `ce577bf` deploy | Graphics **FAIL** — similar dark greens on pies; bar labels invisible (white-on-white); raw `YYYYMMDD` x-axis |
-| *(next)* | Re-run after full chart sprint deploy | Expect Graphics PASS on chart-health + contrast |
+| `20260529_152151` | success | Chart sprint baseline; Graphics still flags bar Y-axis |
+| `20260529_225159` | **success** — **canonical layout** | Action Plan 8/8 enriched; no TWR table; Debate complete |
+| `20260529_214609` | Supervisor BLOCKED | Pre-layout; Integrity TSM false positive (R1 vs R2) |
 
 **Note:** `wait_for_run.py --timeout 660` can false-timeout when debate queue delay (~10 min post-deploy) eats the budget. Poll from debate start or use `--timeout 900`.
 
@@ -54,9 +67,13 @@
 
 ## Color palettes (gain / loss only)
 
+**HTML/email dark theme:** see [`briefing_style.md`](briefing_style.md) — canvas `#121212`, sage `#95b8a2`, chart `.chart-img` CSS filter.
+
+QuickChart **data** colors (white canvas PNGs):
+
 No third hue for gain/loss charts. Semantic: **green = gains, red = losses**.
 
-### Light theme (pies, TWR table text)
+### Light theme (pies)
 
 | Role | High (better) | Low (worse) |
 |------|---------------|-------------|
@@ -101,16 +118,15 @@ After metric box and charts:
 
 1. Performance + bar charts (side by side)
 2. Pie charts (side by side)
-3. Time-Weighted Returns table
-4. **The State of the Union** (analyst quotes)
-5. The Alpha Pick (if displayable)
-6. The Action Plan
-7. The Debate
-8. Unicorn Protocol (if any)
-9. Chairman's Closing Thoughts
-10. Upcoming Catalysts
+3. **The State of the Union** (analyst quotes)
+4. The Alpha Pick (if displayable)
+5. **The Action Plan** — per symbol: Strategic Context → Champion → Dissent (no summary table)
+6. The Debate (hidden if `boardroom_brawl` incomplete)
+7. Unicorn Protocol (if any)
+8. Chairman's Closing Thoughts
+9. Upcoming Catalysts
 
-**Open tension:** Graphics QA on `152151` suggested Action Plan *above* SoTU. Stan approved SoTU earlier (after TWR). Reconcile with Stan before reordering again.
+**Removed May 30:** Time-Weighted Returns **table** (`04af83d`). Account return JSON still drives CAGR mandate text and pie allocation chart.
 
 ---
 
@@ -120,7 +136,7 @@ After metric box and charts:
 |------------|--------|
 | `BenchmarkChartTests` | TWR index rebase, compact month labels, dark line bg |
 | `ChartColorTests` | Palette spread, dark-green-only on light theme, pie legend false, bar datalabels |
-| `BriefingHtmlTests` | Section order TWR → SoTU → Action Plan; CAGR `%` |
+| `BriefingHtmlTests` | Section order pies → SoTU → Action Plan; no TWR table; three-layer Action Plan fields |
 | `BriefingCopyTests` | Alpha pick / debate / QA jargon sanitization |
 
 Add golden HTML fixtures under `tests/fixtures/visual_qa/` when a run is accepted as baseline.
@@ -131,13 +147,14 @@ Add golden HTML fixtures under `tests/fixtures/visual_qa/` when a run is accepte
 
 | Priority | Item | Source |
 |----------|------|--------|
-| **P1** | Validate full chart sprint on production deliver | This session |
-| **P1** | Round 2 rebuttal prompts — stop verbatim R1 copy | Prompt Engineer CRITICAL `152151` |
-| **P1** | Post Mortem QA — verify vote counts vs log (AMZN 2/5 false majority) | Integrity CRITICAL `152151` |
-| **P1** | Section order — SoTU vs Action Plan priority | Graphics WARNING `152151` vs Stan preference |
-| **P2** | R2 debate log bloat (Pass spam) | Systems Architect CRITICAL `152151` |
+| **P1** | Bar chart Y-axis / legend / contrast | Recurring Graphics CRITICAL |
+| **P1** | Flash Strategic Context duplicates Champion text | Action Plan polish — run `225159` |
+| **P1** | Integrity auditor — R2 JSON ground truth for vote digest | TSM false positive `214609` |
+| **P2** | Round 2 rebuttal prompts — stop verbatim R1 copy | Prompt Engineer CRITICAL |
 | **P2** | Split `reporting.py` | Backlog |
 | **P3** | Verdict memory META dedupe | `144833` |
+
+**Done:** Post-mortem vote verification (`bf17114`); section order SoTU before Action Plan (`e044bde`); TWR table removed (`04af83d`).
 
 ---
 
@@ -146,7 +163,7 @@ Add golden HTML fixtures under `tests/fixtures/visual_qa/` when a run is accepte
 Skip debate if checkpoint exists:
 
 ```http
-GET https://<defaultHostName>/api/deliver?run_id=20260529_152151&code=<function-key>
+GET https://<defaultHostName>/api/deliver?run_id=20260529_225159&code=<function-key>
 ```
 
 Hostname: `engineering_playbook.md` — Flex Consumption regional hostname (not `*.azurewebsites.net` guess).

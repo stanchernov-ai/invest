@@ -9,6 +9,15 @@ from jinja2 import Template
 import logging
 
 from src.output.briefing_enrichment import enrich_chairman_for_briefing_sync, _is_generic_synthesis
+from src.output.briefing_style import (
+    executive_briefing_css,
+    qa_dashboard_css,
+    qa_summary_box_html,
+    sotu_quote_colors,
+    verdict_pill_styles,
+    BG_SURFACE,
+    BORDER_SUBTLE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -800,13 +809,7 @@ def build_briefing_charts(sorted_ledger, account_holdings, account_returns, hist
 
 
 def _qa_summary_box_html(qa_summary_text: str) -> str:
-    return (
-        '<div class="qa-box">\n'
-        '                <strong style="color:#4b5563;">Automated QA Audit</strong>\n'
-        '                <span style="color:#9ca3af;">&mdash; see the QA Audit Dashboard for details on any &#10060;.</span><br><br>\n'
-        f"                {qa_summary_text}\n"
-        "            </div>"
-    )
+    return qa_summary_box_html(qa_summary_text)
 
 
 def inject_qa_summary_into_briefing(html: str, qa_summary_text: str) -> str:
@@ -851,6 +854,12 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     for quote in sotu_quotes:
         base_name = quote.get('board_member', '').split(' (')[0].strip()
         quote['avatar_url'] = avatar_map.get(base_name, "https://ui-avatars.com/api/?name=AI&background=333&color=fff&rounded=true&size=128")
+        sotu_bg, sotu_border = sotu_quote_colors(quote.get('board_member', ''))
+        quote['sotu_bg'] = sotu_bg
+        quote['sotu_border'] = sotu_border
+
+    briefing_css = executive_briefing_css()
+    pill_styles = verdict_pill_styles()
 
     brawl_text = cos_data.get('boardroom_brawl', 'The board evaluated the portfolio without major conflict.')
     known_tickers = [sym for sym, _ in sorted_ledger] + ["SPY", "QQQ"]
@@ -862,35 +871,11 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     <html>
     <head>
         <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; color: #1f2937; margin: 0; padding: 20px; }
-            .container { max-width: 800px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-            h1 { color: #111827; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
-            h2 { color: #2563eb; margin-top: 30px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;}
-            h3 { color: #374151; margin-top: 25px; border-bottom: 2px solid #e5e7eb; padding-bottom: 5px; }
-            h4 { color: #111827; margin-bottom: 5px; }
-            .metric-box { background-color: #f8fafc; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #2563eb; }
-            .hedge-box { background-color: #fffbeb; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #d97706; color: #92400e; }
-            .red-team-box { background-color: #fef2f2; padding: 12px; border-radius: 4px; border-left: 4px solid #dc2626; color: #991b1b; }
-            .champion { color: #166534; font-weight: bold; }
-            .dissenter { color: #991b1b; font-weight: bold; }
-            .verdict-pill { display: inline-block; padding: 6px 14px; border-radius: 6px; font-weight: bold; font-size: 13px; letter-spacing: 0.5px; margin-bottom: 12px; border: 1px solid rgba(0,0,0,0.06); }
-            .chart-container { margin: 0; text-align: center; border: 1px solid #e5e7eb; padding: 10px; border-radius: 5px; background-color: #ffffff; }
-            .chart-title { color: #2563eb; font-size: 1.3em; font-weight: 600; margin: 0 0 10px 0; padding-bottom: 5px; border-bottom: 1px solid #e5e7eb; }
-            .chart-img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
-            .footer { margin-top: 40px; font-size: 0.8em; color: #6b7280; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 20px; }
-            .qa-box { margin-top: 40px; font-size: 0.85em; line-height: 1.7; color: #6b7280; border-top: 1px dashed #e5e7eb; padding-top: 15px; }
+            {{ briefing_css }}
         </style>
     </head>
     <body>
         <div class="container">
-            {% set pill_styles = {
-                'STRONG BUY': 'background-color:#dcfce7; color:#166534;',
-                'BUY': 'background-color:#dcfce7; color:#166534;',
-                'HOLD': 'background-color:#f3f4f6; color:#374151;',
-                'TRIM': 'background-color:#fef3c7; color:#92400e;',
-                'SELL': 'background-color:#fee2e2; color:#991b1b;',
-                'STRONG SELL': 'background-color:#fee2e2; color:#991b1b;'
-            } %}
             <h1>Invest AI: Executive Briefing{% if briefing_date %} &mdash; {{ briefing_date }}{% endif %}</h1>
             
             <div class="metric-box">
@@ -948,21 +933,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {% if sotu_quotes %}
             <h2>The State of the Union</h2>
             {% for quote in sotu_quotes %}
-                {% set box_color = '#f9fafb' %}
-                {% set border_color = '#9ca3af' %}
-                
-                {% if '⭐⭐⭐⭐' in quote.board_member %}
-                    {% set box_color = '#dcfce7' %}
-                    {% set border_color = '#22c55e' %}
-                {% elif '⭐⭐⭐' in quote.board_member %}
-                    {% set box_color = '#dbeafe' %}
-                    {% set border_color = '#3b82f6' %}
-                {% elif '⭐⭐' in quote.board_member or '⭐' in quote.board_member %}
-                    {% set box_color = '#fee2e2' %}
-                    {% set border_color = '#ef4444' %}
-                {% endif %}
-                
-                <table width="100%" cellpadding="0" cellspacing="0" style="margin: 10px 0; border-left: 4px solid {{ border_color }}; background-color: {{ box_color }}; border-radius: 4px;">
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin: 10px 0; border-left: 4px solid {{ quote.sotu_border }}; background-color: {{ quote.sotu_bg }}; border-radius: 4px;">
                     <tr>
                         <td width="65" valign="top" style="padding: 15px 0 15px 15px;">
                             <img src="{{ quote.avatar_url }}" style="width: 50px; height: 50px; border-radius: 50%; display: block; max-width: 50px;" alt="{{ quote.board_member }} avatar">
@@ -977,12 +948,12 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
 
             {% if show_alpha_pick %}
             <h2>🎯 The Alpha Pick</h2>
-            <div class="metric-box" style="border-left-color: #f59e0b;">
+            <div class="metric-box alpha-accent">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
                     <tr>
                         {% if alpha_pick.image %}
                         <td valign="top" width="63" style="padding-right: 15px;">
-                            <img src="{{ alpha_pick.image }}" alt="{{ alpha_pick.symbol }} logo" style="width: 48px; height: 48px; border-radius: 6px; display: block; max-width: 48px; background-color: #ffffff;">
+                            <img src="{{ alpha_pick.image }}" alt="{{ alpha_pick.symbol }} logo" style="width: 48px; height: 48px; border-radius: 6px; display: block; max-width: 48px; background-color: {{ bg_surface }};">
                         </td>
                         {% endif %}
                         <td valign="top">
@@ -992,7 +963,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 </table>
                 
                 {% if red_team_case %}
-                <h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 1.05em; color: #991b1b; border-bottom: none;">⚠️ The Bear Case Rebuttal</h3>
+                <h3 class="bear-heading" style="margin-top: 20px; margin-bottom: 10px; font-size: 1.05em; border-bottom: none;">⚠️ The Bear Case Rebuttal</h3>
                 <div class="red-team-box">
                     {{ red_team_case }}
                 </div>
@@ -1012,12 +983,12 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {% for category in action_categories %}
                 {% if grouped_actions[category] %}
                     {% for pos in grouped_actions[category] %}
-                        <div style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
+                        <div class="section-divider" style="margin-bottom: 20px; padding-bottom: 20px;">
                             <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
                                 <tr>
                                     {% if pos.image %}
                                     <td valign="middle" style="padding-right: 12px;">
-                                        <img src="{{ pos.image }}" alt="{{ pos.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; display: block; max-width: 28px; background-color: #ffffff;">
+                                        <img src="{{ pos.image }}" alt="{{ pos.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; display: block; max-width: 28px; background-color: {{ bg_surface }};">
                                     </td>
                                     {% endif %}
                                     <td valign="middle">
@@ -1044,14 +1015,14 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             
             {% if unicorn_protocol_items %}
             <h2>🦄 Unicorn Protocol</h2>
-            <p style="color:#6b7280; font-size:0.95em; margin-top:-5px;">Unanimous board verdict — full context with Red Team rebuttal.</p>
+            <p class="muted" style="font-size:0.95em; margin-top:-5px;">Unanimous board verdict — full context with Red Team rebuttal.</p>
             {% for item in unicorn_protocol_items %}
-                <div style="margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
+                <div class="section-divider" style="margin-bottom: 24px; padding-bottom: 20px;">
                     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
                         <tr>
                             {% if item.image %}
                             <td valign="middle" style="padding-right: 12px;">
-                                <img src="{{ item.image }}" alt="{{ item.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; display: block; max-width: 28px; background-color: #ffffff;">
+                                <img src="{{ item.image }}" alt="{{ item.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; display: block; max-width: 28px; background-color: {{ bg_surface }};">
                             </td>
                             {% endif %}
                             <td valign="middle">
@@ -1066,7 +1037,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                     <p><span class="champion">The Champion ({{ item.champion }}):</span> "{{ item.champion_quote }}"</p>
                     {% endif %}
                     {% if item.red_team_rebuttal %}
-                    <p style="margin-top: 12px; margin-bottom: 6px; font-weight: bold; color: #991b1b;">⚠️ Red Team Rebuttal</p>
+                    <p class="bear-heading" style="margin-top: 12px; margin-bottom: 6px; font-weight: bold;">⚠️ Red Team Rebuttal</p>
                     <div class="red-team-box">{{ item.red_team_rebuttal }}</div>
                     {% endif %}
                 </div>
@@ -1075,7 +1046,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             
             {% if chairman_remarks %}
             <h2>Chairman's Closing Thoughts</h2>
-            <div style="background-color: #f8fafc; padding: 15px; border-radius: 5px; border-left: 4px solid #4f46e5; font-style: italic;">
+            <div class="chairman-box">
                 <p style="margin: 0;">"{{ chairman_remarks }}"</p>
             </div>
             {% endif %}
@@ -1096,8 +1067,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             
             {% if qa_summary_text %}
             <div class="qa-box">
-                <strong style="color:#4b5563;">Automated QA Audit</strong>
-                <span style="color:#9ca3af;">&mdash; see the QA Audit Dashboard for details on any &#10060;.</span><br><br>
+                <strong>Automated QA Audit</strong>
+                <span class="muted">&mdash; see the QA Audit Dashboard for details on any &#10060;.</span><br><br>
                 {{ qa_summary_text }}
             </div>
             {% else %}
@@ -1155,6 +1126,9 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
 
     template = Template(html_template)
     rendered_html = template.render(
+        briefing_css=briefing_css,
+        pill_styles=pill_styles,
+        bg_surface=BG_SURFACE,
         total_val=fmt_dol(total_val),
         qqq_trend=fmt(qqq_trend),
         portfolio_3m_trend=fmt(portfolio_3m_trend),
@@ -1183,36 +1157,19 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     return rendered_html
 
 def generate_qa_dashboard_html(reports, timestamp, review_url: str = None):
+    dashboard_css = qa_dashboard_css()
     html_template = """
     <!DOCTYPE html>
     <html>
     <head>
         <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; color: #1f2937; margin: 0; padding: 20px; }
-            .container { max-width: 1000px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-            h1 { color: #111827; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
-            h2 { color: #2563eb; margin-top: 30px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;}
-            h3 { color: #374151; margin-top: 25px; margin-bottom: 10px; }
-            .status-badge { display: inline-block; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 14px; margin-bottom: 15px; }
-            .status-pass { background-color: #dcfce7; color: #166534; border: 1px solid #22c55e; }
-            .status-fail { background-color: #fee2e2; color: #991b1b; border: 1px solid #ef4444; }
-            
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
-            th { text-align: left; padding: 10px; background-color: #f8fafc; border-bottom: 2px solid #e5e7eb; color: #4b5563; }
-            td { padding: 12px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
-            
-            .sev-CRITICAL { color: #dc2626; font-weight: bold; }
-            .sev-WARNING { color: #d97706; font-weight: bold; }
-            .sev-INFO { color: #2563eb; font-weight: bold; }
-            
-            .summary-box { background-color: #f8fafc; padding: 15px; border-radius: 5px; border-left: 4px solid #64748b; font-style: italic; margin-bottom: 20px; }
-            .footer { margin-top: 40px; font-size: 0.8em; color: #6b7280; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 20px; }
+            {{ dashboard_css }}
         </style>
     </head>
     <body>
         <div class="container">
             <h1>Invest AI: QA Audit Dashboard</h1>
-            <p style="color: #6b7280; margin-top: -10px; margin-bottom: 30px;">Generated: {{ timestamp }}</p>
+            <p class="timestamp">Generated: {{ timestamp }}</p>
             
             <h2>QA Agents Summary</h2>
             <table style="margin-bottom: 40px;">
@@ -1225,9 +1182,9 @@ def generate_qa_dashboard_html(reports, timestamp, review_url: str = None):
                     <td><strong>{{ report.agent_role }}</strong></td>
                     <td>
                         {% if report.is_compliant %}
-                            <span style="color: #166534; font-weight: bold;">✅ PASS</span>
+                            <span class="pass-text">✅ PASS</span>
                         {% else %}
-                            <span style="color: #dc2626; font-weight: bold;">❌ FAIL</span>
+                            <span class="fail-text">❌ FAIL</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -1275,7 +1232,7 @@ def generate_qa_dashboard_html(reports, timestamp, review_url: str = None):
             <div class="footer">
                 Automated Post-Flight Quality Assurance Report.<br>
                 {% if review_url %}
-                <p style="margin: 16px 0;"><a href="{{ review_url }}" style="display:inline-block;background:#2563eb;color:#ffffff;padding:12px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">Review QA accuracy for this run</a></p>
+                <p style="margin: 16px 0;"><a href="{{ review_url }}" class="review-btn">Review QA accuracy for this run</a></p>
                 <p style="font-size: 0.85em;">Confirm or reject each QA agent's verdict (2–5 min). Link requires your review token.</p>
                 {% endif %}
                 Invest AI Boardroom
@@ -1286,4 +1243,9 @@ def generate_qa_dashboard_html(reports, timestamp, review_url: str = None):
     """
     
     template = Template(html_template)
-    return template.render(reports=reports, timestamp=timestamp, review_url=review_url)
+    return template.render(
+        reports=reports,
+        timestamp=timestamp,
+        review_url=review_url,
+        dashboard_css=dashboard_css,
+    )

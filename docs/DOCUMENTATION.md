@@ -1,7 +1,7 @@
 # Documentation Index
 
 **Status:** Active  
-**Last updated:** May 30, 2026 (agent optimization handoffs)  
+**Last updated:** May 30, 2026 (EOD — briefing sprint handoff)  
 **SSOT for:** which document to read or update — agents should start here when unsure where something lives.
 
 **Do not duplicate** content from the docs below into this file. Link only.
@@ -31,6 +31,7 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | Understand **which QA module** does what | [`qa_layers.md`](qa_layers.md) |
 | Understand pipeline phases, deploy, data layer, **vote_engine** | [`technical_solution.md`](technical_solution.md) |
 | Plan SaaS / multi-tenant (blocked on stabilization) | [`saas_technical_solution.md`](saas_technical_solution.md) |
+| Edit briefing HTML palette / dark theme | [`briefing_style.md`](briefing_style.md) + `src/output/briefing_style.py` |
 | Edit briefing charts / QuickChart / section order | [`briefing_charts_handoff.md`](briefing_charts_handoff.md) + `src/output/reporting.py` |
 | Debug chairman retries / vote alignment | [`qa_layers.md`](qa_layers.md) § Debate-phase audit + `src/core/vote_engine.py` |
 | Map FMP endpoints / fields / Starter tier | [`fmp_data_dictionary.md`](fmp_data_dictionary.md) |
