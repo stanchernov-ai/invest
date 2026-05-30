@@ -123,6 +123,24 @@ class RedTeamReport(BaseModel):
         description="One dedicated Red Team rebuttal per Unicorn Protocol symbol (unanimous panel verdict).",
     )
 
+
+class ActionPlanStrategicContext(BaseModel):
+    symbol: str = Field(description="Ticker symbol exactly as provided in the prompt.")
+    strategic_context: str = Field(
+        description=(
+            "2-3 sentences synthesizing why the board landed on the final verdict. "
+            "State vote math (e.g. unanimous 5-0 or 3/5 majority). Weave distinct persona "
+            "angles without copying a single panelist quote verbatim."
+        )
+    )
+
+
+class ActionPlanStrategicContexts(BaseModel):
+    items: list[ActionPlanStrategicContext] = Field(
+        description="One strategic_context entry per symbol block in the user prompt.",
+    )
+
+
 class BoardroomState(BaseModel):
     base_data_prompt: str
     live_mandate: str

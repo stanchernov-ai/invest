@@ -77,7 +77,7 @@ class BriefingCopyTests(unittest.TestCase):
             },
         })
         self.assertNotIn("VOTE ENGINE", pos["synthesis"])
-        self.assertIn("Peter Lynch", pos["narrative"]["champion_quote"])
+        self.assertIn("Peter Lynch", pos["narrative"]["champion"])
         self.assertNotIn("Vote-engine", pos["narrative"]["champion_quote"])
 
     def test_briefing_html_hides_internal_jargon(self):
@@ -240,6 +240,8 @@ class BriefingHtmlTests(unittest.TestCase):
             r"<th[^>]*>Symbol</th>\s*<th[^>]*>Action</th>",
         )
         self.assertIn("Strategic Context:", after_action)
+        self.assertIn("The Champion (", after_action)
+        self.assertIn("The Dissent (None):", after_action)
         self.assertIn("SELL : TSM", after_action)
 
     def test_section_order_and_footer(self):

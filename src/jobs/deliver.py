@@ -14,6 +14,7 @@ import logging
 
 from src import storage_client
 from src.output import reporting
+from src.output import briefing_enrichment
 from src.output import notifier
 from src.core import agent_activity
 from src.config.settings import now_local
@@ -94,6 +95,14 @@ async def run_deliver(run_id: str) -> dict:
         raw_log_combined = debate["raw_log_combined"]
         unicorn_trades = debate["unicorn_trades"]
 
+        portfolio_symbols = set(prep.get("portfolio_holdings") or {})
+        c_data = await briefing_enrichment.enrich_chairman_for_briefing(
+            c_data,
+            raw_verdicts,
+            portfolio_symbols=portfolio_symbols,
+            sanitize_fn=reporting._sanitize_briefing_text,
+        )
+
         board_matrix = qa_pipeline.build_board_matrix(
             raw_board_messages, all_symbols, raw_verdicts=raw_verdicts or None,
         )
@@ -125,6 +134,7 @@ async def run_deliver(run_id: str) -> dict:
             qa_summary_text="", account_holdings=account_holdings, account_returns=account_returns,
             advanced_data=advanced_data, chart_urls=chart_urls,
             raw_verdicts=raw_verdicts or None,
+            portfolio_symbols=portfolio_symbols,
         )
         graphics_report = await qa_pipeline.run_graphics_designer_qa(briefing_for_visual_qa, chart_health)
         qa_reports.append(graphics_report)
@@ -159,6 +169,7 @@ async def run_deliver(run_id: str) -> dict:
             qa_summary_text=final_qa_summary_text, account_holdings=account_holdings, account_returns=account_returns,
             advanced_data=advanced_data, chart_urls=chart_urls,
             raw_verdicts=raw_verdicts or None,
+            portfolio_symbols=portfolio_symbols,
         )
         qa_dashboard_html = reporting.generate_qa_dashboard_html(
             qa_reports, run_id, review_url=review_url

@@ -1,21 +1,46 @@
-"""Enrich investor-facing briefing copy from Round 2 panel JSON (render-time only)."""
+"""Enrich investor-facing Action Plan copy from Round 2 JSON + Flash strategic context."""
 from __future__ import annotations
 
+import json
+import logging
 import re
+from typing import Callable
 
+from google.genai import types
+
+from src.core.agents import FAST_MODEL, FLASH_TOKEN_LIMIT, call_gemini_async, client
+from src.core.schemas import ActionPlanStrategicContexts
 from src.core.vote_engine import (
     AGENT_DISPLAY,
     BUY_VERDICTS,
+    build_vote_summaries,
     panel_verdict_side,
     _normalize_verdict,
 )
+
+logger = logging.getLogger(__name__)
 
 _DISPLAY_TO_AGENT = {name: key for key, name in AGENT_DISPLAY.items()}
 
 _GENERIC_SYNTHESIS_MARKERS = (
     "consensus mandate from today's panel vote",
     "investment committee finalized this position",
+    "vote-engine mandate",
+    "deterministic mandate from round 2",
+    "vote engine",
+    "buy_side=",
 )
+
+_STRATEGIC_CONTEXT_SYSTEM = """You are the board secretary drafting Strategic Context lines for an executive Action Plan.
+
+For EACH symbol in the user prompt, write strategic_context: 2-3 sentences capturing why the committee landed on the final verdict.
+
+Rules:
+- Open with vote math when relevant (e.g. unanimous 5-0, or 3/5 majority split).
+- Synthesize distinct panel worldviews (value, growth, tape, platform, quant) into one room narrative.
+- Do NOT paste or lightly paraphrase a single panelist's Round 2 quote — Champion/Dissent lines carry those separately.
+- When a guardrail override applies (liquidation cap, max buys), state that constraint first, then the board's underlying mandate.
+- Write specific, investor-facing prose — never boilerplate like "the committee finalized this position"."""
 
 
 def _iter_symbol_rows(raw_verdicts: dict[str, dict] | None):
@@ -125,7 +150,7 @@ def _pick_dissenter_row(
         r for r in candidates
         if _side_opposes_final(panel_verdict_side(r["verdict"], section), final_verdict, section)
     ]
-    pool = opposing or candidates
+    pool = opposing or None
     if not pool:
         return None
     return max(pool, key=lambda r: r["conviction"])
@@ -153,13 +178,13 @@ def extract_override_context(sanitized_synthesis: str) -> str:
     return " ".join(kept).strip()
 
 
-def enrich_position_from_round2(
+def enrich_position_narratives(
     pos: dict,
     raw_verdicts: dict[str, dict] | None,
     *,
     sanitized_synthesis: str = "",
 ) -> dict:
-    """Attach Round 2 champion/dissenter quotes for briefing render."""
+    """Attach Round 2 champion/dissenter quotes without merging into strategic context."""
     sym = (pos.get("symbol") or "").strip()
     if not sym or not raw_verdicts:
         return pos
@@ -177,16 +202,12 @@ def enrich_position_from_round2(
     out = dict(pos)
     narrative = dict(pos.get("narrative") or {})
     override = extract_override_context(sanitized_synthesis)
+    if override:
+        out["override_context"] = override
 
     if champion_row:
-        champion_analysis = champion_row["analysis"]
-        if override:
-            out["synthesis"] = f"{override} {champion_analysis}".strip()
-        else:
-            out["synthesis"] = champion_analysis
         narrative["champion"] = champion_row["display_name"]
-        narrative["champion_quote"] = champion_analysis
-
+        narrative["champion_quote"] = champion_row["analysis"]
         dissenter_row = _pick_dissenter_row(
             rows,
             champion_key=champion_row["agent_key"],
@@ -196,22 +217,182 @@ def enrich_position_from_round2(
             narrative["dissenter"] = dissenter_row["display_name"]
             narrative["dissenter_quote"] = dissenter_row["analysis"]
         else:
-            narrative["dissenter"] = narrative.get("dissenter") or "None"
-            narrative["dissenter_quote"] = ""
-    elif override:
-        out["synthesis"] = override
+            narrative["dissenter"] = "None"
+            narrative["dissenter_quote"] = "N/A"
 
     out["narrative"] = narrative
     return out
 
 
-def enrich_chairman_for_briefing(
+def _collect_positions(chairman_data: dict) -> list[dict]:
+    positions: list[dict] = []
+    for section in ("portfolio_positions", "watchlist_positions"):
+        positions.extend(chairman_data.get(section) or [])
+    return positions
+
+
+def _action_plan_enriched(chairman_data: dict) -> bool:
+    for pos in _collect_positions(chairman_data):
+        ctx = (pos.get("strategic_context") or "").strip()
+        if ctx and not _is_generic_synthesis(ctx):
+            return True
+    return False
+
+
+def _build_symbol_prompt_block(
+    pos: dict,
+    raw_verdicts: dict[str, dict],
+    summaries: dict,
+) -> str:
+    sym = (pos.get("symbol") or "").strip().upper()
+    final = pos.get("final_verdict", "")
+    summary = summaries.get(sym)
+    buy = summary.buy_side_count() if summary else 0
+    sell = summary.sell_side_count() if summary else 0
+    unanimous = ""
+    if summary and summary.is_unanimous():
+        unanimous = " [UNANIMOUS 5/5]"
+    override = pos.get("override_context") or ""
+    lines = [
+        f"### {sym} ###",
+        f"Final verdict (executed): {final}",
+        f"Round 2 votes: buy_side={buy}/5 sell_side={sell}/5{unanimous}",
+    ]
+    if override:
+        lines.append(f"Guardrail override: {override}")
+    lines.append("Round 2 panel analyses:")
+    for row in _symbol_rows(raw_verdicts, sym):
+        lines.append(
+            f"- {row['display_name']} ({row['verdict']}, {row['conviction']}/10): {row['analysis']}"
+        )
+    return "\n".join(lines)
+
+
+def _fallback_strategic_context(pos: dict, raw_verdicts: dict[str, dict], summaries: dict) -> str:
+    """Degraded strategic context from real Round 2 prose when Flash is unavailable."""
+    sym = (pos.get("symbol") or "").strip().upper()
+    rows = _symbol_rows(raw_verdicts, sym)
+    final = pos.get("final_verdict", "")
+    parts: list[str] = []
+    override = pos.get("override_context") or ""
+    if override:
+        parts.append(override)
+    summary = summaries.get(sym)
+    if summary:
+        buy, sell = summary.buy_side_count(), summary.sell_side_count()
+        if summary.is_unanimous("reduce"):
+            parts.append(
+                f"The board reached a unanimous {sell}-0 Round 2 reduce mandate on {sym}."
+            )
+        elif summary.is_unanimous("buy"):
+            parts.append(
+                f"The board reached a unanimous {buy}-0 Round 2 buy mandate on {sym}."
+            )
+        else:
+            parts.append(
+                f"Round 2 split buy_side={buy}/5 sell_side={sell}/5; committee executes {final}."
+            )
+    aligned = [
+        r for r in rows
+        if _side_matches_final(panel_verdict_side(r["verdict"], r["section"]), final, r["section"])
+    ]
+    aligned.sort(key=lambda r: -r["conviction"])
+    for row in aligned[:2]:
+        if row["analysis"]:
+            parts.append(row["analysis"])
+    text = " ".join(parts).strip()
+    return text[:800] if text else ""
+
+
+def _apply_strategic_contexts(
+    chairman_data: dict,
+    contexts: dict[str, str],
+    raw_verdicts: dict[str, dict],
+    summaries: dict,
+) -> dict:
+    out = dict(chairman_data)
+    for section in ("portfolio_positions", "watchlist_positions"):
+        enriched = []
+        for pos in chairman_data.get(section) or []:
+            row = dict(pos)
+            sym = (row.get("symbol") or "").strip().upper()
+            ctx = (contexts.get(sym) or "").strip()
+            if not ctx or _is_generic_synthesis(ctx):
+                ctx = _fallback_strategic_context(row, raw_verdicts, summaries)
+            row["strategic_context"] = ctx
+            row["synthesis"] = ctx
+            enriched.append(row)
+        out[section] = enriched
+    return out
+
+
+async def _flash_strategic_contexts(
+    chairman_data: dict,
+    raw_verdicts: dict[str, dict],
+    *,
+    portfolio_symbols: set[str],
+) -> dict[str, str]:
+    positions = _collect_positions(chairman_data)
+    if not positions:
+        return {}
+
+    summaries = build_vote_summaries(
+        raw_verdicts,
+        [p.get("symbol", "") for p in positions],
+        portfolio_symbols=portfolio_symbols,
+    )
+    blocks = [
+        _build_symbol_prompt_block(pos, raw_verdicts, summaries)
+        for pos in positions
+    ]
+    prompt = (
+        "Write strategic_context for every symbol below (one JSON item per symbol).\n\n"
+        + "\n\n".join(blocks)
+    )
+
+    if not client:
+        logger.warning("Gemini client unavailable — using Round 2 fallback strategic contexts.")
+        return {
+            (p.get("symbol") or "").strip().upper(): _fallback_strategic_context(p, raw_verdicts, summaries)
+            for p in positions
+        }
+
+    contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt)])]
+    config = types.GenerateContentConfig(
+        system_instruction=_STRATEGIC_CONTEXT_SYSTEM,
+        temperature=0.25,
+        max_output_tokens=FLASH_TOKEN_LIMIT,
+        response_mime_type="application/json",
+        response_schema=ActionPlanStrategicContexts,
+    )
+    try:
+        response = await call_gemini_async(
+            FAST_MODEL,
+            contents,
+            config,
+            agent_name="briefing_strategic_context",
+            schema=ActionPlanStrategicContexts,
+        )
+        parsed = json.loads(response.text.strip().replace("```json", "").replace("```", "").strip())
+        return {
+            (item["symbol"] or "").strip().upper(): item["strategic_context"]
+            for item in parsed.get("items", [])
+            if item.get("symbol")
+        }
+    except Exception as exc:
+        logger.warning("Flash strategic context failed (%s) — using Round 2 fallback.", exc)
+        return {
+            (p.get("symbol") or "").strip().upper(): _fallback_strategic_context(p, raw_verdicts, summaries)
+            for p in positions
+        }
+
+
+def _enrich_narratives(
     chairman_data: dict,
     raw_verdicts: dict[str, dict] | None,
     *,
-    sanitize_fn,
+    sanitize_fn: Callable[[str], str],
 ) -> dict:
-    """Return chairman_data copy with positions enriched from Round 2 quotes."""
     if not chairman_data or not raw_verdicts:
         return chairman_data
 
@@ -221,7 +402,7 @@ def enrich_chairman_for_briefing(
         for pos in chairman_data.get(section) or []:
             sanitized = sanitize_fn(pos.get("synthesis", ""))
             enriched.append(
-                enrich_position_from_round2(pos, raw_verdicts, sanitized_synthesis=sanitized)
+                enrich_position_narratives(pos, raw_verdicts, sanitized_synthesis=sanitized)
             )
         out[section] = enriched
 
@@ -235,12 +416,66 @@ def enrich_chairman_for_briefing(
                 if (pos.get("symbol") or "").upper() == sym.upper():
                     preferred = _agent_keys_for_names(pos.get("supporting_members") or [])
                     break
-        champion_row = _pick_champion_row(
-            rows,
-            preferred_agents=preferred,
-            final_verdict="Buy",
-        )
+        champion_row = _pick_champion_row(rows, preferred_agents=preferred, final_verdict="Buy")
         if champion_row and champion_row["analysis"]:
             alpha["champion_quote"] = champion_row["analysis"]
     out["alpha_pick"] = alpha
     return out
+
+
+async def enrich_chairman_for_briefing(
+    chairman_data: dict,
+    raw_verdicts: dict[str, dict] | None,
+    *,
+    portfolio_symbols: set[str] | None = None,
+    sanitize_fn: Callable[[str], str],
+) -> dict:
+    """Narratives from Round 2 JSON + Flash strategic context (batched per run)."""
+    if not chairman_data or not raw_verdicts:
+        return chairman_data
+    if _action_plan_enriched(chairman_data):
+        return chairman_data
+
+    portfolio_symbols = portfolio_symbols or set()
+    with_narratives = _enrich_narratives(chairman_data, raw_verdicts, sanitize_fn=sanitize_fn)
+    contexts = await _flash_strategic_contexts(
+        with_narratives, raw_verdicts, portfolio_symbols=portfolio_symbols,
+    )
+    summaries = build_vote_summaries(
+        raw_verdicts,
+        [p.get("symbol", "") for p in _collect_positions(with_narratives)],
+        portfolio_symbols=portfolio_symbols,
+    )
+    return _apply_strategic_contexts(with_narratives, contexts, raw_verdicts, summaries)
+
+
+def enrich_chairman_for_briefing_sync(
+    chairman_data: dict,
+    raw_verdicts: dict[str, dict] | None,
+    *,
+    portfolio_symbols: set[str] | None = None,
+    sanitize_fn: Callable[[str], str],
+) -> dict:
+    """Sync path for unit tests — narratives + Round 2 fallback strategic context."""
+    if not chairman_data or not raw_verdicts:
+        return chairman_data
+    if _action_plan_enriched(chairman_data):
+        return chairman_data
+
+    portfolio_symbols = portfolio_symbols or set()
+    with_narratives = _enrich_narratives(chairman_data, raw_verdicts, sanitize_fn=sanitize_fn)
+    positions = _collect_positions(with_narratives)
+    summaries = build_vote_summaries(
+        raw_verdicts,
+        [p.get("symbol", "") for p in positions],
+        portfolio_symbols=portfolio_symbols,
+    )
+    contexts = {
+        (p.get("symbol") or "").strip().upper(): _fallback_strategic_context(p, raw_verdicts, summaries)
+        for p in positions
+    }
+    return _apply_strategic_contexts(with_narratives, contexts, raw_verdicts, summaries)
+
+
+# Backward-compatible alias used in older tests
+enrich_position_from_round2 = enrich_position_narratives
