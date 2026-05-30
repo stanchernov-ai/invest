@@ -250,9 +250,10 @@ def format_compliance_failure_summary(
     chairman_empty: bool = False,
 ) -> str:
     """Human-readable summary for logs, run_status, and failure emails."""
-    lines = ["Compliance gate rejected chairman output after debate."]
-    if attempts:
-        lines.append(f"Retry attempts exhausted: {attempts}.")
+    lines = [
+        "Compliance gate rejected chairman output after debate (single pass — no retry).",
+        "Flagged for prompt engineering and data quality expert review.",
+    ]
     if chairman_empty:
         lines.append("Chairman produced no approved allocation JSON.")
     if violations:

@@ -141,7 +141,7 @@ flowchart LR
         CLERK --> MUNGER
         MUNGER --> CHAIR
         CHAIR --> COMP
-        COMP -->|retry up to 3×| CHAIR
+        COMP -->|FAIL — no retry| REVIEW[debate_review blob]
         COMP -->|PASS| RED
     end
 
@@ -177,7 +177,7 @@ flowchart LR
 |-----|---------|-------|------|
 | `clerk` | Ray Dalio | Flash | Debate synthesis |
 | `chairman` | Stanley Druckenmiller | Pro (8192 think) | Final allocation |
-| `compliance` | Harry Markopolos | Flash | Chairman vs board audit (retry loop) |
+| `compliance` | Harry Markopolos | Flash | Chairman vs board audit — **single pass, fail closed** |
 | `red_teamer` | Adversarial Red Teamer | Pro | Bear case for briefing (non-feedback) |
 | `data_oracle` | Pre-Flight Data Oracle | — | **🟢 Python only** — `src/core/data_oracle.py`; runs once in prepare |
 

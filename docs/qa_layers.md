@@ -95,13 +95,13 @@ Overlap is intentional but confusing — consolidation is backlog (see `agent_ar
 |-------|--------|------|
 | **vote_engine** | `src/core/vote_engine.py` | After Round 2 — tallies, digest, optional chairman bypass |
 | **guardrails + alignment** | `guardrails.py`, `chairman_alignment.py` | After chairman — max 3, 10% cap, wash-sale, majority buys |
-| **compliance (Python)** | `compliance_audit.py` | Before Markopolos — majority, originator, alpha, hedge |
-| **compliance (LLM)** | Markopolos in `engine.py` | Deathmatch / funding — merged with Python violations |
+| **compliance (Python)** | `compliance_audit.py` | Always — majority, originator, alpha, hedge |
+| **compliance (LLM)** | Markopolos in `engine.py` | **Only when `allocation_source=llm`** — skipped on `vote_engine` days |
 | **debate checkpoint** | `debate.json` | Includes `raw_verdicts` (structured Round 2 JSON) |
 
-Failed compliance → no approved debate → **deliver never runs** → no post-flight QA for that run.
+Failed compliance → no approved debate → **deliver never runs** → no post-flight QA for that run. **No retry** — failures are flagged `requires_expert_review` for prompt engineering and data quality.
 
-**Symptom → start here:** chairman retry loop → check `VOTE_DIGEST` in raw log + `compliance_failure_{run_id}.json` in state container.
+**Symptom → start here:** compliance failure → `compliance_failure_{run_id}.json` + `debate_review_{run_id}.json` in state container (includes `raw_verdicts`, debate log, violations).
 
 ---
 

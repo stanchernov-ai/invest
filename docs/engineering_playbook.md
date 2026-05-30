@@ -64,6 +64,7 @@
 - **`include_thoughts=True` risks breaking structured-output parsing** — `_run_agent` parses `response.text` as JSON; mixing thought parts can corrupt that. *Capturing thoughts needs a parsing refactor (separate thought parts from the JSON answer) — don't enable it casually.* (2026-05-28)
 - **On 2.5 Pro you can't fully disable thinking** (min budget ~128); on 2.5 Flash you can set `thinking_budget=0`. (2026-05-28)
 - **Financial math belongs in deterministic Python, not the LLM** — max buys, 10% cap, wash-sale, **and Round 2 vote tallies** live in `guardrails.py`, `chairman_alignment.py`, and `vote_engine.py`. Chairman/compliance prompts receive a pre-computed **VOTE_DIGEST** — do not ask the model to count votes. (2026-05-28, expanded 2026-05-29)
+- **No LLM debate retry on audit failure** — if in-loop compliance fails, fail closed; persist review artifacts for prompt/data experts. Do not re-prompt chairman/compliance to paper over violations. **Not** a ban on code retries (FMP tenacity, QuickChart, CI, guardrail fixes, etc.). (2026-05-29)
 - **Round 2 structured JSON is vote ground truth** — `debate.json` → `raw_verdicts`. Deliver vote matrix uses `build_board_matrix()` (JSON first, markdown parse fallback). Do not re-parse debate prose for tallies. (2026-05-29)
 - **Chairman bypass is intentional** — `can_bypass_chairman()` skips the Pro call on unanimous actionable Buy/Reduce days; narratives are template stubs. 3/5 majority days still invoke chairman. (2026-05-29)
 

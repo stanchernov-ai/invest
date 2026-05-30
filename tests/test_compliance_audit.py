@@ -111,15 +111,30 @@ class TestComplianceAudit(unittest.TestCase):
         )
         self.assertTrue(any("MAJORITY BUY MANDATE" in v for v in violations))
 
+    def test_merge_python_only_passes_when_no_violations(self):
+        merged = merge_compliance_reports([], None, chairman={"portfolio_positions": []})
+        self.assertTrue(merged["is_compliant"])
+        self.assertEqual(merged["violations"], [])
+
+    def test_merge_python_only_fails_on_deterministic_violations(self):
+        merged = merge_compliance_reports(
+            ["MAJORITY VOTE ALIGNMENT: META board majority is buy but chairman final_verdict is Pass."],
+            None,
+            chairman={"watchlist_positions": [{"symbol": "META", "final_verdict": "Pass", "synthesis": ""}]},
+        )
+        self.assertFalse(merged["is_compliant"])
+        self.assertEqual(len(merged["violations"]), 1)
+
     def test_failure_summary_includes_violations(self):
         summary = format_compliance_failure_summary(
             violations=["HEDGE MANDATE: TLT missing"],
             feedback="Add TLT to target_tickers.",
-            attempts=3,
+            attempts=1,
         )
         self.assertIn("HEDGE MANDATE", summary)
         self.assertIn("Add TLT", summary)
-        self.assertIn("3", summary)
+        self.assertIn("no retry", summary.lower())
+        self.assertIn("expert review", summary.lower())
 
 
 if __name__ == "__main__":

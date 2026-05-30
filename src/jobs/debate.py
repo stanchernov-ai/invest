@@ -65,6 +65,7 @@ async def run_debate(run_id: str) -> dict:
         compliance_failure_detail = None
         allocation_source = "llm"
         chairman_bypassed = False
+        compliance_source = "python+llm"
 
         async for output in app.astream(initial_state):
             for key, value in output.items():
@@ -95,6 +96,7 @@ async def run_debate(run_id: str) -> dict:
                     is_approved_flag = value.get("is_approved", False)
                     allocation_source = value.get("allocation_source", "llm")
                     chairman_bypassed = value.get("chairman_bypassed", False)
+                    compliance_source = value.get("compliance_source", "python+llm")
                     if is_approved_flag:
                         c_data = value.get("chairman_data", {})
                         red_team_data = value.get("red_team_data", {})
@@ -111,16 +113,40 @@ async def run_debate(run_id: str) -> dict:
                 "phase": "debate",
                 "gate": "compliance",
                 "error": error_summary,
+                "requires_expert_review": True,
+                "expert_review_domains": detail.get("expert_review_domains")
+                or ["prompt_engineering", "data_quality"],
                 **detail,
+            }
+            review_blob = {
+                **failure_blob,
+                "raw_verdicts": raw_verdicts,
+                "raw_board_messages": raw_board_messages,
+                "raw_log_combined": "".join(raw_log_lines),
+                "cos_data": cos_data,
+                "unicorn_trades": unicorn_trades,
+                "allocation_source": allocation_source,
+                "chairman_bypassed": chairman_bypassed,
             }
             try:
                 storage_client.save_state_blob(
                     f"compliance_failure_{run_id}.json",
                     failure_blob,
                 )
+                storage_client.save_state_blob(
+                    f"debate_review_{run_id}.json",
+                    review_blob,
+                )
                 storage_client.save_report(
                     f"api_telemetry_{run_id}_debate.json",
-                    json.dumps({"AGENT_ACTIVITY": agent_activity.snapshot(), "COMPLIANCE_FAILURE": failure_blob}, indent=4),
+                    json.dumps(
+                        {
+                            "AGENT_ACTIVITY": agent_activity.snapshot(),
+                            "COMPLIANCE_FAILURE": failure_blob,
+                            "DEBATE_REVIEW": {"blob": f"debate_review_{run_id}.json"},
+                        },
+                        indent=4,
+                    ),
                 )
             except Exception as persist_exc:
                 logger.warning("[DEBATE] Could not persist compliance failure artifact: %s", persist_exc)
@@ -133,6 +159,7 @@ async def run_debate(run_id: str) -> dict:
                 finished_at=now_local().isoformat(),
                 error=error_summary[:2000],
                 compliance_violations=detail.get("violations") or [],
+                requires_expert_review=True,
             )
             return {"run_id": run_id, "status": "failed", "is_approved": False}
 
@@ -141,6 +168,7 @@ async def run_debate(run_id: str) -> dict:
             "AGENT_ACTIVITY": agent_activity.snapshot(),
             "allocation_source": allocation_source,
             "chairman_bypassed": chairman_bypassed,
+            "compliance_source": compliance_source,
         }
 
         checkpoint = {
@@ -156,6 +184,7 @@ async def run_debate(run_id: str) -> dict:
             "telemetry": telemetry,
             "allocation_source": allocation_source,
             "chairman_bypassed": chairman_bypassed,
+            "compliance_source": compliance_source,
         }
         storage_client.save_checkpoint(run_id, "debate", checkpoint)
         storage_client.save_report(f"api_telemetry_{run_id}_debate.json", json.dumps(telemetry, indent=4))

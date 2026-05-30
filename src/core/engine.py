@@ -37,13 +37,13 @@ class StateMachineOrchestrator:
     def __init__(self, state: BoardroomState):
         self.state = state
         self.raw_verdicts = {}
-        self.max_qa_retries = 3
         self.oracle_valid = False
         self.oracle_reason = "Default security stance. Awaiting Oracle clearance."
         self.red_team_json = "{}"
         self.compliance_attempts: list[dict] = []
         self.chairman_bypassed: bool = False
         self.allocation_source: str = "llm"
+        self.compliance_source: str = "python+llm"
 
     def _portfolio_symbols(self) -> set[str]:
         return set((self.state.portfolio_holdings or {}).keys())
@@ -100,12 +100,10 @@ class StateMachineOrchestrator:
         
         if self.state.heavy_tickers:
             await self.execute_munger_audit()
-             
-        attempt = 0
-        while attempt < self.max_qa_retries and not self.state.is_approved:
-            await self.execute_chairman_arbitration()
-            await self.execute_compliance_audit()
-            attempt += 1
+
+        # Single pass — no chairman/compliance retry on audit failure (see .cursorrules).
+        await self.execute_chairman_arbitration()
+        await self.execute_compliance_audit()
 
         if self.state.is_approved:
             await self.execute_red_team()
@@ -275,7 +273,7 @@ class StateMachineOrchestrator:
             munger_warning = "\n\n[CRITICAL MUNGER AUDIT CONCENTRATION WARNINGS]:\n"
             for agent, data in self.state.munger_overrides.items():
                 munger_warning += f"--- {agent.upper()} ---\n{data}\n"
-        corrections = f"\n\n[QA AMENDMENT REQUIRED]:\n{self.state.qa_feedback}" if self.state.qa_feedback else ""
+        corrections = ""
         prompt = (
             f"{vote_digest}\n\n"
             f"Review board arguments. Apply the pre-computed vote digest — do NOT re-count votes. "
@@ -328,21 +326,33 @@ class StateMachineOrchestrator:
             all_symbols=self.state.all_symbols,
             portfolio_symbols=portfolio_symbols,
         )
-        debate_text = format_debate_for_compliance(self.state.messages)
-        digest = format_compliance_digest(deterministic_violations)
 
-        prompt = (
-            f"{digest}\n\n"
-            f"{format_vote_digest(self._vote_summaries(), portfolio_symbols=portfolio_symbols)}\n\n"
-            f"Python already verified max buys, hedge, majority alignment, originator rule, and alpha pick — "
-            f"do NOT contradict a PASS on those items.\n\n"
-            f"RAW BOARD DEBATE LOG (Round 2 votes are ground truth for funding/deathmatch checks):\n"
-            f"{debate_text}\n\n"
-            f"CHAIRMAN JSON OUTPUT (audit deathmatch / capital flow only):\n"
-            f"{self.state.chairman_draft_json}"
-        )
-        res = await self._run_agent("compliance", prompt, schema=ComplianceReport)
-        merged = merge_compliance_reports(deterministic_violations, res, chairman=chairman)
+        if self.allocation_source == "vote_engine":
+            logger.info(
+                "Compliance LLM skipped — vote_engine allocation; Python gate only."
+            )
+            merged = merge_compliance_reports(
+                deterministic_violations, None, chairman=chairman,
+            )
+            self.compliance_source = "python_only"
+        else:
+            debate_text = format_debate_for_compliance(self.state.messages)
+            digest = format_compliance_digest(deterministic_violations)
+
+            prompt = (
+                f"{digest}\n\n"
+                f"{format_vote_digest(self._vote_summaries(), portfolio_symbols=portfolio_symbols)}\n\n"
+                f"Python already verified max buys, hedge, majority alignment, originator rule, and alpha pick — "
+                f"do NOT contradict a PASS on those items.\n\n"
+                f"RAW BOARD DEBATE LOG (Round 2 votes are ground truth for funding/deathmatch checks):\n"
+                f"{debate_text}\n\n"
+                f"CHAIRMAN JSON OUTPUT (audit deathmatch / capital flow only):\n"
+                f"{self.state.chairman_draft_json}"
+            )
+            res = await self._run_agent("compliance", prompt, schema=ComplianceReport)
+            merged = merge_compliance_reports(deterministic_violations, res, chairman=chairman)
+            self.compliance_source = "python+llm"
+
         self.compliance_attempts.append({
             "attempt": len(self.compliance_attempts) + 1,
             "is_compliant": merged.get("is_compliant", False),
@@ -373,7 +383,7 @@ class StateMachineOrchestrator:
         summary = format_compliance_failure_summary(
             violations=violations,
             feedback=feedback,
-            attempts=len(self.compliance_attempts) or self.max_qa_retries,
+            attempts=len(self.compliance_attempts),
             chairman_empty=chairman_empty,
         )
         return {
@@ -383,6 +393,11 @@ class StateMachineOrchestrator:
             "feedback_to_chairman": feedback,
             "summary": summary,
             "chairman_draft_present": not chairman_empty,
+            "requires_expert_review": True,
+            "expert_review_domains": ["prompt_engineering", "data_quality"],
+            "allocation_source": self.allocation_source,
+            "chairman_bypassed": self.chairman_bypassed,
+            "compliance_source": self.compliance_source,
         }
 
     async def execute_red_team(self) -> None:
@@ -426,6 +441,7 @@ class AppWrapper:
             "red_team_data": red_data,
             "chairman_bypassed": orchestrator.chairman_bypassed,
             "allocation_source": orchestrator.allocation_source,
+            "compliance_source": orchestrator.compliance_source,
         }
         if not final_state.is_approved:
             compliance_payload["failure_detail"] = orchestrator.build_compliance_failure_detail()

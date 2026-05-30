@@ -12,6 +12,7 @@
 5. Unsure which doc to read or update? See `docs/DOCUMENTATION.md` (master index).
 6. Production agent roster and QA diagrams: `docs/agent_architecture.md` — not duplicated here.
 7. Keep `docs/action_tracker.md` lean (~200 lines max): one Session Handoff, open backlog only — see `docs/doc_hygiene.md`. History → `docs/archive/`.
+8. Product design non-negotiables: `docs/product_principles.md` — board decides in code, fail closed on debate audit, no LLM gate repair.
 **Do not** treat terminal scrollback as state. Log durable findings to the state files in Section 3.
 
 ## 0.5 Collaboration Protocol
@@ -44,6 +45,7 @@ When recommending next work, backlog ordering, or MCQ options:
 * **The Two Strike Rule.** No sub agent may autonomously iterate on the same file and problem more than twice. On strike three, hard stop, append a conflict record to `ecosystem_state.json`, and escalate to human.
 * **Supervisor Tie Break and Deadlock Timeout.** When the QA Validation and Refactoring Agents disagree, the Supervisor Agent decides once. If the Supervisor fails to resolve the conflict within one attempt, it must immediately drop a lock file, hard abort the loop, and wait for Stan. No infinite loops.
 * **Code over Prompts.** Rules protecting data integrity or financial limits must be deterministic Python, never prompt only.
+* **No LLM debate retry on audit failure.** If in-loop compliance fails during debate, **fail closed** — do not re-prompt chairman or compliance agents to "fix" violations in another conversation turn. Persist failure artifacts and flag for **prompt engineering + data quality** expert review. Incorrect allocations must not reach deliver; asking the LLM to retry hides prompt/data defects. **This does not apply to deterministic code** (guardrails, API backoff, deploy, tests, etc.) — those may still retry or iterate as needed.
 * **Advisory vs Blocking.** Cursor agents are advisory during editing. Only git hooks or CI may hard block commits.
 
 ## 2. Maintenance Sub Agent Ecosystem

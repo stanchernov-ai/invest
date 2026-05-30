@@ -13,8 +13,9 @@
 | Order | Document | Why |
 |------:|----------|-----|
 | 1 | [`action_tracker.md`](action_tracker.md) | **Session Handoff** at top — current pickup, open priorities |
-| 2 | [`.cursorrules`](../.cursorrules) | Guardrails, collaboration MCQ, Cursor sub-agents, triggers |
-| 3 | [`engineering_playbook.md`](engineering_playbook.md) | Skim before retrying a rejected approach |
+| 2 | [`product_principles.md`](product_principles.md) | Non-negotiable product rules — board in code, fail closed |
+| 3 | [`.cursorrules`](../.cursorrules) | Guardrails, collaboration MCQ, Cursor sub-agents, triggers |
+| 4 | [`engineering_playbook.md`](engineering_playbook.md) | Skim before retrying a rejected approach |
 
 When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `.cursorrules` §3).
 
@@ -33,6 +34,7 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | Review subscriptions, SaaS costs, finance oversight | [`tech_stack_and_subscriptions.md`](tech_stack_and_subscriptions.md) + `subscriptions_registry.json` |
 | Run post-deliver retrospective | [`post_deliver_checklist.md`](post_deliver_checklist.md) |
 | Add backlog or record a decision | [`action_tracker.md`](action_tracker.md) |
+| Doc health / which files to clean | [`doc_health_snapshot.md`](doc_health_snapshot.md) |
 | Change guardrails or Cursor workflow | [`.cursorrules`](../.cursorrules) only |
 | Change production agent roster or QA stack | [`agent_architecture.md`](agent_architecture.md) + `src/core/agents.py` |
 
@@ -44,6 +46,7 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 |----------|----------|
 | [`action_tracker.md`](action_tracker.md) | **Live** backlog + Session Handoff only (≤ ~200 lines) |
 | [`doc_hygiene.md`](doc_hygiene.md) | How to trim tracker, archive handoffs, agent doc rules |
+| [`doc_health_snapshot.md`](doc_health_snapshot.md) | Per-file health, impact tiers, DOC-* cleanup backlog |
 | [`archive/`](archive/) | Read-only May 2026 implementation log + old handoffs |
 | [`post_deliver_checklist.md`](post_deliver_checklist.md) | After each deliver run — validation + backlog hygiene |
 | [`engineering_playbook.md`](engineering_playbook.md) | Rejected approaches and gotchas |
