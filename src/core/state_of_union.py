@@ -11,7 +11,8 @@ SELL_VERDICTS = frozenset({"SELL", "TRIM", "STRONG SELL"})
 # Round 2 overall_portfolio_critique is peer rebuttal prose — not briefing SoTU material.
 _REBUTTAL_OPENERS = re.compile(
     r"^\s*(i\s+(fundamentally\s+)?(dis)?agree|while\s+i\s+(dis)?agree|"
-    r"i\s+must\s+(dis)?agree|i\s+partially\s+concede|darwin\s+is\s+right|franklin\s+is\s+right)",
+    r"i\s+must\s+(dis)?agree|i\s+partially\s+concede|davinci\s+is\s+right|hypatia\s+is\s+right|"
+    r"leonardo\s+da\s+vinci\s+is\s+right)",
     re.I,
 )
 _TICKER_HEAVY = re.compile(r"\b[A-Z]{1,5}\b(?:\s*[:—-]\s|\s+(?:is|was|remains)\b)", re.M)

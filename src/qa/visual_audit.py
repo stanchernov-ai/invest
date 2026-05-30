@@ -6,7 +6,7 @@ QA persona. Golden fixtures in tests/fixtures/visual_qa/ regression-test them.
 import re
 from bs4 import BeautifulSoup
 
-from src.output.briefing_style import BG_CANVAS, BRAND_SAGE, CHART_IMG_FILTER
+from src.output.briefing_style import BG_CANVAS, BRAND_SAGE
 
 # Patterns that break in Gmail/Outlook (from graphics_designer_qa mandate).
 _EMAIL_UNSAFE_CSS = re.compile(
@@ -45,12 +45,12 @@ def audit_briefing_theme(html: str) -> list[dict]:
             "description": f"Matte sage accent {BRAND_SAGE} not found in briefing CSS.",
             "recommendation": "Headings and chart titles should use --brand-sage.",
         })
-    if "chart-img-pie" in html and CHART_IMG_FILTER not in html:
+    if "filter:" in html and "chart-img" in html:
         findings.append({
             "severity": "CRITICAL",
             "category": "Chart Presentation",
-            "description": "Pie charts use .chart-img-pie but the dark-mode filter is missing from CSS.",
-            "recommendation": f"Apply filter on .chart-img-pie: {CHART_IMG_FILTER}",
+            "description": "CSS filter applied to chart images — ruins categorical color fidelity.",
+            "recommendation": "Render charts natively on #121212 via QuickChart; remove filter rules from chart CSS.",
         })
     return findings
 

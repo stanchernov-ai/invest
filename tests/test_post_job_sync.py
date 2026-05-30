@@ -27,7 +27,7 @@ class TestPostJobSync(unittest.TestCase):
             run_id = "20260529_152151"
             telemetry = {
                 "AGENT_ACTIVITY": {
-                    "franklin": {"invocations": 2, "total_tokens": 1000, "model": "gemini-2.5-pro",
+                    "hypatia": {"invocations": 2, "total_tokens": 1000, "model": "gemini-2.5-pro",
                                 "prompt_tokens": 800, "output_tokens": 200, "thinking_tokens": 0, "errors": 0},
                     "chairman": {"invocations": 0, "total_tokens": 0, "model": "gemini-2.5-pro",
                                  "prompt_tokens": 0, "output_tokens": 0, "thinking_tokens": 0, "errors": 0},

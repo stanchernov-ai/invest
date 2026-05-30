@@ -11,7 +11,7 @@ CHAIRMAN = {
         "final_verdict": "Hold",
         "synthesis": "Unanimous hold on quality compounder.",
         "narrative": {
-            "champion": PANELIST_ROLES["franklin"],
+            "champion": PANELIST_ROLES["hypatia"],
             "champion_quote": "Moat intact.",
             "dissenter": "None",
             "dissenter_quote": "N/A",
@@ -23,7 +23,7 @@ CHAIRMAN = {
         "narrative": {
             "champion": PANELIST_ROLES["tesla"],
             "champion_quote": "Platform moat widening.",
-            "dissenter": PANELIST_ROLES["franklin"],
+            "dissenter": PANELIST_ROLES["hypatia"],
             "dissenter_quote": "Rich multiples.",
         },
     }],
@@ -43,9 +43,9 @@ RED_TEAM = {
 
 COS = {
     "state_of_the_union_quotes": [{
-        "board_member": f"{PANELIST_ROLES['franklin']} (⭐⭐⭐ Bullish)",
+        "board_member": f"{PANELIST_ROLES['hypatia']} (⭐⭐⭐ Bullish)",
         "quote": "Quality compounders remain attractive.",
-        "avatar_url": PANELIST_AVATAR_URLS["franklin"],
+        "avatar_url": PANELIST_AVATAR_URLS["hypatia"],
     }],
     "boardroom_brawl": "The board debated.\n\nRound two heated up.\n\nChairman decided.",
 }

@@ -216,7 +216,7 @@ class TestVoteEnginePhaseC(unittest.TestCase):
     def test_build_matrix_from_json(self):
         raw = _majority_buy_raw("META")
         matrix = build_matrix_from_raw_verdicts(raw, ["META"])
-        self.assertEqual(matrix["META"]["franklin"], "Buy")
+        self.assertEqual(matrix["META"]["hypatia"], "Buy")
 
     def test_apply_max_three_buys_standalone(self):
         chairman = {

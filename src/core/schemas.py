@@ -51,7 +51,7 @@ class PanelistRebuttalVerdict(BaseModel):
     )
 
 class StateOfTheUnionQuote(BaseModel):
-    board_member: str = Field(description="Panelist display name with star rating and stance, e.g. 'Benjamin Franklin (⭐⭐⭐ Bullish)'.")
+    board_member: str = Field(description="Panelist display name with star rating and stance, e.g. 'Hypatia of Alexandria (⭐⭐⭐ Bullish)'.")
     quote: str = Field(description="The panelist's overall_portfolio_critique — a 2-sentence portfolio-level view. MUST NOT be a per-ticker stock analysis.")
 
 class ChiefOfStaffSynthesis(BaseModel):

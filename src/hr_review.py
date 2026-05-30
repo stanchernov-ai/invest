@@ -41,7 +41,7 @@ PRICING = {
 # output is actually consumed downstream (the classic "discarded output" smell).
 PIPELINE_DATAFLOW_NOTE = (
     "Pipeline data flow (for consumed-by reasoning): the 5 voting panelists "
-    "(franklin, darwin, suntzu, tesla, pythagoras) debate over multiple rounds; the "
+    "(hypatia, davinci, suntzu, tesla, aurelius) debate over multiple rounds; the "
     "clerk (Chief of Staff) synthesizes the debate; the chairman makes final "
     "allocations; compliance audits the chairman; red_teamer writes a bear case "
     "rendered in the briefing but NOT fed back into decisions; data_oracle is a "

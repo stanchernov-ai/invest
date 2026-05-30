@@ -77,7 +77,7 @@ class TestComplianceAudit(unittest.TestCase):
     def test_format_debate_extracts_rounds(self):
         messages = [
             {"content": "noise"},
-            {"content": f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['franklin']}**:\nBuy META (8/10)"},
+            {"content": f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['hypatia']}**:\nBuy META (8/10)"},
         ]
         text = format_debate_for_compliance(messages)
         self.assertIn("ROUND 2", text)
@@ -85,7 +85,7 @@ class TestComplianceAudit(unittest.TestCase):
 
     def test_fails_plurality_buy_without_majority(self):
         raw = {
-            "darwin": {
+            "davinci": {
                 "portfolio_verdicts": [],
                 "watchlist_verdicts": [
                     {"symbol": "AMZN", "verdict": "Buy", "conviction_score": 8, "analysis": "growth"},
@@ -97,7 +97,7 @@ class TestComplianceAudit(unittest.TestCase):
                     {"symbol": "AMZN", "verdict": "Buy", "conviction_score": 7, "analysis": "tape"},
                 ],
             },
-            "franklin": {
+            "hypatia": {
                 "portfolio_verdicts": [],
                 "watchlist_verdicts": [
                     {"symbol": "AMZN", "verdict": "Pass", "conviction_score": 5, "analysis": "val"},

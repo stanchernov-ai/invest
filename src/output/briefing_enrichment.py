@@ -23,11 +23,18 @@ logger = logging.getLogger(__name__)
 
 _DISPLAY_TO_AGENT = {name: key for key, name in AGENT_DISPLAY.items()}
 for legacy_name, key in (
-    ("Warren Buffett", "franklin"),
-    ("Peter Lynch", "darwin"),
+    ("Warren Buffett", "hypatia"),
+    ("Peter Lynch", "davinci"),
     ("Jesse Livermore", "suntzu"),
     ("Jensen Huang", "tesla"),
-    ("Jim Simons", "pythagoras"),
+    ("Jim Simons", "aurelius"),
+    ("Benjamin Franklin", "hypatia"),
+    ("Charles Darwin", "davinci"),
+    ("Pythagoras", "aurelius"),
+    ("Aristotle", "hypatia"),
+    ("Hypatia of Alexandria", "hypatia"),
+    ("Leonardo da Vinci", "davinci"),
+    ("Marcus Aurelius", "aurelius"),
 ):
     _DISPLAY_TO_AGENT.setdefault(legacy_name, key)
 

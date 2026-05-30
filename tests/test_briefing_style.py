@@ -10,8 +10,8 @@ class BriefingStyleTests(unittest.TestCase):
         css = briefing_style.executive_briefing_css()
         self.assertIn("--bg-canvas: #121212", css)
         self.assertIn("--brand-sage: #95b8a2", css)
-        self.assertIn(briefing_style.CHART_IMG_FILTER, css)
-        self.assertIn(".chart-img-pie", css)
+        self.assertIn(".chart-img", css)
+        self.assertNotIn("filter:", css)
 
     def test_verdict_pills_use_semantic_colors(self):
         pills = briefing_style.verdict_pill_styles()
@@ -25,12 +25,12 @@ class BriefingStyleTests(unittest.TestCase):
         self.assertEqual(briefing_style.CHART_LEGEND_FONT_SIZE, 14)
         self.assertEqual(briefing_style.CHART_CANVAS_DARK, briefing_style.BG_CANVAS)
 
-        bull = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['franklin']} ⭐⭐⭐⭐")
+        bull = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['hypatia']} ⭐⭐⭐⭐")
         self.assertTrue(bull[0].startswith("rgba("))
         self.assertIn(str(briefing_style.SOTU_BG_ALPHA), bull[0])
-        sage = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['darwin']} ⭐⭐⭐")
+        sage = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['davinci']} ⭐⭐⭐")
         self.assertEqual(sage[1], briefing_style.BRAND_SAGE)
-        bear = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['pythagoras']} ⭐")
+        bear = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['aurelius']} ⭐")
         self.assertTrue(bear[0].startswith("rgba("))
 
     def test_briefing_html_includes_dark_theme(self):
@@ -53,8 +53,8 @@ class BriefingStyleTests(unittest.TestCase):
         )
         self.assertIn("#121212", html)
         self.assertIn("#95b8a2", html)
-        self.assertIn(briefing_style.CHART_IMG_FILTER, html)
         self.assertIn("chart-img", html)
+        self.assertNotIn("chart-img-pie", html)
 
 
 if __name__ == "__main__":

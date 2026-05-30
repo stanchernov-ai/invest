@@ -282,8 +282,8 @@ class StateMachineOrchestrator:
                 "Your previous boardroom_brawl was truncated or incomplete. "
                 "Return ONLY valid JSON with a complete boardroom_brawl field: exactly 3 full "
                 "paragraphs (blank line between each), 3-4 sentences per paragraph, ending with "
-                "proper punctuation. Name Benjamin Franklin, Charles Darwin, Sun Tzu, Nikola Tesla, "
-                "and Pythagoras where relevant.\n\n"
+                "proper punctuation. Name Hypatia of Alexandria, Leonardo da Vinci, Sun Tzu, Nikola Tesla, "
+                "and Marcus Aurelius where relevant.\n\n"
                 f"{debate_digest}"
             )
             retry_res = await self._run_agent(

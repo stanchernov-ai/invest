@@ -23,7 +23,7 @@ FORBIDDEN_PHRASES: dict[str, tuple[str, ...]] = {
         "free cash flow",
         "return on equity",
     ),
-    "franklin": (
+    "hypatia": (
         "3m trend",
         "relative strength",
         "the tape",
@@ -31,7 +31,7 @@ FORBIDDEN_PHRASES: dict[str, tuple[str, ...]] = {
         "breakout",
         "rising scale",
     ),
-    "pythagoras": (
+    "aurelius": (
         "economic moat",
         "margin of safety",
         "story stock",

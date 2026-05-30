@@ -19,7 +19,7 @@ class TestPostJobAudit(unittest.TestCase):
     def test_build_oversight_blocked_on_many_criticals(self):
         telemetry = {
             "AGENT_ACTIVITY": {
-                    "franklin": {"invocations": 2, "total_tokens": 1000, "model": "gemini-2.5-pro",
+                    "hypatia": {"invocations": 2, "total_tokens": 1000, "model": "gemini-2.5-pro",
                             "prompt_tokens": 800, "output_tokens": 200, "thinking_tokens": 0, "errors": 0},
             },
             "chairman_bypassed": True,

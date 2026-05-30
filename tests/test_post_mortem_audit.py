@@ -119,18 +119,18 @@ class TestPostMortemAudit(unittest.TestCase):
         raw = _raw_verdicts_amzn_buy_votes(3)
         messages = [{
             "content": (
-                f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['franklin']}**:\n"
+                f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['hypatia']}**:\n"
                 "* **AMZN**: Pass (2/10).\n"
-                f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['darwin']}**:\n"
+                f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['davinci']}**:\n"
                 "* **AMZN**: Buy (8/10).\n"
             )
         }]
-        # franklin Pass in prose but Buy in raw for first agent — fix raw to create drift
-        raw["franklin"]["watchlist_verdicts"][0]["verdict"] = "Buy"
+        # hypatia Pass in prose but Buy in raw for first agent — fix raw to create drift
+        raw["hypatia"]["watchlist_verdicts"][0]["verdict"] = "Buy"
         violations = audit_debate_prose_vs_raw_verdicts(
             messages, raw, all_symbols=["AMZN"]
         )
-        self.assertTrue(any("VOTE JSON/PROSE DRIFT" in v and PANELIST_ROLES["franklin"] in v for v in violations))
+        self.assertTrue(any("VOTE JSON/PROSE DRIFT" in v and PANELIST_ROLES["hypatia"] in v for v in violations))
 
     def test_cumulative_debate_messages_align_with_json(self):
         import json

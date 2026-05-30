@@ -39,7 +39,7 @@
   * **Rejected:** fixed `sleep 300` then list blobs hoping a new file appeared — racey and wastes time. (2026-05-28)
 
 - **QuickChart `outlabeledPie` legend:** `"plugins": { "legend": false }` must be a **boolean** — `{ "display": false }` is ignored and the top ticker row still renders. Same for bar charts. SSOT: `docs/briefing_charts_handoff.md`. (2026-05-29)
-- **Bar chart datalabels on white canvas were invisible** — white text on white background. Line/bar charts use dark canvas `#121212` with off-white labels (weight 700); pies stay white with `.chart-img-pie` filter. SSOT: `briefing_style.py`. (2026-05-29, typography bump 2026-05-30)
+- **All charts use dark canvas `#121212`** with off-white labels (weight 700). Do not CSS-filter chart PNGs — native QuickChart rendering preserves gain/loss color semantics. SSOT: `briefing_style.py`. (2026-05-30)
 - **`wait_for_run.py` false timeout after deploy** — ~10 min queue delay before debate starts can consume the 660s budget. Use `--timeout 900` or poll from debate phase. (2026-05-29)
 
 ## 3. Data & APIs

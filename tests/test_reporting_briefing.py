@@ -71,14 +71,14 @@ class BriefingCopyTests(unittest.TestCase):
             "final_verdict": "Buy",
             "synthesis": "[VOTE ENGINE] Deterministic mandate from Round 2 panel votes (buy_side=3/5, sell_side=2/5).",
             "narrative": {
-                "champion": PANELIST_ROLES["darwin"],
+                "champion": PANELIST_ROLES["davinci"],
                 "champion_quote": "Vote-engine mandate from unanimous / deterministic Round 2 panel votes.",
                 "dissenter": "None",
                 "dissenter_quote": "N/A",
             },
         })
         self.assertNotIn("VOTE ENGINE", pos["synthesis"])
-        self.assertIn(PANELIST_ROLES["darwin"], pos["narrative"]["champion"])
+        self.assertIn(PANELIST_ROLES["davinci"], pos["narrative"]["champion"])
         self.assertNotIn("Vote-engine", pos["narrative"]["champion_quote"])
 
     def test_briefing_html_hides_internal_jargon(self):
@@ -98,7 +98,7 @@ class BriefingCopyTests(unittest.TestCase):
                             "(buy_side=0/5, sell_side=5/5)."
                         ),
                         "narrative": {
-                            "champion": PANELIST_ROLES["franklin"],
+                            "champion": PANELIST_ROLES["hypatia"],
                             "champion_quote": "Vote-engine mandate from unanimous / deterministic Round 2 panel votes.",
                             "dissenter": "None",
                             "dissenter_quote": "N/A",
@@ -126,7 +126,7 @@ class BriefingCopyTests(unittest.TestCase):
         self.assertFalse(reporting._debate_has_content("Short."))
 
     def test_debate_hidden_for_truncated_mid_sentence(self):
-        truncated = "Franklin initiated by dismissing the entire portfolio as"
+        truncated = "hypatia initiated by dismissing the entire portfolio as"
         self.assertFalse(reporting._debate_has_content(truncated))
 
 
@@ -195,10 +195,10 @@ class ChartColorTests(unittest.TestCase):
         with patch.object(reporting, "get_quickchart_short_url", return_value="https://example.com/pie.png") as mock_url:
             reporting.build_portfolio_pie_chart(ledger)
         outlabels = mock_url.call_args[0][0]["options"]["plugins"]["outlabels"]
-        self.assertEqual(outlabels["color"], reporting.CHART_DATALABEL_ON_LIGHT)
+        self.assertEqual(outlabels["color"], reporting.CHART_DATALABEL_ON_DARK)
         self.assertEqual(outlabels["font"]["weight"], str(reporting.CHART_OUTLABEL_WEIGHT))
         self.assertEqual(outlabels["font"]["minSize"], reporting.CHART_OUTLABEL_MIN_SIZE)
-        self.assertEqual(mock_url.call_args[1]["background_color"], reporting.CHART_CANVAS_LIGHT)
+        self.assertEqual(mock_url.call_args[1]["background_color"], reporting.CHART_CANVAS_DARK)
 
     def test_bar_chart_dark_canvas_and_high_contrast_datalabels(self):
         ledger = [
@@ -245,7 +245,7 @@ class BriefingHtmlTests(unittest.TestCase):
                         "final_verdict": "Sell",
                         "synthesis": "Unanimous sell mandate.",
                         "narrative": {
-                            "champion": PANELIST_ROLES["pythagoras"],
+                            "champion": PANELIST_ROLES["aurelius"],
                             "champion_quote": "Mathematically suboptimal.",
                             "dissenter": "None",
                             "dissenter_quote": "N/A",
@@ -285,7 +285,7 @@ class BriefingHtmlTests(unittest.TestCase):
                         "symbol": "NVDA",
                         "final_verdict": "Buy",
                         "synthesis": "Strong momentum.",
-                        "narrative": {"champion": "Franklin", "champion_quote": "Buy.", "dissenter": "NONE", "dissenter_quote": "N/A"},
+                        "narrative": {"champion": "hypatia", "champion_quote": "Buy.", "dissenter": "NONE", "dissenter_quote": "N/A"},
                     }
                 ],
                 "watchlist_positions": [],
@@ -294,7 +294,7 @@ class BriefingHtmlTests(unittest.TestCase):
             },
             cos_data={
                 "state_of_the_union_quotes": [
-                    {"board_member": PANELIST_ROLES["franklin"], "quote": "Markets remain rational long term."},
+                    {"board_member": PANELIST_ROLES["hypatia"], "quote": "Markets remain rational long term."},
                 ],
                 "boardroom_brawl": "x" * 100,
             },

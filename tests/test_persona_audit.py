@@ -19,12 +19,12 @@ class TestPersonaAudit(unittest.TestCase):
         from src.qa_pipeline import parse_board_matrix
 
         messages = [
-            _round2_msg(PANELIST_ROLES["franklin"], "* **META**: Buy (8/10)."),
-            _round2_msg(PANELIST_ROLES["darwin"], "* **META**: Hold (6/10)."),
+            _round2_msg(PANELIST_ROLES["hypatia"], "* **META**: Buy (8/10)."),
+            _round2_msg(PANELIST_ROLES["davinci"], "* **META**: Hold (6/10)."),
         ]
         matrix = parse_board_matrix(messages, ["META"])
-        self.assertEqual(matrix["META"]["franklin"], "Buy")
-        self.assertEqual(matrix["META"]["darwin"], "Hold")
+        self.assertEqual(matrix["META"]["hypatia"], "Buy")
+        self.assertEqual(matrix["META"]["davinci"], "Hold")
 
     def test_suntzu_forbidden_pe_ratio(self):
         messages = [
@@ -45,9 +45,9 @@ class TestPersonaAudit(unittest.TestCase):
 
     def test_clean_debate_passes_deterministic(self):
         messages = [
-            _round2_msg(PANELIST_ROLES["franklin"], "* **META**: Hold. Cash flow adequate but no margin of safety."),
+            _round2_msg(PANELIST_ROLES["hypatia"], "* **META**: Hold. Cash flow adequate but no margin of safety."),
             _round2_msg(PANELIST_ROLES["suntzu"], "* **META**: Trim. Tape weakening vs QQQ."),
-            _round2_msg(PANELIST_ROLES["pythagoras"], "* **META**: Hold. Beta elevated; edge unclear."),
+            _round2_msg(PANELIST_ROLES["aurelius"], "* **META**: Hold. Beta elevated; edge unclear."),
         ]
         violations, _ = audit_debate_persona(messages, ["META"])
         self.assertEqual(violations, [])
@@ -73,23 +73,23 @@ class TestPersonaAudit(unittest.TestCase):
 
     def test_verbatim_r1_copy_detected_in_persona_audit(self):
         shared = "The portfolio is too concentrated in mega-cap tech without margin of safety."
-        franklin = PANELIST_ROLES["franklin"]
+        hypatia = PANELIST_ROLES["hypatia"]
         messages = [
             {
                 "content": (
-                    f"**[ROUND 1] {franklin}**:\n* **Portfolio Overview**: {shared}\n"
+                    f"**[ROUND 1] {hypatia}**:\n* **Portfolio Overview**: {shared}\n"
                     "* **NVDA**: Hold (5/10).\n"
                 )
             },
             {
                 "content": (
-                    f"**[ROUND 2 REBUTTAL] {franklin}**:\n* **Rebuttal Summary**: {shared}\n"
+                    f"**[ROUND 2 REBUTTAL] {hypatia}**:\n* **Rebuttal Summary**: {shared}\n"
                     "* **NVDA**: Hold (5/10).\n"
                 )
             },
         ]
         violations, stats = audit_debate_persona(messages, ["NVDA"])
-        self.assertIn("franklin", stats["verbatim_r1_copies"])
+        self.assertIn("hypatia", stats["verbatim_r1_copies"])
         self.assertTrue(any("VERBATIM R1 COPY" in v for v in violations))
 
     def test_format_digest_includes_stats(self):
@@ -101,13 +101,13 @@ class TestPersonaAudit(unittest.TestCase):
         """Prod debate checkpoints append R2 blocks; scan only the agent's section."""
         cumulative = {
             "content": (
-                f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['darwin']}**:\n"
+                f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['davinci']}**:\n"
                 "* **Rebuttal Summary**: The portfolio's problem isn't high P/E ratios.\n"
                 "* **NET**: Pass (2/10). This is a story stock with no earnings.\n\n"
                 f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['suntzu']}**:\n"
                 "* **Rebuttal Summary**: The tape is the only truth.\n"
                 "* **NVDA**: Strong Sell (10/10). Lagging the QQQ.\n\n"
-                f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['pythagoras']}**:\n"
+                f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['aurelius']}**:\n"
                 "* **Rebuttal Summary**: Alpha decay requires reallocation.\n"
                 "* **NVDA**: Strong Buy (10/10). PEG 0.29 supports the edge.\n"
             )

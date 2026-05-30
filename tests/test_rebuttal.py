@@ -11,32 +11,32 @@ from src.core.rebuttal import (
 
 class TestRebuttalHelpers(unittest.TestCase):
     def test_extract_round1_overview(self):
-        franklin = PANELIST_ROLES["franklin"]
+        hypatia = PANELIST_ROLES["hypatia"]
         messages = [
             {
                 "content": (
-                    f"**[ROUND 1] {franklin}**:\n"
+                    f"**[ROUND 1] {hypatia}**:\n"
                     "* **Portfolio Overview**: Tech concentration is reckless.\n"
                     "* **NVDA**: Hold. Analysis: Too expensive.\n"
                 )
             }
         ]
-        text = extract_round_overview(messages, "franklin", "1")
+        text = extract_round_overview(messages, "hypatia", "1")
         self.assertIn("Tech concentration", text)
 
     def test_extract_round2_rebuttal_summary(self):
-        franklin = PANELIST_ROLES["franklin"]
+        hypatia = PANELIST_ROLES["hypatia"]
         messages = [
             {
                 "content": (
-                    f"**[ROUND 2 REBUTTAL] {franklin}**:\n"
-                    "* **Rebuttal Summary**: Darwin is wrong about NVDA — cash flow supports it.\n"
+                    f"**[ROUND 2 REBUTTAL] {hypatia}**:\n"
+                    "* **Rebuttal Summary**: davinci is wrong about NVDA — cash flow supports it.\n"
                     "* **NVDA**: Buy (8/10). Margin of safety emerging.\n"
                 )
             }
         ]
-        text = extract_round_overview(messages, "franklin", "2")
-        self.assertIn("Darwin is wrong", text)
+        text = extract_round_overview(messages, "hypatia", "2")
+        self.assertIn("davinci is wrong", text)
 
     def test_verbatim_copy_detected(self):
         prose = "Tech concentration is reckless given current multiples."
@@ -45,28 +45,28 @@ class TestRebuttalHelpers(unittest.TestCase):
 
     def test_distinct_rebuttal_not_flagged(self):
         r1 = "Tech concentration is reckless given current multiples."
-        r2 = "Charles Darwin argues growth justifies NVDA, but I still see no margin of safety."
+        r2 = "Charles davinci argues growth justifies NVDA, but I still see no margin of safety."
         self.assertFalse(is_verbatim_r1_copy(r1, r2))
 
     def test_build_round2_prompt_names_peers_and_forbids_copy(self):
-        franklin = PANELIST_ROLES["franklin"]
-        darwin = PANELIST_ROLES["darwin"]
+        hypatia = PANELIST_ROLES["hypatia"]
+        davinci = PANELIST_ROLES["davinci"]
         messages = [
             {
                 "content": (
-                    f"**[ROUND 1] {franklin}**:\n"
+                    f"**[ROUND 1] {hypatia}**:\n"
                     "* **Portfolio Overview**: Concentration risk is elevated.\n"
                 )
             },
             {
                 "content": (
-                    f"**[ROUND 1] {darwin}**:\n"
+                    f"**[ROUND 1] {davinci}**:\n"
                     "* **Portfolio Overview**: Growth names still have runway.\n"
                 )
             },
         ]
-        prompt = build_round2_user_prompt("franklin", messages)
-        self.assertIn(darwin, prompt)
+        prompt = build_round2_user_prompt("hypatia", messages)
+        self.assertIn(davinci, prompt)
         self.assertIn("do not copy", prompt.lower())
         self.assertIn("Concentration risk", prompt)
         self.assertIn("Growth names", prompt)

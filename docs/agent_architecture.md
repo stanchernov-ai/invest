@@ -167,13 +167,18 @@ flowchart LR
 
 ### 3.1 Panelists (debate core)
 
-| Key | Persona | Model | Thinking budget |
-|-----|---------|-------|-----------------|
-| `buffett` | Warren Buffett | Pro | 4096 |
-| `lynch` | Peter Lynch | Pro | 4096 |
-| `livermore` | Jesse Livermore | Pro | 4096 |
-| `huang` | Jensen Huang | Pro | 4096 |
-| `simons` | Jim Simons | Pro | 4096 |
+**SSOT:** `src/core/board_roster.py` (keys, display names, avatars) · `src/core/agents.py` (`board_members` prompts)  
+**Avatar art direction:** [`briefing_avatars.md`](briefing_avatars.md) — Stealth Wealth busts (marble / bronze / obsidian on `#000000`)
+
+| Key | Persona | Archetype | Model | Thinking budget |
+|-----|---------|-----------|-------|-----------------|
+| `hypatia` | Hypatia of Alexandria | Value Anchor | Pro | 4096 |
+| `davinci` | Leonardo da Vinci | Growth Narrator | Pro | 4096 |
+| `suntzu` | Sun Tzu | Tape Reader | Pro | 4096 |
+| `tesla` | Nikola Tesla | Tech Visionary | Pro | 4096 |
+| `aurelius` | Marcus Aurelius | Pure Quant | Pro | 4096 |
+
+Legacy keys (`buffett`, `lynch`, `livermore`, `huang`, `simons`, `franklin`, `darwin`, `pythagoras`, `aristotle`) resolve via `LEGACY_AGENT_KEY_MAP` for checkpoint replay.
 
 ### 3.2 Decision & audit (debate)
 
@@ -185,7 +190,7 @@ flowchart LR
 | `red_teamer` | Adversarial Red Teamer | Pro | Bear case for briefing (non-feedback) |
 | `data_oracle` | Pre-Flight Data Oracle | — | **🟢 Python only** — `src/core/data_oracle.py`; runs once in prepare |
 
-**Munger audit** (conditional): reuses `buffett`, `huang`, `lynch` when concentration triggers — not a separate config key.
+**Munger audit** (conditional): reuses `hypatia`, `tesla`, `davinci` (`CONCENTRATION_AUDIT_KEYS`) when concentration triggers — not a separate config key.
 
 ### 3.3 Post-flight QA (deliver)
 

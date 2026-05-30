@@ -1,8 +1,8 @@
-"""Invest AI executive briefing — dark premium palette (SSOT).
+"""Invest AI executive briefing — Stealth Wealth dark premium palette (SSOT).
 
 Code constants, CSS blocks, and agent digests for briefing HTML, QA dashboard,
-Graphics Designer QA, and deterministic visual audit. QuickChart images stay
-white-background; dark chart appearance comes from the `.chart-img` CSS filter.
+Graphics Designer QA, and deterministic visual audit. Charts render natively on
+#121212 via QuickChart (Chart.js) — never CSS-filtered static images.
 """
 
 from __future__ import annotations
@@ -28,12 +28,10 @@ BEAR_BG = "#450a0a"
 WARN_TEXT = "#fcd34d"
 WARN_BG = "#3f2c12"
 
-# QuickChart canvas stays light for pies; line/bar use CHART_CANVAS_DARK natively.
-CHART_IMG_FILTER = "invert(0.9) hue-rotate(180deg) grayscale(0.6)"
-
+# QuickChart (Chart.js) renders all chart types on CHART_CANVAS_DARK natively.
 # --- QuickChart typography (credibility gate: labels/legends must not require squinting) ---
-CHART_CANVAS_DARK = BG_CANVAS  # #121212 — line + bar charts
-CHART_CANVAS_LIGHT = "#ffffff"  # pie charts (outlabels on white)
+CHART_CANVAS_DARK = BG_CANVAS  # #121212 — all charts (line, bar, pie)
+CHART_CANVAS_LIGHT = "#ffffff"  # legacy alias — do not use for new charts
 
 CHART_DATALABEL_ON_DARK = TEXT_HIGHLIGHT  # #f4f4f5 off-white on dark canvas
 CHART_DATALABEL_ON_LIGHT = "#18181b"  # near-black on white pie canvas
@@ -201,9 +199,6 @@ def executive_briefing_css() -> str:
                 display: block;
                 margin: 0 auto;
             }}
-            .chart-img-pie {{
-                filter: {CHART_IMG_FILTER};
-            }}
             .section-divider {{ border-bottom: 1px solid var(--border-subtle); }}
             .muted {{ color: var(--text-primary); }}
             .bear-heading {{ color: var(--bear-text); }}
@@ -321,9 +316,9 @@ Financial semantics:
 - Bearish (Sell / Strong Sell, dissent, red team): {BEAR_TEXT} on {BEAR_BG}.
 - Warning / hedge mandate: {WARN_TEXT} on {WARN_BG}.
 
-Charts: Pie PNGs render on white; the email applies `.chart-img-pie {{ filter: {CHART_IMG_FILTER}; }}` so pies match the cool sage-green dark theme. Line and bar charts render natively on {CHART_CANVAS_DARK} with off-white data labels — do NOT expect those to look filtered.
+Charts: All chart types (line, bar, pie) render natively on {CHART_CANVAS_DARK} via QuickChart (Chart.js). Do NOT apply CSS filters to chart images — filters ruin categorical color fidelity.
 
-Chart typography (QuickChart): data labels weight {CHART_DATALABEL_WEIGHT}, off-white {CHART_DATALABEL_ON_DARK} on dark canvas; pie outlabels weight {CHART_OUTLABEL_WEIGHT} on white canvas. Legend base size {CHART_LEGEND_FONT_SIZE}px on line chart. Flag CRITICAL if labels or legends are faint or unreadable.
+Chart typography (QuickChart): data labels weight {CHART_DATALABEL_WEIGHT}, off-white {CHART_DATALABEL_ON_DARK} on dark canvas; pie outlabels weight {CHART_OUTLABEL_WEIGHT} on dark canvas. Legend base size {CHART_LEGEND_FONT_SIZE}px on line chart. Flag CRITICAL if labels or legends are faint or unreadable.
 
 Also flag CRITICAL if charts are broken, if bright white Bootstrap/SaaS blocks return, or if more than three unrelated accent hues appear outside this palette.
 """.strip()

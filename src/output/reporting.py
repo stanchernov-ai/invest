@@ -382,15 +382,16 @@ def _light_chart_scales(*, y_title: str, y_begin_at_zero: bool = False) -> dict:
     }
 
 
-def _outlabeled_pie_options() -> dict:
+def _outlabeled_pie_options(*, dark: bool = True) -> dict:
     """QuickChart outlabeledPie — legend must be boolean false, not {display: false}."""
+    label_color = CHART_DATALABEL_ON_DARK if dark else CHART_DATALABEL_ON_LIGHT
     return {
         "plugins": {
             "legend": False,
             "datalabels": {"display": False},
             "outlabels": {
                 "text": "%l %p",
-                "color": CHART_DATALABEL_ON_LIGHT,
+                "color": label_color,
                 "stretch": 35,
                 "font": {
                     "resizable": True,
@@ -418,7 +419,7 @@ def _render_outlabeled_pie_chart(labels, data, colors):
         chart_config,
         width=PIE_CHART_WIDTH,
         height=PIE_CHART_HEIGHT,
-        background_color=CHART_CANVAS_LIGHT,
+        background_color=CHART_CANVAS_DARK,
     )
 
 
@@ -490,7 +491,7 @@ def build_portfolio_pie_chart(sorted_ledger):
     if not data:
         return ""
 
-    colors = colors_for_metric(returns)
+    colors = colors_for_metric(returns, theme="dark")
 
     return _render_outlabeled_pie_chart(labels, data, colors)
 
@@ -521,7 +522,7 @@ def build_account_allocation_pie(account_holdings, account_returns):
     if not data:
         return ""
 
-    colors = colors_for_metric(twelves)
+    colors = colors_for_metric(twelves, theme="dark")
 
     return _render_outlabeled_pie_chart(labels, data, colors)
 
@@ -984,7 +985,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                     <td valign="top" width="{{ '50%' if account_pie_url else '100%' }}" style="padding: 0 {{ '10px' if account_pie_url else '0' }} 0 0;">
                         <div class="chart-title">Unrealized Gains</div>
                         <div class="chart-container">
-                            <img class="chart-img chart-img-pie" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart">
+                            <img class="chart-img" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart">
                         </div>
                     </td>
                     {% endif %}
@@ -992,7 +993,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                     <td valign="top" width="{{ '50%' if pie_chart_url else '100%' }}" style="padding: 0 0 0 {{ '10px' if pie_chart_url else '0' }};">
                         <div class="chart-title">12M Return by Account</div>
                         <div class="chart-container">
-                            <img class="chart-img chart-img-pie" src="{{ account_pie_url }}" alt="1 Yr Return Pie Chart">
+                            <img class="chart-img" src="{{ account_pie_url }}" alt="1 Yr Return Pie Chart">
                         </div>
                     </td>
                     {% endif %}

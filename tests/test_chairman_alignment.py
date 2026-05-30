@@ -30,7 +30,7 @@ def _pos(symbol, verdict, conviction=10, synthesis="Rationale."):
 
 def _round2_raw_verdicts(amzn_votes: int = 3) -> dict:
     """Three panelists Buy AMZN; others Pass — majority Buy on AMZN."""
-    buy_agents = ("darwin", "suntzu", "tesla")[:amzn_votes]
+    buy_agents = ("davinci", "suntzu", "tesla")[:amzn_votes]
     raw = {}
     for agent in PANELIST_KEYS:
         verdict = "Buy" if agent in buy_agents else "Pass"
