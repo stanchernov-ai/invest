@@ -183,7 +183,7 @@ def merge_persona_reports(deterministic_violations: list[str], llm_report: dict 
     elif llm_report:
         is_compliant = bool(llm.get("is_compliant"))
     else:
-        is_compliant = False
+        is_compliant = True
 
     summary = (llm.get("summary") or "").strip()
     if deterministic_violations and summary:

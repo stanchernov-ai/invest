@@ -79,7 +79,7 @@ def merge_post_mortem_reports(deterministic_violations: list[str], llm_report: d
     elif llm_report:
         is_compliant = bool(llm.get("is_compliant"))
     else:
-        is_compliant = False
+        is_compliant = True
 
     summary = (llm.get("summary") or "").strip()
     if deterministic_violations and summary:

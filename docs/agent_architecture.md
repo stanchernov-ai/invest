@@ -1,7 +1,7 @@
 # SC Invest Boardroom — Agent Architecture
 
 **Status:** Active  
-**Last updated:** May 29, 2026 (vote_engine Phase A)  
+**Last updated:** May 30, 2026 (funding sell, optimization handoffs)  
 **Owner:** Stan  
 **SSOT for:** agent inventory, interaction diagrams, QA validation layers, and when to update this doc  
 
@@ -16,6 +16,8 @@
 | [`engineering_playbook.md`](engineering_playbook.md) | Rejected approaches — read before retrying |
 | [`action_tracker.md`](action_tracker.md) | Backlog and Session Handoff |
 | [`post_deliver_checklist.md`](post_deliver_checklist.md) | After every deliver — retrospective + backlog hygiene |
+| [`agent_optimization_handoff.md`](agent_optimization_handoff.md) | Runtime audit, funding sell, planned cost/latency tickets |
+| [`cursor_dev_plane_handoff.md`](cursor_dev_plane_handoff.md) | Cursor agents, ecosystem_state, standing QA digest |
 
 ---
 
@@ -32,6 +34,8 @@ Update **`docs/agent_architecture.md`** whenever you change any of the following
 | Agent promoted 🟡 → 🟢 (code-enforced) | §8 enforcement legend + roster notes |
 | Cross-run state / scout cooldown change | §3.6 verdict memory |
 | New QA module or deliver QA order change | [`qa_layers.md`](qa_layers.md) + §6 here |
+| Funding sell / allocation rules | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) §3.1; `src/core/vote_engine.py` |
+| Runtime optimization ticket shipped | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) §5 + §10 below |
 
 **Do not duplicate** guardrail prose here — edit `.cursorrules` only.  
 **Do not duplicate** FMP/API details — see `fmp_data_dictionary.md`.
@@ -507,6 +511,9 @@ Areas with **multiple owners** — track reductions in `action_tracker.md`:
 
 | Date | Change |
 |------|--------|
+| May 30, 2026 | **`ensure_funding_sell`** — Python reallocation (lowest conviction; skip if board >1 sell or all portfolio buys); [`agent_optimization_handoff.md`](agent_optimization_handoff.md) |
+| May 30, 2026 | **`briefing_enrichment`** — Round 2 quotes at render time; `LIQUIDATION_CAP_PCT` env hook in settings |
+| May 30, 2026 | Agent optimization + Cursor dev plane **handoff docs**; telemetry baseline run `20260529_152151` |
 | May 29, 2026 | **`vote_engine` Phase A** (`6107539`) — vote SSOT, VOTE_DIGEST, chairman bypass, Python compliance A/D/E, `raw_verdicts` in debate checkpoint; validated run `20260529_144833` |
 | May 29, 2026 | Chairman guardrails + `chairman_alignment` — max-3 coherence, majority-buy promotion (`93df4ed`, `01b5ed6`) |
 | May 29, 2026 | Verdict memory implicit Pass + per-run status + double-run 409 guard |

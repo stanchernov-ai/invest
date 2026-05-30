@@ -18,6 +18,7 @@ from src.core.guardrails import (
 from src.core.vote_engine import (
     MAJORITY_THRESHOLD,
     build_vote_summaries,
+    is_funding_sell_override,
     mandate_verdict,
     verdict_bucket,
 )
@@ -135,6 +136,8 @@ def audit_chairman_vote_alignment(
                 "reduce" if summary.sell_side_count() >= MAJORITY_THRESHOLD else None
             )
             if _has_valid_majority_override(pos, mb or ""):
+                continue
+            if is_funding_sell_override(pos):
                 continue
             if _is_surplus_majority_buy_demotion(pos, summary, chairman, mb or ""):
                 continue

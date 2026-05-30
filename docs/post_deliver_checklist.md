@@ -131,15 +131,36 @@ When closing an item that was a **code fix**:
 
 ---
 
-## 8. Optional — Cursor post-job agents
+## 8. Post-job agents (automated)
 
-When coding the same day as a run, spawn (or run yourself):
+After a successful run, activate the dev-plane audit trail with one command:
 
-1. **Data Insight** — scan `.cache/` for recurring N/A fields, idle agents
-2. **API Optimization** — check `api_telemetry_*` for duplicate FMP calls
-3. **Supervisor** — synthesize into `ecosystem_state.json` → `supervisor_summaries`
+```powershell
+.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id RUN_ID --post-job
+```
 
-These are advisory; they do not replace steps 3–6.
+Or wait for completion and sync in one step:
+
+```powershell
+.venv\Scripts\python.exe scripts\wait_for_run.py --run-id RUN_ID --post-job
+```
+
+This writes to `.cursor/agent_state/ecosystem_state.json`:
+
+| Bucket | Agent | What it captures |
+|--------|-------|------------------|
+| `api_audit` | API Optimization | Idle agents, token spend ranking |
+| `data_insights` | Data Insight | QA CRITICAL/WARNING counts |
+| `supervisor_summaries` | Supervisor | PASS / PASS_WITH_WARNINGS / BLOCKED + human actions |
+| `qa_scorecards` | (from Azure) | Deliver QA scorecard mirror |
+
+Inspect results:
+
+```powershell
+.venv\Scripts\python.exe tools\ecosystem_state.py show --last 3
+```
+
+These replace the former **manual-only** Cursor post-job steps. Cursor rules remain for ad-hoc deep dives.
 
 ---
 
@@ -149,7 +170,7 @@ Replace `RUN_ID`:
 
 ```powershell
 .venv\Scripts\python.exe scripts\wait_for_run.py --run-id RUN_ID
-.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id RUN_ID
+.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id RUN_ID --post-job
 # Retrospective already ran in deliver — read reports/retrospective_RUN_ID.md
 ```
 

@@ -10,7 +10,6 @@ from datetime import datetime
 from src.config.settings import now_local
 
 MAX_DAILY_BUYS = 3
-LIQUIDATION_CAP_PCT = 0.10
 WASH_SALE_DAYS = 30
 
 BUY_VERDICTS = frozenset({"BUY", "STRONG BUY"})
@@ -157,9 +156,13 @@ def enforce_liquidation_cap(
     *,
     total_portfolio_value: float,
     portfolio_holdings: dict[str, float],
-    cap_pct: float = LIQUIDATION_CAP_PCT,
+    cap_pct: float | None = None,
 ) -> dict:
     """Cap total Sell/Trim notional to ``cap_pct`` of portfolio value."""
+    from src.config.settings import LIQUIDATION_CAP_PCT
+
+    if cap_pct is None:
+        cap_pct = LIQUIDATION_CAP_PCT
     if not chairman.get("capital_flow_audit"):
         return chairman
 
@@ -239,6 +242,14 @@ def apply_chairman_guardrails(
         raw_verdicts,
         portfolio_symbols=portfolio_symbols,
         watchlist_symbols=watchlist_symbols,
+    )
+    from src.core.vote_engine import ensure_funding_sell
+
+    ensure_funding_sell(
+        result,
+        portfolio_symbols=portfolio_symbols,
+        raw_verdicts=raw_verdicts,
+        all_symbols=list(universe),
     )
     enforce_wash_sale(result, purchase_dates or {}, ref=ref)
     enforce_liquidation_cap(

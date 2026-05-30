@@ -29,20 +29,24 @@ def resolve_run_id(explicit: str | None) -> str | None:
     return status.get("run_id") if status else None
 
 
-def maybe_fetch(run_id: str, cache_dir: Path) -> None:
+def maybe_fetch(run_id: str, cache_dir: Path, *, post_job: bool = False) -> None:
     fetch_script = REPO_ROOT / "tools" / "fetch_azure_reports.py"
     if fetch_script.exists():
-        subprocess.run(
-            [sys.executable, str(fetch_script), "--run-id", run_id, "--out", str(cache_dir)],
-            check=False,
-            cwd=str(REPO_ROOT),
-        )
+        cmd = [sys.executable, str(fetch_script), "--run-id", run_id, "--out", str(cache_dir)]
+        if post_job:
+            cmd.append("--post-job")
+        subprocess.run(cmd, check=False, cwd=str(REPO_ROOT))
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Post-deliver retrospective CLI.")
     parser.add_argument("--run-id", help="Run id (default: latest run_status.json)")
     parser.add_argument("--fetch", action="store_true", help="Fetch artifacts before analysis")
+    parser.add_argument(
+        "--post-job",
+        action="store_true",
+        help="With --fetch, also run post-job sync (activates dev-plane agents)",
+    )
     parser.add_argument("--force", action="store_true", help="Reprocess even if already completed")
     parser.add_argument("--cache-dir", default=".cache")
     parser.add_argument("--no-local-insights", action="store_true",
@@ -58,7 +62,7 @@ def main() -> int:
     if not cache_dir.is_absolute():
         cache_dir = REPO_ROOT / cache_dir
     if args.fetch:
-        maybe_fetch(run_id, cache_dir)
+        maybe_fetch(run_id, cache_dir, post_job=args.post_job)
 
     try:
         result = execute_retrospective(

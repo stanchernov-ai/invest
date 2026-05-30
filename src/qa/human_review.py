@@ -152,7 +152,18 @@ def save_human_review(run_id: str, reviews: list[dict], *, reviewer: str = "stan
     storage_client.save_state_blob(f"qa_human_review_{run_id}.json", record)
     _update_ledger(record)
     _persist_local_ecosystem(record)
+    _refresh_retrospective_after_review(run_id)
     return record
+
+
+def _refresh_retrospective_after_review(run_id: str) -> None:
+    """Re-run retrospective after human review so candidates reflect confirmations."""
+    try:
+        from src.qa.retrospective import execute_retrospective
+
+        execute_retrospective(run_id, force=True, write_local_insights=False)
+    except Exception as exc:
+        logger.debug("Post-review retrospective refresh skipped: %s", exc)
 
 
 def _summarize_reviews(reviews: list[dict]) -> str:

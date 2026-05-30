@@ -16,6 +16,7 @@ Usage (from repo root, via the venv interpreter):
   .venv\\Scripts\\python.exe tools/fetch_azure_reports.py --list          # list available run IDs, no download
   .venv\\Scripts\\python.exe tools/fetch_azure_reports.py --latest 3      # last 3 of each artifact family
   .venv\\Scripts\\python.exe tools/fetch_azure_reports.py --run-id 20260528_204417
+  .venv\\Scripts\\python.exe tools/fetch_azure_reports.py --run-id 20260528_204417 --post-job
   .venv\\Scripts\\python.exe tools/fetch_azure_reports.py --out .cache --no-state-singletons
 
 Exit codes: 0 = ok, 2 = no Azure connection string / client, 3 = nothing matched.
@@ -104,7 +105,19 @@ def main():
     parser.add_argument("--run-id", default=None, help="Fetch all artifacts for a specific run id (e.g. 20260528_204417)")
     parser.add_argument("--list", action="store_true", help="List available run IDs and exit (no download)")
     parser.add_argument("--no-state-singletons", action="store_true", help="Skip run_status/portfolio_history/etc.")
+    parser.add_argument(
+        "--sync-ecosystem",
+        action="store_true",
+        help="After fetch, sync qa_scorecards / retrospective / human review into ecosystem_state.json",
+    )
+    parser.add_argument(
+        "--post-job",
+        action="store_true",
+        help="After fetch, run full post-job sync (implies --sync-ecosystem + post_job_sync.py)",
+    )
     args = parser.parse_args()
+    if args.post_job:
+        args.sync_ecosystem = True
 
     client = get_blob_service_client()
     if not client:
@@ -144,6 +157,9 @@ def main():
             subdir = "reports" if container == REPORT_CONTAINER else "state"
             picked = [n for n in pool if n.startswith(prefix)][: args.latest]
             to_fetch.extend((container, n, subdir) for n in picked)
+        # retrospective marker JSON lives in state; .md in reports — same prefix, two containers.
+        state_retro = [n for n in state_names if n.startswith("retrospective_") and n.endswith(".json")]
+        to_fetch.extend((STATE_CONTAINER, n, "state") for n in state_retro[: args.latest])
 
     # State singletons (current snapshot), unless suppressed.
     if not args.no_state_singletons:
@@ -183,6 +199,31 @@ def main():
         json.dump({"files": manifest, "count": len(manifest)}, f, indent=2)
 
     print(f"\nDone. {len(manifest)} file(s) cached. Manifest: {manifest_path}")
+
+    resolved_run_id = args.run_id
+    if not resolved_run_id:
+        for item in manifest:
+            rid = extract_run_id(item["blob"])
+            if rid:
+                resolved_run_id = rid
+                break
+
+    if resolved_run_id and args.sync_ecosystem:
+        from tools.sync_ecosystem import sync_ecosystem_from_cache
+
+        synced = sync_ecosystem_from_cache(resolved_run_id, out_dir)
+        print(f"Ecosystem sync ({resolved_run_id}): {synced}")
+
+    if resolved_run_id and args.post_job:
+        from tools.post_job_sync import run_post_job_sync
+
+        summary = run_post_job_sync(resolved_run_id, out_dir, sync_ecosystem=False)
+        print(
+            f"Post-job agents activated ({resolved_run_id}): "
+            f"api_audit + data_insights + supervisor_summaries "
+            f"({summary['qa_critical_count']} QA CRITICAL, ~{summary['total_tokens']:,} tokens)."
+        )
+
     return 0
 
 

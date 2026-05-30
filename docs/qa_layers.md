@@ -1,7 +1,9 @@
 # QA Layers — Quick Map
 
-**Status:** Active · **Last updated:** May 29, 2026 (vote_engine)  
+**Status:** Active · **Last updated:** May 30, 2026 (planned optimizations pointer)  
 **SSOT for:** which QA module does what — **not** full layer diagrams (see [`agent_architecture.md`](agent_architecture.md) §6).
+
+**Planned runtime wins (not yet implemented):** [`agent_optimization_handoff.md`](agent_optimization_handoff.md) §5 (Tickets A1–A4).
 
 ---
 
@@ -113,7 +115,8 @@ Failed compliance → no approved debate → **deliver never runs** → no post-
 | Refactoring | `refactoring_agent.mdc` | Pre-commit (blocking) |
 | API Optimization | `api_optimization_agent.mdc` | Post-job (advisory) |
 
-See [`.cursorrules`](../.cursorrules) §2–§5 — do not duplicate here.
+See [`.cursorrules`](../.cursorrules) §2–§5 — do not duplicate here.  
+**Cursor plane backlog (fetch sync, standing QA digest, human review loop):** [`cursor_dev_plane_handoff.md`](cursor_dev_plane_handoff.md).
 
 ---
 

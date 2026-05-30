@@ -44,6 +44,26 @@ DATA_DIR = os.getenv("BOARDROOM_DATA_DIR", os.path.join(_DEFAULT_BASE, "data"))
 OUTPUT_DIR = os.getenv("BOARDROOM_OUTPUT_DIR", os.path.join(_DEFAULT_BASE, "output"))
 
 
+def _parse_liquidation_cap_pct() -> float:
+    """Max fraction of portfolio NAV that may be sold/trimmed to fund buys per run.
+
+    TODO(user-profile): replace env default with persisted user profile when available.
+    Until then, override via LIQUIDATION_CAP_PCT (decimal, e.g. 0.10 = 10%).
+    """
+    raw = os.getenv("LIQUIDATION_CAP_PCT", "0.10")
+    try:
+        val = float(raw)
+        if 0 < val <= 1.0:
+            return val
+    except (TypeError, ValueError):
+        pass
+    logger.warning("Invalid LIQUIDATION_CAP_PCT %r; using 0.10.", raw)
+    return 0.10
+
+
+LIQUIDATION_CAP_PCT = _parse_liquidation_cap_pct()
+
+
 class Settings:
     FMP_API_KEY = os.getenv("FMP_API_KEY")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")

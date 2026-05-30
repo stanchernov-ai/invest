@@ -66,6 +66,7 @@ async def run_debate(run_id: str) -> dict:
         allocation_source = "llm"
         chairman_bypassed = False
         compliance_source = "python+llm"
+        munger_skipped = False
 
         async for output in app.astream(initial_state):
             for key, value in output.items():
@@ -97,6 +98,7 @@ async def run_debate(run_id: str) -> dict:
                     allocation_source = value.get("allocation_source", "llm")
                     chairman_bypassed = value.get("chairman_bypassed", False)
                     compliance_source = value.get("compliance_source", "python+llm")
+                    munger_skipped = value.get("munger_skipped", False)
                     if is_approved_flag:
                         c_data = value.get("chairman_data", {})
                         red_team_data = value.get("red_team_data", {})
@@ -169,6 +171,7 @@ async def run_debate(run_id: str) -> dict:
             "allocation_source": allocation_source,
             "chairman_bypassed": chairman_bypassed,
             "compliance_source": compliance_source,
+            "munger_skipped": munger_skipped,
         }
 
         checkpoint = {
@@ -185,6 +188,7 @@ async def run_debate(run_id: str) -> dict:
             "allocation_source": allocation_source,
             "chairman_bypassed": chairman_bypassed,
             "compliance_source": compliance_source,
+            "munger_skipped": munger_skipped,
         }
         storage_client.save_checkpoint(run_id, "debate", checkpoint)
         storage_client.save_report(f"api_telemetry_{run_id}_debate.json", json.dumps(telemetry, indent=4))

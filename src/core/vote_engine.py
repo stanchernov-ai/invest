@@ -4,16 +4,23 @@ Panel structured output is ground truth — never re-count votes from debate mar
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Literal
 
 from src.core.guardrails import (
     BUY_VERDICTS,
     MAX_DAILY_BUYS,
+    SELL_VERDICTS,
     _is_hedge_symbol,
     _normalize_verdict,
     _prepend_override,
+    count_equity_buys,
 )
+
+FUNDING_SELL_MARKER = "[VOTE ENGINE] Funding sell"
+
+logger = logging.getLogger(__name__)
 
 MAJORITY_THRESHOLD = 3
 PANEL_SIZE = 5
@@ -388,6 +395,129 @@ def _pick_alpha_pick(
     }
 
 
+def is_funding_sell_override(pos: dict) -> bool:
+    """True when Python assigned a sell to fund equity buys (exempt from mandate alignment)."""
+    return FUNDING_SELL_MARKER in (pos.get("synthesis") or "")
+
+
+def count_board_portfolio_sell_mandates(
+    summaries: dict[str, SymbolVoteSummary],
+    portfolio_symbols: set[str],
+) -> int:
+    """Portfolio symbols with a Round 2 majority sell-side mandate (Trim/Sell/Strong Sell)."""
+    count = 0
+    for sym, summary in summaries.items():
+        if sym not in portfolio_symbols:
+            continue
+        if _normalize_verdict(mandate_verdict(summary)) in SELL_VERDICTS:
+            count += 1
+    return count
+
+
+def _portfolio_has_sell(chairman: dict) -> bool:
+    for pos in chairman.get("portfolio_positions") or []:
+        sym = (pos.get("symbol") or "").strip()
+        if not sym or _is_hedge_symbol(sym):
+            continue
+        if _normalize_verdict(pos.get("final_verdict", "")) in SELL_VERDICTS:
+            return True
+    return False
+
+
+def _funding_sell_candidates(chairman: dict) -> list[dict]:
+    """Portfolio equities eligible to fund buys: Hold, Trim, Sell, Strong Sell — never Buy."""
+    candidates: list[dict] = []
+    for pos in chairman.get("portfolio_positions") or []:
+        sym = (pos.get("symbol") or "").strip()
+        if not sym or _is_hedge_symbol(sym):
+            continue
+        if _normalize_verdict(pos.get("final_verdict", "")) in BUY_VERDICTS:
+            continue
+        candidates.append(pos)
+    return candidates
+
+
+def _all_portfolio_equities_are_buys(chairman: dict) -> bool:
+    """True when every non-hedge portfolio row is Buy/Strong Buy (no sell funding possible)."""
+    equities = [
+        pos for pos in (chairman.get("portfolio_positions") or [])
+        if (pos.get("symbol") or "").strip() and not _is_hedge_symbol(pos.get("symbol", ""))
+    ]
+    if not equities:
+        return False
+    return all(
+        _normalize_verdict(pos.get("final_verdict", "")) in BUY_VERDICTS
+        for pos in equities
+    )
+
+
+def ensure_funding_sell(
+    chairman: dict,
+    *,
+    summaries: dict[str, SymbolVoteSummary] | None = None,
+    portfolio_symbols: set[str] | None = None,
+    raw_verdicts: dict[str, dict] | None = None,
+    all_symbols: list[str] | None = None,
+) -> dict:
+    """When equity buys exist, authorize one portfolio Sell — lowest conviction — to fund them.
+
+    Funding sell candidate pool (portfolio only):
+      - Allowed: Hold, Trim, Sell, Strong Sell (any non-Buy equity).
+      - Forbidden: Buy, Strong Buy, hedge symbols (TLT/VXX).
+
+    Hard stop: if every portfolio equity is Buy/Strong Buy, no sell is added.
+
+    Skipped when the board already voted sell on more than one portfolio name.
+    Skipped when a portfolio Sell/Trim/Strong Sell is already present.
+    """
+    if count_equity_buys(chairman) < 1:
+        return chairman
+
+    ps = portfolio_symbols or set()
+    if summaries is None and raw_verdicts is not None and ps:
+        symbols = all_symbols or list(ps)
+        summaries = build_vote_summaries(raw_verdicts, symbols, portfolio_symbols=ps)
+
+    if summaries and ps and count_board_portfolio_sell_mandates(summaries, ps) > 1:
+        return chairman
+
+    if _portfolio_has_sell(chairman):
+        return chairman
+
+    if _all_portfolio_equities_are_buys(chairman):
+        logger.info(
+            "Funding sell skipped — all portfolio equities are Buy/Strong Buy; "
+            "no non-buy holding available to fund equity purchases."
+        )
+        return chairman
+
+    candidates = _funding_sell_candidates(chairman)
+    if not candidates:
+        return chairman
+
+    victim = min(
+        candidates,
+        key=lambda p: (int(p.get("aggregate_conviction_score") or 0), p.get("symbol", "")),
+    )
+    score = int(victim.get("aggregate_conviction_score") or 0)
+    victim["final_verdict"] = "Sell"
+    _prepend_override(
+        victim,
+        f"{FUNDING_SELL_MARKER} — lowest conviction portfolio holding "
+        f"(score {score}) funds equity buy(s).",
+    )
+
+    audit = chairman.get("capital_flow_audit")
+    if not audit:
+        chairman["capital_flow_audit"] = audit = {"liquidated_tickers": [], "target_tickers": []}
+    liquidated = list(audit.get("liquidated_tickers") or [])
+    sym = victim["symbol"]
+    if sym not in liquidated:
+        liquidated.append(sym)
+    audit["liquidated_tickers"] = liquidated
+    return chairman
+
+
 def apply_max_three_buys(
     chairman: dict,
     summaries: dict[str, SymbolVoteSummary] | None = None,
@@ -516,6 +646,9 @@ def build_chairman_allocation(
     }
 
     chairman = apply_max_three_buys(chairman, summaries)
+    chairman = ensure_funding_sell(
+        chairman, summaries=summaries, portfolio_symbols=portfolio_symbols,
+    )
     chairman["alpha_pick"] = _pick_alpha_pick_from_chairman(chairman, summaries)
 
     digest = format_vote_digest(summaries, portfolio_symbols=portfolio_symbols)

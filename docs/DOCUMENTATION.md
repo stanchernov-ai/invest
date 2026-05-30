@@ -1,7 +1,7 @@
 # Documentation Index
 
 **Status:** Active  
-**Last updated:** May 29, 2026 (doc hygiene + archive)  
+**Last updated:** May 30, 2026 (agent optimization handoffs)  
 **SSOT for:** which document to read or update — agents should start here when unsure where something lives.
 
 **Do not duplicate** content from the docs below into this file. Link only.
@@ -26,8 +26,11 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | I need to… | Read |
 |------------|------|
 | See agent diagrams, production roster, QA layers | [`agent_architecture.md`](agent_architecture.md) |
+| **Agent audit, runtime optimizations, funding sell** | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) |
+| **Cursor agents, ecosystem_state, post-job sync** | [`cursor_dev_plane_handoff.md`](cursor_dev_plane_handoff.md) |
 | Understand **which QA module** does what | [`qa_layers.md`](qa_layers.md) |
 | Understand pipeline phases, deploy, data layer, **vote_engine** | [`technical_solution.md`](technical_solution.md) |
+| Plan SaaS / multi-tenant (blocked on stabilization) | [`saas_technical_solution.md`](saas_technical_solution.md) |
 | Edit briefing charts / QuickChart / section order | [`briefing_charts_handoff.md`](briefing_charts_handoff.md) + `src/output/reporting.py` |
 | Debug chairman retries / vote alignment | [`qa_layers.md`](qa_layers.md) § Debate-phase audit + `src/core/vote_engine.py` |
 | Map FMP endpoints / fields / Starter tier | [`fmp_data_dictionary.md`](fmp_data_dictionary.md) |
@@ -59,9 +62,12 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 |----------|----------|
 | [`../README.md`](../README.md) | Repo entry point — quick start + doc chain |
 | [`agent_architecture.md`](agent_architecture.md) | Agent inventory, mermaid diagrams, QA layers L0–L7, golden fixtures |
+| [`agent_optimization_handoff.md`](agent_optimization_handoff.md) | **May 2026 audit**, telemetry baseline, funding sell, planned runtime tickets A1–B4 |
+| [`cursor_dev_plane_handoff.md`](cursor_dev_plane_handoff.md) | Cursor agents, ecosystem_state sync, standing QA digest tickets C1–C5 |
 | [`qa_layers.md`](qa_layers.md) | **Which QA file runs when** — deliver vs weekly vs dev |
 | [`briefing_charts_handoff.md`](briefing_charts_handoff.md) | QuickChart, palettes, briefing layout |
 | [`technical_solution.md`](technical_solution.md) | End-to-end flow, repo layout, env vars, blob containers, vote_engine |
+| [`saas_technical_solution.md`](saas_technical_solution.md) | **Planning** — multi-user data model, shared market cache, tenancy (blocked on stabilization) |
 | [`agent_guardrails.md`](agent_guardrails.md) | **Pointer only** → `.cursorrules` |
 
 ---
@@ -121,6 +127,9 @@ Persona rule files: `refactoring_agent.mdc`, `qa_validation_agent.mdc`, `api_opt
 | Cursor rule in `.cursor/rules/` | `.cursorrules` if mandate/trigger changes; `agent_architecture.md` §2 file table |
 | Pipeline phase or checkpoint shape | `agent_architecture.md`, `technical_solution.md` |
 | Vote engine / compliance Python checks | `technical_solution.md` §2.2, `agent_architecture.md` §6, `tests/test_vote_engine.py` |
+| Funding sell / allocation rules | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) §3.1, `src/core/vote_engine.py` |
+| Planned agent cost/latency wins | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) §5 |
+| Cursor ecosystem_state / post-job agents | [`cursor_dev_plane_handoff.md`](cursor_dev_plane_handoff.md) |
 | Briefing charts / QuickChart config | [`briefing_charts_handoff.md`](briefing_charts_handoff.md) + `tests/test_reporting_briefing.py` |
 | New doc file | **This index** only (do not add doc tables to action_tracker) |
 | Shipped work / new priority | `action_tracker.md` Session Handoff — per `doc_hygiene.md` |

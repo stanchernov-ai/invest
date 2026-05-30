@@ -68,10 +68,11 @@ class TestHumanReviewHandler(unittest.TestCase):
 
 
 class TestHumanReviewPersist(unittest.TestCase):
+    @patch("src.qa.human_review._refresh_retrospective_after_review")
     @patch("src.qa.human_review._persist_local_ecosystem")
     @patch("src.qa.human_review._update_ledger")
     @patch("src.storage_client.save_state_blob")
-    def test_save_human_review(self, mock_save, mock_ledger, mock_local):
+    def test_save_human_review(self, mock_save, mock_ledger, mock_local, mock_retro):
         record = save_human_review("20260529_120000", [
             {"agent_key": "post_mortem_qa", "agent_role": "Post Mortem QA Auditor",
              "human_confirmed": True, "human_notes": "Correct call."},
@@ -79,6 +80,7 @@ class TestHumanReviewPersist(unittest.TestCase):
         self.assertEqual(record["run_id"], "20260529_120000")
         self.assertEqual(record["reviews"][0]["human_confirmed"], True)
         mock_save.assert_called_once()
+        mock_retro.assert_called_once_with("20260529_120000")
 
 
 if __name__ == "__main__":

@@ -10,8 +10,11 @@ from src.core.vote_engine import (
     build_vote_summaries,
     can_bypass_chairman,
     can_determine_allocation,
+    count_board_portfolio_sell_mandates,
     detect_unicorn_trades,
+    ensure_funding_sell,
     format_vote_digest,
+    is_funding_sell_override,
     mandate_verdict,
 )
 
@@ -228,6 +231,150 @@ class TestVoteEnginePhaseC(unittest.TestCase):
         apply_max_three_buys(chairman)
         verdicts = {p["symbol"]: p["final_verdict"] for p in chairman["watchlist_positions"]}
         self.assertEqual(verdicts["D"], "Pass")
+
+
+def _majority_sell_portfolio(symbol: str) -> dict:
+    return _raw_portfolio_symbol(
+        symbol,
+        [
+            ("Sell", 8),
+            ("Sell", 7),
+            ("Trim", 6),
+            ("Hold", 5),
+            ("Hold", 4),
+        ],
+    )
+
+
+class TestFundingSell(unittest.TestCase):
+    def test_buy_triggers_lowest_conviction_sell(self):
+        raw = _merge_raw(
+            _majority_buy_raw("META"),
+            _raw_portfolio_symbol(
+                "AAPL",
+                [("Hold", 3)] * 5,
+            ),
+            _raw_portfolio_symbol(
+                "MSFT",
+                [("Hold", 2)] * 5,
+            ),
+        )
+        allocation = build_chairman_allocation(
+            raw,
+            ["META", "AAPL", "MSFT"],
+            portfolio_symbols={"AAPL", "MSFT"},
+            watchlist_symbols={"META"},
+        )
+        by_sym = {p["symbol"]: p for p in allocation["portfolio_positions"]}
+        self.assertEqual(by_sym["MSFT"]["final_verdict"], "Sell")
+        self.assertTrue(is_funding_sell_override(by_sym["MSFT"]))
+        self.assertEqual(by_sym["AAPL"]["final_verdict"], "Hold")
+        self.assertIn("MSFT", allocation["capital_flow_audit"]["liquidated_tickers"])
+
+    def test_skipped_when_board_votes_more_than_one_sell(self):
+        raw = _merge_raw(
+            _majority_buy_raw("META"),
+            _majority_sell_portfolio("AAPL"),
+            _majority_sell_portfolio("MSFT"),
+        )
+        allocation = build_chairman_allocation(
+            raw,
+            ["META", "AAPL", "MSFT"],
+            portfolio_symbols={"AAPL", "MSFT"},
+            watchlist_symbols={"META"},
+        )
+        by_sym = {p["symbol"]: p for p in allocation["portfolio_positions"]}
+        self.assertEqual(by_sym["AAPL"]["final_verdict"], "Sell")
+        self.assertEqual(by_sym["MSFT"]["final_verdict"], "Sell")
+        self.assertFalse(is_funding_sell_override(by_sym["AAPL"]))
+        self.assertFalse(is_funding_sell_override(by_sym["MSFT"]))
+
+    def test_single_board_sell_sufficient_no_funding_sell(self):
+        raw = _merge_raw(
+            _majority_buy_raw("META"),
+            _majority_sell_portfolio("AAPL"),
+            _raw_portfolio_symbol("MSFT", [("Hold", 1)] * 5),
+        )
+        allocation = build_chairman_allocation(
+            raw,
+            ["META", "AAPL", "MSFT"],
+            portfolio_symbols={"AAPL", "MSFT"},
+            watchlist_symbols={"META"},
+        )
+        by_sym = {p["symbol"]: p for p in allocation["portfolio_positions"]}
+        self.assertEqual(by_sym["AAPL"]["final_verdict"], "Sell")
+        self.assertEqual(by_sym["MSFT"]["final_verdict"], "Hold")
+        self.assertFalse(is_funding_sell_override(by_sym["MSFT"]))
+
+    def test_compliance_passes_funding_sell_on_hold_mandate(self):
+        raw = _merge_raw(
+            _majority_buy_raw("META"),
+            _raw_portfolio_symbol("MSFT", [("Hold", 2)] * 5),
+        )
+        allocation = build_chairman_allocation(
+            raw,
+            ["META", "MSFT"],
+            portfolio_symbols={"MSFT"},
+            watchlist_symbols={"META"},
+        )
+        violations = audit_chairman_compliance(
+            allocation,
+            raw,
+            all_symbols=["META", "MSFT"],
+            portfolio_symbols={"MSFT"},
+        )
+        self.assertEqual(violations, [], violations)
+
+    def test_count_board_portfolio_sell_mandates(self):
+        raw = _merge_raw(_majority_sell_portfolio("A"), _majority_sell_portfolio("B"))
+        summaries = build_vote_summaries(raw, ["A", "B"], portfolio_symbols={"A", "B"})
+        self.assertEqual(count_board_portfolio_sell_mandates(summaries, {"A", "B"}), 2)
+
+    def test_no_sell_when_all_portfolio_positions_are_buy(self):
+        raw = _merge_raw(
+            _majority_buy_raw("META"),
+            _raw_portfolio_symbol(
+                "NVDA",
+                [("Buy", 9), ("Buy", 8), ("Buy", 7), ("Hold", 4), ("Hold", 3)],
+            ),
+            _raw_portfolio_symbol(
+                "AAPL",
+                [("Buy", 8), ("Buy", 7), ("Buy", 6), ("Hold", 4), ("Hold", 3)],
+            ),
+        )
+        allocation = build_chairman_allocation(
+            raw,
+            ["META", "NVDA", "AAPL"],
+            portfolio_symbols={"NVDA", "AAPL"},
+            watchlist_symbols={"META"},
+        )
+        by_sym = {p["symbol"]: p for p in allocation["portfolio_positions"]}
+        self.assertIn(by_sym["NVDA"]["final_verdict"], ("Buy", "Strong Buy"))
+        self.assertIn(by_sym["AAPL"]["final_verdict"], ("Buy", "Strong Buy"))
+        funding_liquidations = [
+            sym for sym in allocation["capital_flow_audit"]["liquidated_tickers"]
+            if sym in {"NVDA", "AAPL"}
+        ]
+        self.assertEqual(funding_liquidations, [])
+        self.assertFalse(any(is_funding_sell_override(p) for p in allocation["portfolio_positions"]))
+
+    def test_existing_trim_satisfies_sell_requirement(self):
+        """Trim/Sell on portfolio counts as sell-side — no funding-sell override."""
+        chairman = {
+            "capital_flow_audit": {"liquidated_tickers": [], "target_tickers": ["TLT", "META"]},
+            "portfolio_positions": [
+                {"symbol": "MSFT", "final_verdict": "Trim", "aggregate_conviction_score": 6, "synthesis": ""},
+                {"symbol": "AAPL", "final_verdict": "Hold", "aggregate_conviction_score": 20, "synthesis": ""},
+            ],
+            "watchlist_positions": [
+                {"symbol": "META", "final_verdict": "Buy", "aggregate_conviction_score": 21, "synthesis": ""},
+            ],
+        }
+        result = ensure_funding_sell(chairman)
+        by_sym = {p["symbol"]: p for p in result["portfolio_positions"]}
+        self.assertEqual(by_sym["MSFT"]["final_verdict"], "Trim")
+        self.assertFalse(is_funding_sell_override(by_sym["MSFT"]))
+        self.assertEqual(by_sym["AAPL"]["final_verdict"], "Hold")
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import time
 
@@ -43,6 +44,12 @@ def main() -> None:
         default=15,
         help="Initial poll interval in seconds (backs off to 60s).",
     )
+    parser.add_argument(
+        "--post-job",
+        action="store_true",
+        help="On success, fetch artifacts and run post-job sync (activates dev-plane agents).",
+    )
+    parser.add_argument("--cache-dir", default=".cache", help="Cache directory for fetch/post-job.")
     args = parser.parse_args()
 
     deadline = time.time() + args.timeout
@@ -87,6 +94,21 @@ def main() -> None:
                         raise SystemExit(3)
                     if state == "success":
                         print(f"SUCCESS — {status.get('duration_seconds')}s")
+                        if args.post_job and run_id:
+                            fetch_script = os.path.join(ROOT, "tools", "fetch_azure_reports.py")
+                            cmd = [
+                                sys.executable,
+                                fetch_script,
+                                "--run-id",
+                                run_id,
+                                "--out",
+                                args.cache_dir,
+                                "--post-job",
+                            ]
+                            print(f"Running post-job sync: {' '.join(cmd)}")
+                            rc = subprocess.run(cmd, cwd=ROOT).returncode
+                            if rc != 0:
+                                print(f"WARNING: post-job sync exited {rc}", file=sys.stderr)
                         raise SystemExit(0)
                     err = status.get("error") or "no error detail"
                     print(f"RUN {state.upper()}: {err}", file=sys.stderr)

@@ -45,6 +45,7 @@ class StateMachineOrchestrator:
         self.chairman_bypassed: bool = False
         self.allocation_source: str = "llm"
         self.compliance_source: str = "python+llm"
+        self.munger_skipped: bool = False
 
     def _portfolio_symbols(self) -> set[str]:
         return set((self.state.portfolio_holdings or {}).keys())
@@ -104,9 +105,15 @@ class StateMachineOrchestrator:
         await self.execute_parallel_board()
         await self.execute_rebuttal_round()
         await self.execute_synthesis()
-        
-        if self.state.heavy_tickers:
+
+        summaries = self._vote_summaries()
+        if self.state.heavy_tickers and not can_determine_allocation(summaries):
             await self.execute_munger_audit()
+        elif self.state.heavy_tickers:
+            self.munger_skipped = True
+            logger.info(
+                "Munger audit skipped — vote_engine will bypass chairman (concentration pass unused)."
+            )
 
         # Single pass — no chairman/compliance retry on audit failure (see .cursorrules).
         await self.execute_chairman_arbitration()
@@ -449,6 +456,7 @@ class AppWrapper:
             "chairman_bypassed": orchestrator.chairman_bypassed,
             "allocation_source": orchestrator.allocation_source,
             "compliance_source": orchestrator.compliance_source,
+            "munger_skipped": orchestrator.munger_skipped,
         }
         if not final_state.is_approved:
             compliance_payload["failure_detail"] = orchestrator.build_compliance_failure_detail()

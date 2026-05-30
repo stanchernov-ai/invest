@@ -95,6 +95,10 @@ class TestPostMortemAudit(unittest.TestCase):
         self.assertIn("AMZN", digest)
         self.assertIn("buy_side=3", digest)
 
+    def test_merge_pass_without_llm(self):
+        merged = merge_post_mortem_reports([], None)
+        self.assertTrue(merged["is_compliant"])
+
 
 if __name__ == "__main__":
     unittest.main()

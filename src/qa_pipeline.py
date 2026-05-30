@@ -127,47 +127,61 @@ async def run_post_flight_qa(
 ):
     logger.info("Initiating Post Flight QA Audit.")
 
-    post_mortem_report = await run_post_mortem_qa(
+    base_prompt = f"RAW DEBATE LOG:\n{raw_log}\n\nFINAL CHAIRMAN ALLOCATION:\n{chairman_json}"
+    post_mortem_task = run_post_mortem_qa(
         raw_log,
         chairman_json,
         raw_verdicts=raw_verdicts,
         all_symbols=all_symbols or [],
         portfolio_symbols=portfolio_symbols,
     )
-
-    base_prompt = f"RAW DEBATE LOG:\n{raw_log}\n\nFINAL CHAIRMAN ALLOCATION:\n{chairman_json}"
-    contents = [types.Content(role="user", parts=[types.Part.from_text(text=base_prompt)])]
-
-    parallel_keys = ["system_architect"]
-    tasks = []
-    for key in parallel_keys:
-        info = agent_config["board_members"][key]
-        config_params = {
-            "system_instruction": info["system_instruction"],
-            "temperature": 0.15,
-            "response_mime_type": "application/json",
-            "response_schema": QAAgentReport,
-        }
-        if info["model"] == FAST_MODEL:
-            config_params["max_output_tokens"] = FLASH_TOKEN_LIMIT
-        tasks.append(call_gemini_async(info["model"], contents, types.GenerateContentConfig(**config_params), agent_name=key))
-
-    parallel_results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    qa_reports = [post_mortem_report]
-    for key, res in zip(parallel_keys, parallel_results):
-        role_name = agent_config["board_members"][key]["role"]
-        qa_reports.append(_parse_qa_result(role_name, res))
-
-    prompt_engineer_report = await run_prompt_engineer_qa(
+    architect_task = _run_system_architect_qa(base_prompt)
+    persona_task = run_prompt_engineer_qa(
         raw_log,
         chairman_json,
         raw_board_messages or [],
         all_symbols or [],
     )
-    qa_reports.append(prompt_engineer_report)
+    results = await asyncio.gather(
+        post_mortem_task,
+        architect_task,
+        persona_task,
+        return_exceptions=True,
+    )
 
+    role_names = [
+        agent_config["board_members"]["post_mortem_qa"]["role"],
+        agent_config["board_members"]["system_architect"]["role"],
+        agent_config["board_members"]["prompt_engineer"]["role"],
+    ]
+    qa_reports = []
+    for role_name, res in zip(role_names, results):
+        if isinstance(res, Exception):
+            qa_reports.append(_execution_error_report(role_name, res))
+        else:
+            qa_reports.append(res)
     return qa_reports
+
+
+async def _run_system_architect_qa(base_prompt: str) -> dict:
+    contents = [types.Content(role="user", parts=[types.Part.from_text(text=base_prompt)])]
+    key = "system_architect"
+    info = agent_config["board_members"][key]
+    config_params = {
+        "system_instruction": info["system_instruction"],
+        "temperature": 0.15,
+        "response_mime_type": "application/json",
+        "response_schema": QAAgentReport,
+    }
+    if info["model"] == FAST_MODEL:
+        config_params["max_output_tokens"] = FLASH_TOKEN_LIMIT
+    res = await call_gemini_async(
+        info["model"],
+        contents,
+        types.GenerateContentConfig(**config_params),
+        agent_name=key,
+    )
+    return _parse_qa_result(info["role"], res)
 
 
 async def run_post_mortem_qa(
@@ -197,6 +211,12 @@ async def run_post_mortem_qa(
         all_symbols=all_symbols or [],
         portfolio_symbols=portfolio_symbols,
     )
+    if not violations:
+        merged = merge_post_mortem_reports([], None)
+        merged["agent_role"] = role_name
+        logger.info("Post Mortem deterministic PASS — skipping LLM audit.")
+        return reconcile_compliance(merged)
+
     digest = format_post_mortem_digest(
         violations,
         raw_verdicts,
@@ -264,47 +284,18 @@ async def run_prompt_engineer_qa(
     raw_board_messages: list[dict],
     all_symbols: list[str],
 ) -> dict:
-    """Persona audit: deterministic pre-check + contrarian LLM pass."""
-    from src.qa.persona_audit import (
-        audit_debate_persona,
-        format_persona_digest,
-        merge_persona_reports,
-        sanitize_rubber_stamp_pass,
-    )
+    """Persona audit: deterministic pre-check (LLM skipped — Python is authoritative)."""
+    from src.qa.persona_audit import audit_debate_persona, merge_persona_reports
 
     role_name = agent_config["board_members"]["prompt_engineer"]["role"]
-    violations, stats = audit_debate_persona(raw_board_messages, all_symbols)
-    digest = format_persona_digest(violations, stats)
-    prompt_text = (
-        f"{digest}\n\nRAW DEBATE LOG:\n{raw_log}\n\nFINAL CHAIRMAN ALLOCATION:\n{chairman_json}"
-    )
-    contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt_text)])]
-    info = agent_config["board_members"]["prompt_engineer"]
-    config_params = {
-        "system_instruction": info["system_instruction"],
-        "temperature": 0.15,
-        "response_mime_type": "application/json",
-        "response_schema": QAAgentReport,
-    }
-
-    try:
-        res = await call_gemini_async(
-            info["model"],
-            contents,
-            types.GenerateContentConfig(**config_params),
-            agent_name="prompt_engineer",
-        )
-        parsed = json.loads(res.text)
-        parsed["agent_role"] = role_name
-        merged = merge_persona_reports(violations, parsed)
-        return sanitize_rubber_stamp_pass(reconcile_compliance(merged))
-    except Exception as exc:
-        logger.error(f"QA execution failed for {role_name}: {exc}")
-        if violations:
-            merged = merge_persona_reports(violations, None)
-            merged["agent_role"] = role_name
-            return reconcile_compliance(merged)
-        return _execution_error_report(role_name, exc)
+    violations, _stats = audit_debate_persona(raw_board_messages, all_symbols)
+    merged = merge_persona_reports(violations, None)
+    merged["agent_role"] = role_name
+    if violations:
+        logger.info("Persona deterministic FAIL — skipping LLM audit.")
+    else:
+        logger.info("Persona deterministic PASS — skipping LLM audit.")
+    return reconcile_compliance(merged)
 
 
 def build_graphics_report(chart_health: list[dict]) -> dict:

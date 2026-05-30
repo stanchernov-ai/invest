@@ -1,7 +1,7 @@
 # SC Invest Boardroom — Action Tracker
 
 **Status:** Active  
-**Last Updated:** May 29, 2026 (product principles + pipeline cleanup)
+**Last Updated:** May 30, 2026 (agent optimization handoffs — implementation deferred)
 
 **Purpose:** Current session pickup and prioritized backlog. Historical handoffs and Phase 0–6 specs live in [`archive/implementation_log_2026-05.md`](archive/implementation_log_2026-05.md). Maintenance rules: [`doc_hygiene.md`](doc_hygiene.md). Doc map: [`DOCUMENTATION.md`](DOCUMENTATION.md).
 
@@ -9,7 +9,62 @@
 
 ---
 
-## Session Handoff — May 29, 2026 (**pick up here**)
+## Session Handoff — May 30, 2026 (**pick up here**)
+
+**Theme:** Post-job agents automated; Tier 1 runtime optimizations shipped locally.
+
+| Shipped (local / pending deploy) | Note |
+|----------------------------------|------|
+| **Post-job sync** | `fetch --post-job` / `wait_for_run --post-job` → api_audit, data_insights, supervisor_summaries |
+| **Tier 1 A1–A4** | Munger skip, post_mortem LLM skip, parallel QA trio, integrity Flash |
+| **C1/C3/C4** | sync_ecosystem, human review → retrospective refresh, post_job_sync.py |
+| **C2** | qa_digest blob persisted from standing QA |
+
+| Deliverable | Doc |
+|-------------|-----|
+| Production audit, telemetry baseline, funding sell spec, tickets A1–B4 | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) |
+| Cursor agents, ecosystem_state sync, standing QA digest, tickets C1–C5 | [`cursor_dev_plane_handoff.md`](cursor_dev_plane_handoff.md) |
+
+| Shipped (local / pending deploy) | Note |
+|----------------------------------|------|
+| Funding sell | `ensure_funding_sell()` — see handoff §3.1 |
+| Briefing enrichment | Round 2 quotes at render — handoff §3.3 |
+| Liquidation cap env | `LIQUIDATION_CAP_PCT` — handoff §3.2 |
+| Phase B/C vote engine | Commits `285d70a` + local; validate on `152151` |
+
+| Gate | Action |
+|------|--------|
+| **Commit + deploy** | Tier 1 + post-job automation bundle |
+| **Validate** | After prod run: `fetch --run-id X --post-job` then `ecosystem_state.py show --last 3` |
+| **Baseline** | Compare telemetry vs `20260529_152151` — expect fewer deliver tokens |
+
+**Pull artifacts:** `.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id 20260529_152151`
+
+### Open items (from handoff docs — not started)
+
+| Pri | ID | Effort | Item | Doc |
+|-----|-----|--------|------|-----|
+| **P1** | A1 | S | ~~Skip Munger when `can_determine_allocation()`~~ **DONE** (local) | optimization §5 |
+| **P1** | A2 | S | ~~Skip post_mortem LLM on deterministic PASS~~ **DONE** (local) | optimization §5 |
+| **P1** | A3 | S | ~~Parallelize post-flight QA trio~~ **DONE** (local) | optimization §5 |
+| **P1** | A4 | S | ~~qa_integrity_auditor → Flash default~~ **DONE** (local) | optimization §5 |
+| **P1** | B4 | S | Commit + prod validate local bundle | optimization §5 |
+| **P2** | C1 | M | ~~`fetch_azure_reports --sync-ecosystem`~~ **DONE** (local) | cursor §4 |
+| **P2** | C2 | M | ~~Persist standing QA digest blob~~ **DONE** (local) | cursor §4 |
+| **P2** | C3 | M | ~~Human review → retrospective refresh~~ **DONE** (local) | cursor §4 |
+| **P2** | C4 | M | ~~`post_job_sync.py` deterministic audit~~ **DONE** (local) | cursor §4 |
+| **P2** | C5 | — | ~~Supervisor automate vs checklist-only~~ **DONE** — Option A (C1+C4) | cursor §4 |
+| **P2** | B3 | — | Systems Architect QA demote/cut (product call) | optimization §5 |
+
+### First steps (when resuming implementation)
+
+1. Commit + deploy local bundle; re-validate `152151`.
+2. Implement A1–A4 per [`agent_optimization_handoff.md`](agent_optimization_handoff.md) §5–§8.
+3. Optionally wire C1 fetch sync before standing QA digest work.
+
+---
+
+## Session Handoff — May 29, 2026 (superseded)
 
 **Theme:** Product-grade pipeline — board votes in Python, fail closed, no LLM gate repair.
 
@@ -59,10 +114,25 @@
 
 ---
 
+## SaaS / multi-tenant roadmap (**blocked — stabilize first**)
+
+**Do not start SaaS implementation until the current single-tenant pipeline is stabilized and simplified.** Building multi-tenant layers on an unstable base compounds rework.
+
+| Pri | ID | Effort | Item | Gate |
+|-----|-----|--------|------|------|
+| — | SAAS-0 | — | **Design SSOT** — [`saas_technical_solution.md`](saas_technical_solution.md) | **DONE** (May 29) |
+| **P2** | SAAS-1 | L | **SaaS foundation** — `PortfolioSource`, Postgres entities, `market_sync`, per-user tenancy (phases 1–4 in doc) | **Blocked on:** P1 commit/deploy + prod validate; core flow simplification (current session handoff complete) |
+
+Phases and data model: [`saas_technical_solution.md`](saas_technical_solution.md) §4–10. Not deferred long-term — **queued immediately after stabilization**, not in parallel with it.
+
+---
+
 ## Recently shipped (last 7 days)
 
 | Area | Commit(s) | Run / note |
 |------|-----------|------------|
+| **Handoff docs** | (local) | [`agent_optimization_handoff.md`](agent_optimization_handoff.md), [`cursor_dev_plane_handoff.md`](cursor_dev_plane_handoff.md) |
+| Funding sell (local) | uncommitted | `ensure_funding_sell()` — handoff §3.1 |
 | Vote engine Phase B | `285d70a` | Deterministic 3/5 allocation, max-3, alpha from executed buys |
 | P1 rebuttal + post-mortem | `ba8df67` | Round 2 prompts, 3/5 buy mandate |
 | Doc hygiene | `6825f56` | Lean tracker, `doc_hygiene.md` |
@@ -84,7 +154,10 @@
 | Topic | Doc |
 |-------|-----|
 | **Product principles** | [`product_principles.md`](product_principles.md) |
+| **Agent audit + runtime optimizations** | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) |
+| **Cursor dev plane + ecosystem_state** | [`cursor_dev_plane_handoff.md`](cursor_dev_plane_handoff.md) |
 | Charts / QuickChart | [`briefing_charts_handoff.md`](briefing_charts_handoff.md) |
 | QA modules | [`qa_layers.md`](qa_layers.md) |
 | Pipeline timers | [`technical_solution.md`](technical_solution.md) §1.4 |
+| SaaS / multi-tenant target architecture | [`saas_technical_solution.md`](saas_technical_solution.md) |
 | May 2026 history | [`archive/implementation_log_2026-05.md`](archive/implementation_log_2026-05.md) |

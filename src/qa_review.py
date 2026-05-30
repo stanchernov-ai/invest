@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from typing import List
 
 from google.genai import types
-from src.storage_client import get_blob_service_client, STATE_CONTAINER, REPORT_CONTAINER, DATA_DIR
+from src.storage_client import get_blob_service_client, STATE_CONTAINER, REPORT_CONTAINER, DATA_DIR, save_state_blob
 from src.core.agents import call_gemini_async, FAST_MODEL, HEAVY_MODEL, FLASH_TOKEN_LIMIT
 from src.output.notifier import send_qa_digest
 from src.config.settings import now_local, settings
@@ -61,15 +61,17 @@ QA_TEAM_CONFIG = {
 async def fetch_latest_artifacts():
     client = get_blob_service_client()
     if not client:
-        return None, None, None
+        return None, None, None, None
     
     state_client = client.get_container_client(STATE_CONTAINER)
     report_client = client.get_container_client(REPORT_CONTAINER)
     
+    latest_telemetry_name = None
     try:
         telemetry_blobs = [b for b in state_client.list_blobs() if b.name.startswith("api_telemetry_")]
         telemetry_blobs.sort(key=lambda x: x.name, reverse=True)
-        latest_telemetry = state_client.download_blob(telemetry_blobs[0].name).readall().decode('utf-8') if telemetry_blobs else "{}"
+        latest_telemetry_name = telemetry_blobs[0].name if telemetry_blobs else None
+        latest_telemetry = state_client.download_blob(latest_telemetry_name).readall().decode('utf-8') if latest_telemetry_name else "{}"
     except Exception as e:
         logger.warning(f"Could not fetch telemetry: {e}")
         latest_telemetry = "{}"
@@ -90,7 +92,7 @@ async def fetch_latest_artifacts():
         logger.warning(f"Could not fetch html briefing: {e}")
         latest_html = ""
         
-    return latest_telemetry, latest_debate, latest_html
+    return latest_telemetry, latest_debate, latest_html, latest_telemetry_name
 
 def generate_qa_digest_html(reports, hr_html=""):
     html = "<html><body style='font-family: Arial, sans-serif; padding: 20px; background-color: #f4f6f9;'>"
@@ -126,7 +128,7 @@ async def run_qa_review_team():
         logger.error("FATAL ABORT: Required environment variables missing. Halting QA review pipeline.")
         return
 
-    latest_telemetry, latest_debate, latest_html = await fetch_latest_artifacts()
+    latest_telemetry, latest_debate, latest_html, latest_telemetry_name = await fetch_latest_artifacts()
     
     if not latest_telemetry and not latest_debate:
         logger.warning("No artifacts found to review. Exiting.")
@@ -203,6 +205,23 @@ async def run_qa_review_team():
     html_content = generate_qa_digest_html(reports, hr_html=hr_html)
     
     send_qa_digest(html_content)
+
+    run_id = None
+    if latest_telemetry_name and latest_telemetry_name.startswith("api_telemetry_"):
+        run_id = latest_telemetry_name.replace("api_telemetry_", "").replace(".json", "")
+    if run_id:
+        digest_record = {
+            "run_id": run_id,
+            "generated_at": now_local().isoformat(),
+            "reports": reports,
+            "hr_included": bool(hr_html),
+        }
+        try:
+            save_state_blob(f"qa_digest_{run_id}.json", digest_record)
+            logger.info("Persisted qa_digest_%s.json to state container.", run_id)
+        except Exception as exc:
+            logger.warning("Could not persist QA digest blob: %s", exc)
+
     logger.info("QA Cost Review Team execution complete.")
 
 if __name__ == "__main__":
