@@ -116,7 +116,6 @@ async def run_post_flight_qa(
 ):
     logger.info("Initiating Post Flight QA Audit.")
 
-    base_prompt = f"RAW DEBATE LOG:\n{raw_log}\n\nFINAL CHAIRMAN ALLOCATION:\n{chairman_json}"
     post_mortem_task = run_post_mortem_qa(
         raw_log,
         chairman_json,
@@ -125,7 +124,12 @@ async def run_post_flight_qa(
         portfolio_symbols=portfolio_symbols,
         raw_board_messages=raw_board_messages,
     )
-    architect_task = _run_system_architect_qa(base_prompt)
+    architect_task = run_system_architect_qa(
+        raw_log,
+        chairman_json,
+        raw_verdicts=raw_verdicts,
+        all_symbols=all_symbols or [],
+    )
     persona_task = run_prompt_engineer_qa(
         raw_log,
         chairman_json,
@@ -153,25 +157,41 @@ async def run_post_flight_qa(
     return qa_reports
 
 
-async def _run_system_architect_qa(base_prompt: str) -> dict:
-    contents = [types.Content(role="user", parts=[types.Part.from_text(text=base_prompt)])]
-    key = "system_architect"
-    info = agent_config["board_members"][key]
-    config_params = {
-        "system_instruction": info["system_instruction"],
-        "temperature": 0.15,
-        "response_mime_type": "application/json",
-        "response_schema": QAAgentReport,
-    }
-    if info["model"] == FAST_MODEL:
-        config_params["max_output_tokens"] = FLASH_TOKEN_LIMIT
-    res = await call_gemini_async(
-        info["model"],
-        contents,
-        types.GenerateContentConfig(**config_params),
-        agent_name=key,
+async def run_system_architect_qa(
+    raw_log: str,
+    chairman_json: str,
+    *,
+    raw_verdicts: dict | None = None,
+    all_symbols: list[str] | None = None,
+) -> dict:
+    """Structural / bloat audit: deterministic Python gate; LLM skipped on PASS."""
+    from src.qa.architect_audit import (
+        audit_system_architect_deterministic,
+        merge_architect_reports,
     )
-    return _parse_qa_result(info["role"], res)
+
+    role_name = agent_config["board_members"]["system_architect"]["role"]
+    try:
+        chairman = json.loads(chairman_json) if chairman_json else {}
+    except json.JSONDecodeError:
+        chairman = {}
+
+    violations = audit_system_architect_deterministic(
+        chairman,
+        raw_log,
+        raw_verdicts,
+        all_symbols=all_symbols or [],
+    )
+    if not violations:
+        merged = merge_architect_reports([], None)
+        merged["agent_role"] = role_name
+        logger.info("Systems Architect deterministic PASS — skipping LLM audit.")
+        return reconcile_compliance(merged)
+
+    merged = merge_architect_reports(violations, None)
+    merged["agent_role"] = role_name
+    logger.info("Systems Architect deterministic FAIL — skipping LLM audit.")
+    return reconcile_compliance(merged)
 
 
 async def run_post_mortem_qa(
