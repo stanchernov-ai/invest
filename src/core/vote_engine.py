@@ -171,16 +171,13 @@ def detect_sell_candidates(summaries: dict[str, SymbolVoteSummary]) -> list[str]
 
 
 def can_determine_allocation(summaries: dict[str, SymbolVoteSummary]) -> bool:
-    """Skip chairman Pro when every symbol has a clear board majority (Phase B).
+    """Skip chairman Pro when every symbol has enough panel votes for Python allocation.
 
-    3/5 majority buys/reduces are resolved in Python via ``mandate_verdict``,
-    ``apply_max_three_buys``, and guardrails — not by chairman LLM judgment."""
+    Includes 3/5 majorities, max-3 demotions, and conservative 2/2 tie-breaks via
+    ``mandate_verdict`` — one ambiguous symbol must not force chairman Pro for all."""
     if not summaries:
         return False
-    for summary in summaries.values():
-        if summary.needs_chairman_judgment():
-            return False
-    return True
+    return all(summary.panel_count >= MAJORITY_THRESHOLD for summary in summaries.values())
 
 
 def can_bypass_chairman(summaries: dict[str, SymbolVoteSummary]) -> bool:
@@ -208,6 +205,12 @@ def mandate_verdict(summary: SymbolVoteSummary) -> str:
         return "Trim"
     if mb == "pass":
         return "Pass"
+
+    # No 3/5 majority — conservative tie-break (e.g. AVGO 2 Trim / 2 Hold).
+    top_two = sorted(summary.bucket_counts.values(), reverse=True)
+    if len(top_two) >= 2 and top_two[0] == top_two[1] == 2:
+        return "Hold" if summary.section == "portfolio" else "Pass"
+
     return "Hold"
 
 
@@ -376,6 +379,23 @@ def apply_max_three_buys(
     if not any(_is_hedge_symbol(t) for t in targets):
         targets.insert(0, "TLT")
     audit["target_tickers"] = targets
+    return chairman
+
+
+def enforce_alpha_pick_from_executed_buys(
+    chairman: dict,
+    raw_verdicts: dict[str, dict] | None,
+    all_symbols: list[str],
+    *,
+    portfolio_symbols: set[str] | None = None,
+) -> dict:
+    """Overwrite alpha_pick from executed Buy rows (guards against LLM chairman errors)."""
+    if not chairman or not raw_verdicts:
+        return chairman
+    summaries = build_vote_summaries(
+        raw_verdicts, all_symbols, portfolio_symbols=portfolio_symbols or set(),
+    )
+    chairman["alpha_pick"] = _pick_alpha_pick_from_chairman(chairman, summaries)
     return chairman
 
 

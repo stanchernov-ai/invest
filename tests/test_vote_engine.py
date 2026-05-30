@@ -109,6 +109,22 @@ class TestVoteEngine(unittest.TestCase):
         self.assertEqual(mandate_verdict(summaries["NVDA"]), "Hold")
         self.assertEqual(mandate_verdict(summaries["META"]), "Pass")
 
+    def test_avgo_tie_still_allows_vote_engine_bypass(self):
+        raw = _raw_symbol_votes(
+            "AVGO",
+            [
+                ("Buy", 6),
+                ("Trim", 7),
+                ("Trim", 7),
+                ("Hold", 5),
+                ("Hold", 5),
+            ],
+        )
+        summaries = build_vote_summaries(raw, ["AVGO"], portfolio_symbols={"AVGO"})
+        self.assertTrue(summaries["AVGO"].needs_chairman_judgment())
+        self.assertTrue(can_determine_allocation(summaries))
+        self.assertEqual(mandate_verdict(summaries["AVGO"]), "Hold")
+
     def test_split_vote_still_needs_chairman(self):
         raw = _raw_symbol_votes(
             "META",
@@ -122,7 +138,7 @@ class TestVoteEngine(unittest.TestCase):
         )
         summaries = build_vote_summaries(raw, ["META"])
         self.assertTrue(summaries["META"].needs_chairman_judgment())
-        self.assertFalse(can_determine_allocation(summaries))
+        self.assertTrue(can_determine_allocation(summaries))
 
     def test_build_matrix_from_json(self):
         raw = _raw_unanimous_buy("META")

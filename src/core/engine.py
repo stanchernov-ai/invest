@@ -21,6 +21,7 @@ from src.core.vote_engine import (
     can_determine_allocation,
     detect_sell_candidates,
     detect_unicorn_trades,
+    enforce_alpha_pick_from_executed_buys,
     format_vote_digest,
 )
 from src.core.agents import call_gemini_async, agent_config, FAST_MODEL, FLASH_TOKEN_LIMIT
@@ -63,13 +64,19 @@ class StateMachineOrchestrator:
         if not chairman:
             return None
         chairman = apply_conviction_scores(chairman, self.raw_verdicts)
-        return apply_chairman_guardrails(
+        chairman = apply_chairman_guardrails(
             chairman,
             total_portfolio_value=self.state.total_portfolio_value,
             portfolio_holdings=self.state.portfolio_holdings,
             purchase_dates=self.state.purchase_dates,
             raw_verdicts=self.raw_verdicts,
             all_symbols=self.state.all_symbols,
+        )
+        return enforce_alpha_pick_from_executed_buys(
+            chairman,
+            self.raw_verdicts,
+            self.state.all_symbols,
+            portfolio_symbols=self._portfolio_symbols(),
         )
 
     async def _ensure_oracle_cleared(self) -> None:

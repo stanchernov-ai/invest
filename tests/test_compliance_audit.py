@@ -3,6 +3,7 @@ import unittest
 
 from src.core.compliance_audit import (
     audit_chairman_compliance,
+    audit_chairman_vote_alignment,
     count_buy_verdicts,
     format_compliance_failure_summary,
     format_debate_for_compliance,
@@ -124,6 +125,33 @@ class TestComplianceAudit(unittest.TestCase):
         )
         self.assertFalse(merged["is_compliant"])
         self.assertEqual(len(merged["violations"]), 1)
+
+    def test_surplus_majority_buy_demotion_not_a_violation(self):
+        raw = {}
+        for i, agent in enumerate(("buffett", "lynch", "livermore", "huang", "simons")):
+            raw[agent] = {
+                "portfolio_verdicts": [],
+                "watchlist_verdicts": [
+                    {"symbol": "META", "verdict": "Buy", "conviction_score": 9},
+                    {"symbol": "PLTR", "verdict": "Buy", "conviction_score": 8},
+                    {"symbol": "NVDA", "verdict": "Buy", "conviction_score": 7},
+                    {"symbol": "MNDY", "verdict": "Buy" if i < 3 else "Pass", "conviction_score": 6},
+                ],
+            }
+        chairman = {
+            "alpha_pick": {"symbol": "META", "champion_quote": "test"},
+            "portfolio_positions": [],
+            "watchlist_positions": [
+                {"symbol": "META", "final_verdict": "Buy", "synthesis": ""},
+                {"symbol": "PLTR", "final_verdict": "Buy", "synthesis": ""},
+                {"symbol": "NVDA", "final_verdict": "Buy", "synthesis": ""},
+                {"symbol": "MNDY", "final_verdict": "Pass", "synthesis": "Max 3 buys."},
+            ],
+        }
+        violations = audit_chairman_vote_alignment(
+            chairman, raw, all_symbols=["META", "PLTR", "NVDA", "MNDY"], portfolio_symbols=set(),
+        )
+        self.assertFalse(any("MNDY" in v for v in violations))
 
     def test_failure_summary_includes_violations(self):
         summary = format_compliance_failure_summary(

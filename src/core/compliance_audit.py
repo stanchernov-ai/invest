@@ -66,6 +66,22 @@ def _chairman_aligns_with_majority(final_verdict: str, majority_bucket: str) -> 
     return cb == majority_bucket
 
 
+def _is_surplus_majority_buy_demotion(
+    pos: dict,
+    summary,
+    chairman: dict,
+    majority_bucket: str,
+) -> bool:
+    """Pass/Hold on a 3/5 Buy when max equity buy slots are already filled."""
+    if majority_bucket != "buy":
+        return False
+    if _normalize_verdict(pos.get("final_verdict", "")) in BUY_VERDICTS:
+        return False
+    if summary.bucket_counts.get("buy", 0) < MAJORITY_THRESHOLD:
+        return False
+    return count_equity_buys(chairman) >= MAX_DAILY_BUYS
+
+
 def _has_valid_majority_override(pos: dict, majority_bucket: str) -> bool:
     syn = pos.get("synthesis") or ""
     if _SYSTEM_MAX_BUY_OVERRIDE in syn or _SYSTEM_VOTE_ENGINE in syn:
@@ -110,6 +126,8 @@ def audit_chairman_vote_alignment(
                 continue
             final = pos.get("final_verdict", "")
             if _has_valid_majority_override(pos, mb):
+                continue
+            if _is_surplus_majority_buy_demotion(pos, summary, chairman, mb):
                 continue
             if not _chairman_aligns_with_majority(final, mb):
                 violations.append(
