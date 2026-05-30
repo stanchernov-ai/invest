@@ -31,9 +31,10 @@ class PanelistPortfolioVerdict(BaseModel):
 class PanelistRebuttalVerdict(BaseModel):
     overall_portfolio_critique: str = Field(
         description=(
-            "ROUND 2 REBUTTAL ONLY — 2-3 NEW sentences. Name at least one other panelist by name, "
-            "respond to a specific Round 1 argument (agree, disagree, or partially concede), and "
-            "explain any vote changes. FORBIDDEN: copying or lightly paraphrasing your Round 1 Portfolio Overview."
+            "ROUND 2 REBUTTAL ONLY — 2-3 NEW sentences for the debate log (Rebuttal Summary). "
+            "Name at least one other panelist, respond to a specific Round 1 argument, and "
+            "explain any vote changes. NOT used for executive briefing State of the Union "
+            "(SoTU uses your Round 1 Portfolio Overview). FORBIDDEN: copying Round 1 verbatim."
         )
     )
     portfolio_verdicts: list[OwnedAssetVerdict] = Field(
@@ -194,7 +195,8 @@ ROUND_2_REBUTTAL_DIRECTIVE = (
     "* REQUIRED: name at least ONE other panelist by name, cite their Round 1 argument, and state whether you "
     "agree, disagree, or partially concede — with persona-specific reasoning.\n"
     "* REQUIRED: if your verdict or conviction changed on any symbol, explain what peer argument or data point moved you.\n"
-    "* Pass symbols still need a one-sentence rebuttal rationale — do not spam identical 'Pass (5/10)' with no text."
+    "* Pass symbols still need a one-sentence rebuttal rationale — do not spam identical 'Pass (5/10)' with no text.\n"
+    "* NOTE: Executive briefing State of the Union uses your Round 1 Portfolio Overview, not this rebuttal summary."
 )
 
 CHAIRMAN_MANDATE = "You are the Executive Chairman. Your job is to listen to the board's debate, weigh the conviction scores, and make the final, unappealable decisions. ANTI-COWARDICE PROTOCOL: If any watchlist asset receives strong board backing, you MUST authorize the purchase. To fund it, you MUST liquidate the weakest portfolio asset. You are forbidden from defaulting to Hold out of fear. You must assign rich, detailed background context to the Champion and Dissenter quotes for every trade you authorize. SCRATCHPAD MANDATE: You MUST use the `chain_of_thought_scratchpad` field to explicitly calculate your capital flow before making decisions."

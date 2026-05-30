@@ -1,5 +1,7 @@
-"""Deterministic State of the Union quotes from panel overall portfolio critiques."""
+"""Deterministic State of the Union quotes from panel Round 1 portfolio overviews."""
 from __future__ import annotations
+
+import re
 
 from src.core.agents import agent_config
 
@@ -7,6 +9,14 @@ PANELIST_KEYS = ("buffett", "lynch", "livermore", "huang", "simons")
 
 BUY_VERDICTS = frozenset({"STRONG BUY", "BUY"})
 SELL_VERDICTS = frozenset({"SELL", "TRIM", "STRONG SELL"})
+
+# Round 2 overall_portfolio_critique is peer rebuttal prose — not briefing SoTU material.
+_REBUTTAL_OPENERS = re.compile(
+    r"^\s*(i\s+(fundamentally\s+)?(dis)?agree|while\s+i\s+(dis)?agree|"
+    r"i\s+must\s+(dis)?agree|i\s+partially\s+concede|lynch\s+is\s+right|buffett\s+is\s+right)",
+    re.I,
+)
+_TICKER_HEAVY = re.compile(r"\b[A-Z]{1,5}\b(?:\s*[:—-]\s|\s+(?:is|was|remains)\b)", re.M)
 
 
 def _stance_label(portfolio_verdicts: list[dict]) -> str:
@@ -31,15 +41,48 @@ def _stance_label(portfolio_verdicts: list[dict]) -> str:
     return "(⭐⭐ Neutral)"
 
 
-def build_state_of_union_quotes(raw_verdicts: dict[str, dict]) -> list[dict]:
-    """Build SoTU from each panelist's Round 2 overall_portfolio_critique (authoritative)."""
+def _looks_like_rebuttal(text: str) -> bool:
+    """Heuristic: Round 2 peer-rebuttal summary vs Round 1 portfolio overview."""
+    if not text:
+        return False
+    if _REBUTTAL_OPENERS.search(text):
+        return True
+    # Many ALLCAPS tickers + rebuttal framing → per-stock fight, not portfolio view.
+    tickers = _TICKER_HEAVY.findall(text)
+    return len(tickers) >= 3
+
+
+def _pick_sotu_quote(
+    agent_key: str,
+    raw_verdicts: dict[str, dict],
+    round1_critiques: dict[str, str] | None,
+) -> str:
+    """Prefer Round 1 portfolio overview; never surface Round 2 rebuttal summaries in SoTU."""
+    round1 = (round1_critiques or {}).get(agent_key, "").strip()
+    if round1:
+        return round1
+
+    round2 = ((raw_verdicts.get(agent_key) or {}).get("overall_portfolio_critique") or "").strip()
+    if round2 and not _looks_like_rebuttal(round2):
+        return round2
+    if round2:
+        return (
+            "Round 1 portfolio overview unavailable; Round 2 text was peer rebuttal only — "
+            "re-run debate for a portfolio-level State of the Union quote."
+        )
+    return "No overall portfolio critique was recorded for this session."
+
+
+def build_state_of_union_quotes(
+    raw_verdicts: dict[str, dict],
+    *,
+    round1_critiques: dict[str, str] | None = None,
+) -> list[dict]:
+    """Build SoTU from Round 1 overall_portfolio_critique; stance stars from Round 2 votes."""
     quotes: list[dict] = []
     for agent_key in PANELIST_KEYS:
         data = raw_verdicts.get(agent_key) or {}
-        critique = (data.get("overall_portfolio_critique") or "").strip()
-        if not critique:
-            critique = "No overall portfolio critique was recorded for this session."
-
+        critique = _pick_sotu_quote(agent_key, raw_verdicts, round1_critiques)
         role = agent_config["board_members"][agent_key]["role"]
         stance = _stance_label(data.get("portfolio_verdicts") or [])
         quotes.append({

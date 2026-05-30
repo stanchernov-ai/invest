@@ -43,6 +43,7 @@ class StateMachineOrchestrator:
     def __init__(self, state: BoardroomState):
         self.state = state
         self.raw_verdicts = {}
+        self.round1_portfolio_critiques: dict[str, str] = {}
         self.oracle_valid = False
         self.oracle_reason = "Default security stance. Awaiting Oracle clearance."
         self.red_team_json = "{}"
@@ -200,6 +201,10 @@ class StateMachineOrchestrator:
         
         for agent_key, res in zip(agents, results):
             role_name = agent_config["board_members"][agent_key]["role"]
+            if res and res.get("overall_portfolio_critique"):
+                self.round1_portfolio_critiques[agent_key] = (
+                    res["overall_portfolio_critique"].strip()
+                )
             msg = f"**[ROUND 1] {role_name}**:\n"
             if res and res.get("overall_portfolio_critique"):
                 msg += f"* **Portfolio Overview**: {res['overall_portfolio_critique']}\n"
@@ -293,7 +298,10 @@ class StateMachineOrchestrator:
                 )
                 logger.warning("Clerk retry still incomplete — using deterministic boardroom_brawl fallback.")
         if cos_res:
-            cos_res["state_of_the_union_quotes"] = build_state_of_union_quotes(self.raw_verdicts)
+            cos_res["state_of_the_union_quotes"] = build_state_of_union_quotes(
+                self.raw_verdicts,
+                round1_critiques=self.round1_portfolio_critiques,
+            )
         self.state.chief_of_staff_json = json.dumps(cos_res) if cos_res else "{}"
 
     async def execute_munger_audit(self) -> None:

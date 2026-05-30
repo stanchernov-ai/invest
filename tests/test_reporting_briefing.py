@@ -186,7 +186,20 @@ class ChartColorTests(unittest.TestCase):
         self.assertEqual(mock_url.call_args[1]["width"], reporting.PIE_CHART_WIDTH)
         self.assertEqual(mock_url.call_args[1]["height"], reporting.PIE_CHART_HEIGHT)
 
-    def test_bar_chart_hides_legend_and_labels_y_axis(self):
+    def test_pie_outlabels_use_heavy_type(self):
+        ledger = [
+            ("A", {"Total": 5000, "Personal_Return_Pct": 8.0}),
+            ("B", {"Total": 6000, "Personal_Return_Pct": 22.0}),
+        ]
+        with patch.object(reporting, "get_quickchart_short_url", return_value="https://example.com/pie.png") as mock_url:
+            reporting.build_portfolio_pie_chart(ledger)
+        outlabels = mock_url.call_args[0][0]["options"]["plugins"]["outlabels"]
+        self.assertEqual(outlabels["color"], reporting.CHART_DATALABEL_ON_LIGHT)
+        self.assertEqual(outlabels["font"]["weight"], str(reporting.CHART_OUTLABEL_WEIGHT))
+        self.assertEqual(outlabels["font"]["minSize"], reporting.CHART_OUTLABEL_MIN_SIZE)
+        self.assertEqual(mock_url.call_args[1]["background_color"], reporting.CHART_CANVAS_LIGHT)
+
+    def test_bar_chart_dark_canvas_and_high_contrast_datalabels(self):
         ledger = [
             ("AAPL", {"Personal_Return_Pct": 10.0}),
             ("MSFT", {"Personal_Return_Pct": -5.0}),
@@ -197,9 +210,24 @@ class ChartColorTests(unittest.TestCase):
         datalabels = opts["plugins"]["datalabels"]
         self.assertIs(opts["plugins"]["legend"], False)
         self.assertEqual(opts["scales"]["y"]["title"]["text"], "Return (%)")
-        self.assertEqual(datalabels["color"], reporting.CHART_LABEL_COLOR)
+        self.assertEqual(datalabels["color"], reporting.CHART_DATALABEL_ON_DARK)
+        self.assertEqual(datalabels["font"]["weight"], reporting.CHART_DATALABEL_WEIGHT)
+        self.assertEqual(datalabels["font"]["size"], reporting.CHART_DATALABEL_SIZE)
         self.assertIn("formatter", datalabels)
-        self.assertEqual(mock_url.call_args[1]["background_color"], reporting.CHART_BG)
+        self.assertEqual(mock_url.call_args[1]["background_color"], reporting.CHART_CANVAS_DARK)
+
+    def test_line_chart_legend_font_size_and_dark_canvas(self):
+        history = {
+            "20250101": {"portfolio_index": 100, "spy": 100, "qqq": 100},
+            "20250201": {"portfolio_index": 105, "spy": 102, "qqq": 103},
+        }
+        with patch.object(reporting, "get_quickchart_short_url", return_value="https://example.com/line.png") as mock_url:
+            reporting.build_benchmark_line_chart(history)
+        opts = mock_url.call_args[0][0]["options"]
+        legend_font = opts["plugins"]["legend"]["labels"]["font"]
+        self.assertEqual(legend_font["size"], reporting.CHART_LEGEND_FONT_SIZE)
+        self.assertEqual(legend_font["weight"], reporting.CHART_LEGEND_WEIGHT)
+        self.assertEqual(mock_url.call_args[1]["background_color"], reporting.CHART_CANVAS_DARK)
 
 
 class BriefingHtmlTests(unittest.TestCase):

@@ -594,6 +594,37 @@ A team of focused reviewers, each producing a short scored report + prioritized 
 
 ---
 
+## May 30, 2026 — Session handoffs (archived)
+
+Moved from [`action_tracker.md`](../action_tracker.md) per [`doc_hygiene.md`](../doc_hygiene.md) — superseded by May 30 EOD handoff.
+
+### May 30 AM — Post-job + Tier 1 (local → shipped `a64bcd9`)
+
+**Theme:** Post-job agents automated; Tier 1 runtime optimizations.
+
+| Shipped | Note |
+|---------|------|
+| Post-job sync | `fetch --post-job` / `wait_for_run --post-job` → api_audit, data_insights, supervisor_summaries |
+| Tier 1 A1–A4 | Munger skip, post_mortem LLM skip, parallel QA trio, integrity Flash |
+| C1/C3/C4 | sync_ecosystem, human review → retrospective refresh, post_job_sync.py |
+| C2 | qa_digest blob persisted from standing QA |
+
+Baseline comparison run: `20260529_152151`.
+
+### May 29 — Product-grade pipeline (partially superseded)
+
+**Theme:** Board votes in Python, fail closed, no LLM gate repair.
+
+| Shipped | Note |
+|---------|------|
+| `285d70a` | Phase B — `vote_engine` allocation on 3/5 majority days |
+| Phase C (local → prod) | Strong Buy/Sell schema, buy_side/sell_side counts |
+| `product_principles.md` | SSOT for fail-closed behavior |
+
+Open items from this handoff that **carried forward** to May 30 EOD tracker: Round 2 rebuttal quality, Run Review UI, DOC-1, chairman narrator-only (Tier 3), roster freeze.
+
+---
+
 ## Backlog (Deferred Items)
 
 * **Single Bad Ticker Abort:** Currently, one bad ticker kills the FMP fetch. *Decision:* Kept as-is intentionally to fail-fast during active development. Will implement graceful degradation when the solution matures.

@@ -10,6 +10,7 @@ class BriefingStyleTests(unittest.TestCase):
         self.assertIn("--bg-canvas: #121212", css)
         self.assertIn("--brand-sage: #95b8a2", css)
         self.assertIn(briefing_style.CHART_IMG_FILTER, css)
+        self.assertIn(".chart-img-pie", css)
 
     def test_verdict_pills_use_semantic_colors(self):
         pills = briefing_style.verdict_pill_styles()
@@ -17,13 +18,19 @@ class BriefingStyleTests(unittest.TestCase):
         self.assertIn(briefing_style.BEAR_BG, pills["SELL"])
         self.assertIn(briefing_style.WARN_BG, pills["TRIM"])
 
-    def test_sotu_star_mapping(self):
+    def test_chart_typography_tokens(self):
+        self.assertEqual(briefing_style.CHART_DATALABEL_ON_DARK, briefing_style.TEXT_HIGHLIGHT)
+        self.assertEqual(briefing_style.CHART_DATALABEL_WEIGHT, 700)
+        self.assertEqual(briefing_style.CHART_LEGEND_FONT_SIZE, 14)
+        self.assertEqual(briefing_style.CHART_CANVAS_DARK, briefing_style.BG_CANVAS)
+
         bull = briefing_style.sotu_quote_colors("Warren Buffett ⭐⭐⭐⭐")
-        self.assertEqual(bull[0], briefing_style.BULL_BG)
+        self.assertTrue(bull[0].startswith("rgba("))
+        self.assertIn(str(briefing_style.SOTU_BG_ALPHA), bull[0])
         sage = briefing_style.sotu_quote_colors("Peter Lynch ⭐⭐⭐")
         self.assertEqual(sage[1], briefing_style.BRAND_SAGE)
         bear = briefing_style.sotu_quote_colors("Jim Simons ⭐")
-        self.assertEqual(bear[0], briefing_style.BEAR_BG)
+        self.assertTrue(bear[0].startswith("rgba("))
 
     def test_briefing_html_includes_dark_theme(self):
         html = reporting.generate_html_briefing(

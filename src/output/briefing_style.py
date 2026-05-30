@@ -28,8 +28,44 @@ BEAR_BG = "#450a0a"
 WARN_TEXT = "#fcd34d"
 WARN_BG = "#3f2c12"
 
-# QuickChart canvas stays light; email dark mode via filter on rendered PNGs.
+# QuickChart canvas stays light for pies; line/bar use CHART_CANVAS_DARK natively.
 CHART_IMG_FILTER = "invert(0.9) hue-rotate(180deg) grayscale(0.6)"
+
+# --- QuickChart typography (credibility gate: labels/legends must not require squinting) ---
+CHART_CANVAS_DARK = BG_CANVAS  # #121212 — line + bar charts
+CHART_CANVAS_LIGHT = "#ffffff"  # pie charts (outlabels on white)
+
+CHART_DATALABEL_ON_DARK = TEXT_HIGHLIGHT  # #f4f4f5 off-white on dark canvas
+CHART_DATALABEL_ON_LIGHT = "#18181b"  # near-black on white pie canvas
+CHART_DATALABEL_WEIGHT = 700
+CHART_DATALABEL_SIZE = 13
+
+CHART_LEGEND_COLOR_ON_DARK = TEXT_HIGHLIGHT
+CHART_LEGEND_FONT_SIZE = 14
+CHART_LEGEND_WEIGHT = 600
+
+CHART_AXIS_ON_DARK = TEXT_PRIMARY
+CHART_AXIS_TITLE_ON_DARK = TEXT_HIGHLIGHT
+CHART_AXIS_TICK_SIZE = 11
+CHART_AXIS_TITLE_SIZE = 12
+CHART_GRID_ON_DARK = "rgba(255,255,255,0.08)"
+
+CHART_INNER_TITLE_ON_DARK = TEXT_HIGHLIGHT
+CHART_INNER_TITLE_SIZE = 13
+CHART_INNER_TITLE_WEIGHT = 600
+
+CHART_OUTLABEL_WEIGHT = 700
+CHART_OUTLABEL_MIN_SIZE = 13
+CHART_OUTLABEL_MAX_SIZE = 18
+
+# State of the Union quote rows — backgrounds at least 50% transparent (borders stay solid).
+SOTU_BG_ALPHA = 0.5
+
+
+def _hex_to_rgba(hex_color: str, alpha: float) -> str:
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return f"rgba({r},{g},{b},{alpha})"
 
 CSS_ROOT_BLOCK = f""":root {{
     --bg-canvas: {BG_CANVAS};
@@ -64,12 +100,12 @@ def sotu_quote_colors(board_member_label: str) -> tuple[str, str]:
     """Return (background, border-left) for State of the Union quote rows."""
     label = board_member_label or ""
     if "⭐⭐⭐⭐" in label:
-        return BULL_BG, BULL_TEXT
+        return _hex_to_rgba(BULL_BG, SOTU_BG_ALPHA), BULL_TEXT
     if "⭐⭐⭐" in label:
-        return BG_SURFACE, BRAND_SAGE
+        return _hex_to_rgba(BG_SURFACE, SOTU_BG_ALPHA), BRAND_SAGE
     if "⭐⭐" in label or "⭐" in label:
-        return BEAR_BG, BEAR_TEXT
-    return BG_SURFACE, BORDER_SUBTLE
+        return _hex_to_rgba(BEAR_BG, SOTU_BG_ALPHA), BEAR_TEXT
+    return _hex_to_rgba(BG_SURFACE, SOTU_BG_ALPHA), BORDER_SUBTLE
 
 
 def executive_briefing_css() -> str:
@@ -164,6 +200,8 @@ def executive_briefing_css() -> str:
                 height: auto;
                 display: block;
                 margin: 0 auto;
+            }}
+            .chart-img-pie {{
                 filter: {CHART_IMG_FILTER};
             }}
             .section-divider {{ border-bottom: 1px solid var(--border-subtle); }}
@@ -283,9 +321,11 @@ Financial semantics:
 - Bearish (Sell / Strong Sell, dissent, red team): {BEAR_TEXT} on {BEAR_BG}.
 - Warning / hedge mandate: {WARN_TEXT} on {WARN_BG}.
 
-Charts: QuickChart PNGs render on white; the email applies `.chart-img {{ filter: {CHART_IMG_FILTER}; }}` so charts match the cool sage-green dark theme without rebuilding the chart engine. Attached multimodal images may still look filtered — that is intentional.
+Charts: Pie PNGs render on white; the email applies `.chart-img-pie {{ filter: {CHART_IMG_FILTER}; }}` so pies match the cool sage-green dark theme. Line and bar charts render natively on {CHART_CANVAS_DARK} with off-white data labels — do NOT expect those to look filtered.
 
-Flag CRITICAL if charts are broken/unreadable, if bright white Bootstrap/SaaS blocks return, or if more than three unrelated accent hues appear outside this palette.
+Chart typography (QuickChart): data labels weight {CHART_DATALABEL_WEIGHT}, off-white {CHART_DATALABEL_ON_DARK} on dark canvas; pie outlabels weight {CHART_OUTLABEL_WEIGHT} on white canvas. Legend base size {CHART_LEGEND_FONT_SIZE}px on line chart. Flag CRITICAL if labels or legends are faint or unreadable.
+
+Also flag CRITICAL if charts are broken, if bright white Bootstrap/SaaS blocks return, or if more than three unrelated accent hues appear outside this palette.
 """.strip()
 
 

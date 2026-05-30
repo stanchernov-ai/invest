@@ -45,12 +45,12 @@ def audit_briefing_theme(html: str) -> list[dict]:
             "description": f"Matte sage accent {BRAND_SAGE} not found in briefing CSS.",
             "recommendation": "Headings and chart titles should use --brand-sage.",
         })
-    if ".chart-img" in html and CHART_IMG_FILTER not in html:
+    if "chart-img-pie" in html and CHART_IMG_FILTER not in html:
         findings.append({
             "severity": "CRITICAL",
             "category": "Chart Presentation",
-            "description": "Briefing defines .chart-img but is missing the dark-mode chart filter.",
-            "recommendation": f"Apply filter: {CHART_IMG_FILTER}",
+            "description": "Pie charts use .chart-img-pie but the dark-mode filter is missing from CSS.",
+            "recommendation": f"Apply filter on .chart-img-pie: {CHART_IMG_FILTER}",
         })
     return findings
 

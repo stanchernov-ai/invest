@@ -1,9 +1,9 @@
 # Agent Optimization Handoff — Production Pipeline
 
 **Status:** Active handoff for developers  
-**Last updated:** May 30, 2026  
+**Last updated:** May 30, 2026 (EOD — Tier 1 + B1 shipped; architect gated)  
 **Owner:** Stan  
-**SSOT for:** May 2026 agent audit, telemetry baseline, allocation/funding rules (shipped local), and **planned** runtime optimizations (not yet implemented).
+**SSOT for:** May 2026 agent audit, telemetry baseline, allocation/funding rules (shipped), and **remaining** runtime optimizations.
 
 **Related**
 
@@ -15,10 +15,10 @@
 | [`product_principles.md`](product_principles.md) | Board in Python, fail closed |
 | [`post_deliver_checklist.md`](post_deliver_checklist.md) | After each deliver |
 
-**Evidence run (prod):** `20260529_152151` — pull via  
-`.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id 20260529_152151`
+**Evidence run (prod):** `20260529_225159` — canonical post–Action Plan sprint. Pull via  
+`.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id 20260529_225159`
 
-**Baseline comparison run:** `20260529_144833` (pre-full bypass; debate ~287s vs ~124s on 152151).
+**Telemetry baseline run:** `20260529_152151` — pre–Tier 1 deliver token profile (~151k QA tokens).
 
 ---
 
@@ -26,9 +26,9 @@
 
 The **debate bottleneck is largely resolved** on `vote_engine` days: chairman Pro and Markopolos LLM are skipped; debate dropped from ~287s to ~124s on comparable runs.
 
-The **new bottleneck is deliver QA**: ~53% of LLM tokens on a typical bypass day (~151k of ~286k total). Post-flight agents run **mostly sequentially** and several **run LLM passes even when deterministic Python already PASS**.
+**Tier 1 (A1–A4) and B1 shipped** in `a64bcd9` and `748ad6c`. Deliver QA remains the main token sink (~50%+ on bypass days). **B2** (prompt_engineer skip) and **B3** (architect demote) are the next tickets.
 
-**Do not implement the Tier 1–3 tickets in this doc unless explicitly assigned** — this file is the developer handoff spec.
+**Do not implement Tier 2–3 tickets in this doc unless explicitly assigned** — pick from [`action_tracker.md`](action_tracker.md) open items.
 
 ---
 
@@ -54,7 +54,7 @@ The **new bottleneck is deliver QA**: ~53% of LLM tokens on a typical bypass day
 | huang | 2 | 26,495 | 4,885 | Pro |
 | simons | 2 | 25,628 | 3,643 | Pro |
 | clerk | 1 | 17,789 | 986 | Flash |
-| red_teamer | 1 | 17,455 | 1,692 | Pro |
+| red_teamer | 1 | ~17k (est.) | — | **Flash** (B1 shipped `748ad6c`) |
 
 **Not invoked:** `chairman`, `compliance`, Munger (buffett/huang/lynch concentration pass).
 
@@ -72,9 +72,9 @@ The **new bottleneck is deliver QA**: ~53% of LLM tokens on a typical bypass day
 
 ---
 
-## 3. Shipped locally (document before deploy)
+## 3. Shipped to prod (May 30, 2026)
 
-These are in the working tree; confirm prod deploy status before treating as live.
+Confirm on telemetry from `20260529_220253`+ runs.
 
 ### 3.1 Funding sell (`ensure_funding_sell`)
 
@@ -104,12 +104,17 @@ These are in the working tree; confirm prod deploy status before treating as liv
 **TODO(user-profile):** replace env with persisted user profile when available.  
 **Enforcement:** `src/core/guardrails.py` → `enforce_liquidation_cap()` — caps **size**, not **selection** (selection uses conviction only).
 
-### 3.3 Briefing enrichment (render-time)
+### 3.3 Briefing enrichment (three-layer Action Plan)
 
-**Module:** `src/output/briefing_enrichment.py`  
-**Wired in:** `src/output/reporting.py` → `enrich_chairman_for_briefing()`  
-**Purpose:** Replace generic chairman synthesis strings with Round 2 panel quotes per symbol at HTML render time.  
-**Tests:** `tests/test_briefing_enrichment.py`
+**Modules:** `src/output/briefing_enrichment.py`, `src/jobs/deliver.py`  
+**Agents:** Flash `briefing_strategic_context` (batched); Champion/Dissent from Round 2 JSON only  
+**Render:** `src/output/reporting.py` — Strategic Context + Champion + Dissent per symbol (`N/A` when unanimous)
+
+**Shipped:** `cfe55fd`, `380427f` — sanitizer no longer wipes `strategic_context` as “generic synthesis.”
+
+**Known follow-up (AP-1):** When Flash output is short, fallback can duplicate Champion prose — tune in enrichment or raise Flash token budget.
+
+**Tests:** `tests/test_briefing_enrichment.py`, `tests/test_reporting_briefing.py`
 
 ### 3.4 Vote engine bypass + Python compliance (deployed / validating)
 
@@ -139,13 +144,11 @@ These are in the working tree; confirm prod deploy status before treating as liv
 
 ---
 
-## 5. Planned optimizations (implementation tickets)
+## 5. Optimization tickets
 
-Implement in order unless blocked. Each ticket is independent unless noted.
+### Tier 1 — **SHIPPED** (`a64bcd9`)
 
-### Tier 1 — highest impact ÷ effort
-
-#### Ticket A1 — Skip Munger when chairman will bypass
+#### Ticket A1 — Skip Munger when chairman will bypass — **DONE**
 
 | Field | Detail |
 |-------|--------|
@@ -157,7 +160,7 @@ Implement in order unless blocked. Each ticket is independent unless noted.
 | **Tests** | New `tests/test_munger_skip.py` or extend `tests/test_vote_engine.py` — mock orchestrator with `heavy_tickers` + full panel votes → zero Munger invocations in `AGENT_ACTIVITY` |
 | **Est. savings** | 0–3 Pro calls (~80k+ tokens on concentration days) |
 
-#### Ticket A2 — Skip post_mortem LLM when deterministic PASS
+#### Ticket A2 — Skip post_mortem LLM when deterministic PASS — **DONE**
 
 | Field | Detail |
 |-------|--------|
@@ -167,7 +170,7 @@ Implement in order unless blocked. Each ticket is independent unless noted.
 | **Tests** | Extend `tests/test_post_mortem_audit.py` — empty violations → no `call_gemini_async` (mock) |
 | **Est. savings** | ~25k tokens + ~15–20s deliver time on clean runs |
 
-#### Ticket A3 — Parallelize post-flight QA trio
+#### Ticket A3 — Parallelize post-flight QA trio — **DONE**
 
 | Field | Detail |
 |-------|--------|
@@ -177,7 +180,7 @@ Implement in order unless blocked. Each ticket is independent unless noted.
 | **Tests** | Existing QA tests must pass; optional timing mock |
 | **Est. savings** | ~30–50s deliver wall-clock (no token reduction) |
 
-#### Ticket A4 — Default qa_integrity_auditor to Flash
+#### Ticket A4 — Default qa_integrity_auditor to Flash — **DONE**
 
 | Field | Detail |
 |-------|--------|
@@ -190,12 +193,12 @@ Implement in order unless blocked. Each ticket is independent unless noted.
 
 ### Tier 2 — solid payoff
 
-#### Ticket B1 — Red team → Flash
+#### Ticket B1 — Red team → Flash — **DONE** (`748ad6c`)
 
 | Field | Detail |
 |-------|--------|
 | **File** | `src/core/agents.py` → `red_teamer.model` → `FAST_MODEL` |
-| **Risk** | Bear case quality — spot-check 2–3 runs before/after |
+| **Validate** | Spot-check bear case on `20260529_220253`+ |
 | **Est. savings** | ~17k Pro-tier tokens/run |
 
 #### Ticket B2 — Skip prompt_engineer LLM on hard deterministic FAIL
@@ -204,15 +207,16 @@ Implement in order unless blocked. Each ticket is independent unless noted.
 | **Change** | If `audit_debate_persona()` returns CRITICAL-class violations, return merged persona report without LLM (mirror post_mortem pattern) |
 | **Est. savings** | ~24k tokens on noisy runs |
 
-#### Ticket B3 — Demote or cut Systems Architect QA
+#### Ticket B3 — Demote or cut Systems Architect QA — **PARTIAL** (`a4dfea6`)
 
-| **Options** | (a) Remove from `run_post_flight_qa` parallel list; (b) deterministic-only JSON size check; (c) run weekly only via `qa_review.py` |
+| **Shipped** | `src/qa/architect_audit.py` — deterministic Python checks gate LLM; skip architect when clean |
+| **Options remaining** | (a) Remove from post-flight entirely; (b) weekly-only via `qa_review.py` |
 | **Rationale** | Often FAIL on JSON bloat; overlaps post_mortem + integrity (~23k/run) |
-| **Product call** | Stan to approve removal vs demotion |
+| **Product call** | Stan to approve full removal vs current gated behavior |
 
-#### Ticket B4 — Deploy local bundle
+#### Ticket B4 — Deploy local bundle — **DONE**
 
-Commit + deploy: funding sell, briefing enrichment, Phase C, liquidation cap settings, any open compliance/funding tests. Validate on `20260529_152151` or fresh run.
+Funding sell, briefing enrichment, Phase C, liquidation cap, Tier 1, post-job sync — all on `main`. Canonical validation: `20260529_225159`.
 
 ---
 
@@ -241,11 +245,11 @@ Commit + deploy: funding sell, briefing enrichment, Phase C, liquidation cap set
 ## 7. Validation commands
 
 ```powershell
-# Pull prod artifacts
-.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id 20260529_152151
+# Pull prod artifacts (canonical)
+.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id 20260529_225159 --post-job
 
 # Agent activity summary (after fetch)
-.venv\Scripts\python.exe -c "import json; from pathlib import Path; d=json.loads(Path('.cache/state/api_telemetry_20260529_152151.json').read_text()); act=d['AGENT_ACTIVITY']; print('tokens', sum(v['total_tokens'] for v in act.values())); [print(k, v['invocations'], v['total_tokens']) for k,v in sorted(act.items(), key=lambda x:-x[1]['total_tokens'])]"
+.venv\Scripts\python.exe -c "import json; from pathlib import Path; d=json.loads(Path('.cache/state/api_telemetry_20260529_225159.json').read_text()); act=d['AGENT_ACTIVITY']; print('tokens', sum(v['total_tokens'] for v in act.values())); [print(k, v['invocations'], v['total_tokens']) for k,v in sorted(act.items(), key=lambda x:-x[1]['total_tokens'])]"
 
 # Unit tests (funding sell + vote engine)
 .venv\Scripts\python.exe -m unittest tests.test_vote_engine tests.test_compliance_audit tests.test_post_mortem_audit -v
@@ -256,15 +260,16 @@ Commit + deploy: funding sell, briefing enrichment, Phase C, liquidation cap set
 
 ---
 
-## 8. Acceptance criteria (post Tier 1)
+## 8. Acceptance criteria (Tier 1 — verified May 30)
 
 On a `vote_engine` day with `heavy_tickers`:
 
-- [ ] `AGENT_ACTIVITY` shows no Munger panelist keys beyond Round 1/2 (no third invocation pass)
-- [ ] Post-mortem deterministic PASS → no `post_mortem_qa` LLM call (verify invocations=0 or skipped in logs)
-- [ ] Deliver phase wall-clock drops vs 152151 baseline (same symbol count)
-- [ ] `qa_integrity_auditor` uses Flash in telemetry
-- [ ] All existing `tests/test_vote_engine.py`, `tests/test_integrity_qa_fixtures.py`, `tests/test_post_mortem_audit.py` pass
+- [x] `AGENT_ACTIVITY` shows no Munger panelist keys beyond Round 1/2 (A1)
+- [x] Post-mortem deterministic PASS → no `post_mortem_qa` LLM call (A2)
+- [x] Post-flight QA trio runs in parallel (A3)
+- [x] `qa_integrity_auditor` uses Flash in telemetry (A4)
+- [x] `red_teamer` uses Flash (B1)
+- [ ] Deliver token count vs `152151` baseline — re-benchmark after B2
 
 ---
 
@@ -272,6 +277,7 @@ On a `vote_engine` day with `heavy_tickers`:
 
 | Ticket | Update |
 |--------|--------|
-| A1–A4 | This file → move tickets to "Shipped"; `agent_architecture.md` §10 changelog |
-| Funding sell deploy | `technical_solution.md` §2.2 vote_engine / guardrails |
-| B3 architect cut | `qa_layers.md` deliver stack table |
+| A1–A4, B1, B4 | **Done** — this file + [`action_tracker.md`](action_tracker.md) May 30 EOD handoff |
+| B2 | Move to Shipped when implemented; `qa_layers.md` |
+| B3 full cut | `qa_layers.md` deliver stack table |
+| AP-1 Action Plan polish | `briefing_charts_handoff.md` + enrichment module docstring |

@@ -56,12 +56,23 @@
 
 | Chart | Builder | Canvas | Color rule |
 |-------|---------|--------|------------|
-| Performance vs. Benchmark | `build_benchmark_line_chart()` | **Dark** `#111827` | Lines: blue / gray / mint (not gain-loss semantic) |
-| Personal Return by Asset | `build_returns_bar_chart()` | **Dark** `#111827` | Green/red ramp via `colors_for_metric(..., theme="dark")` |
+| Performance vs. Benchmark | `build_benchmark_line_chart()` | **Dark** `#121212` | Lines: blue / gray / mint; legend 14px off-white |
+| Personal Return by Asset | `build_returns_bar_chart()` | **Dark** `#121212` | Green/red ramp via `colors_for_metric(..., theme="dark")`; datalabels off-white weight 700 |
 | Unrealized Gains (pie) | `build_portfolio_pie_chart()` | **White** | Green/red ramp via `colors_for_metric(..., theme="light")` |
 | 12M Return by Account (pie) | `build_account_allocation_pie()` | **White** | Same light-theme ramp on 12M TWR |
 
-**Design intent:** Top row = dashboard terminal (dark). Pies = allocation detail inside white email containers — keep white background so outlabels breathe.
+**Design intent:** Top row = dashboard terminal (dark, native — no CSS filter). Pies = allocation detail on white; `.chart-img-pie` filter harmonizes them in the email. **Typography SSOT:** [`briefing_style.md`](briefing_style.md) § Chart typography.
+
+---
+
+## Chart typography (QuickChart)
+
+| Element | Line / bar (dark canvas) | Pies (white canvas) |
+|---------|--------------------------|---------------------|
+| Data labels | `#f4f4f5`, weight 700, 13px | Outlabels `#18181b`, weight 700, 13–18px |
+| Legend | 14px, weight 600 (line only) | Hidden |
+
+Line and bar PNGs skip the email CSS filter so off-white labels stay crisp.
 
 ---
 
@@ -94,11 +105,12 @@ Constants live at top of `reporting.py`. `colors_for_metric(values, theme="light
 ## QuickChart gotchas (read before editing)
 
 1. **`outlabeledPie` legend:** Must be `"plugins": { "legend": false }` (boolean). `{ "display": false }` is **ignored** — top ticker row still renders (see user screenshot May 29).
-2. **Bar datalabels:** Were configured white on white canvas — invisible. Fixed with dark canvas + `CHART_LABEL_ON_DARK` (`#ecfdf5`).
-3. **Bar legend:** Same boolean `false` in `plugins.legend` plus top-level `"legend": {"display": false}`.
-4. **Datalabel formatter:** QuickChart accepts JS string: `BAR_DATALABEL_FORMATTER` → `function(value){...}+'%'`.
-5. **Short URL API:** `get_quickchart_short_url(..., background_color=...)` POSTs to `quickchart.io/chart/create` — prefer over inline URL (line chart URL length).
-6. **Pie size:** `PIE_CHART_WIDTH=600`, `PIE_CHART_HEIGHT=420` after legend removal.
+2. **Bar datalabels:** Dark canvas `#121212` + off-white `#f4f4f5` at weight 700. Never white-on-white.
+3. **Pie outlabels:** Near-black `#18181b` at weight 700 on white canvas (filter applied via `.chart-img-pie` only).
+4. **Bar legend:** Same boolean `false` in `plugins.legend` plus top-level `"legend": {"display": false}`.
+5. **Datalabel formatter:** QuickChart accepts JS string: `BAR_DATALABEL_FORMATTER` → `function(value){...}+'%'`.
+6. **Short URL API:** `get_quickchart_short_url(..., background_color=...)` POSTs to `quickchart.io/chart/create` — prefer over inline URL (line chart URL length).
+7. **Pie size:** `PIE_CHART_WIDTH=600`, `PIE_CHART_HEIGHT=420` after legend removal.
 
 ---
 

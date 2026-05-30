@@ -17,6 +17,26 @@ from src.output.briefing_style import (
     verdict_pill_styles,
     BG_SURFACE,
     BORDER_SUBTLE,
+    CHART_CANVAS_DARK,
+    CHART_CANVAS_LIGHT,
+    CHART_DATALABEL_ON_DARK,
+    CHART_DATALABEL_ON_LIGHT,
+    CHART_DATALABEL_SIZE,
+    CHART_DATALABEL_WEIGHT,
+    CHART_AXIS_ON_DARK,
+    CHART_AXIS_TITLE_ON_DARK,
+    CHART_AXIS_TICK_SIZE,
+    CHART_AXIS_TITLE_SIZE,
+    CHART_GRID_ON_DARK,
+    CHART_INNER_TITLE_ON_DARK,
+    CHART_INNER_TITLE_SIZE,
+    CHART_INNER_TITLE_WEIGHT,
+    CHART_LEGEND_COLOR_ON_DARK,
+    CHART_LEGEND_FONT_SIZE,
+    CHART_LEGEND_WEIGHT,
+    CHART_OUTLABEL_MIN_SIZE,
+    CHART_OUTLABEL_MAX_SIZE,
+    CHART_OUTLABEL_WEIGHT,
 )
 
 logger = logging.getLogger(__name__)
@@ -271,16 +291,21 @@ def _lerp_hex(color_low: str, color_high: str, t: float) -> str:
     )
 
 
-# Gain/loss chart palette — light canvas (all briefing charts); brand-aligned greens/reds.
+# Gain/loss chart palette — light canvas (pies); dark canvas (bar) uses *_DARK ramps.
 GAIN_GREEN_HIGH = "#16a34a"
 GAIN_GREEN_LOW = "#bbf7d0"
 LOSS_RED_HIGH = "#dc2626"
 LOSS_RED_LOW = "#fecaca"
-CHART_BG = "#ffffff"
-CHART_LABEL_COLOR = "#111827"
-CHART_AXIS_COLOR = "#374151"
-CHART_GRID_COLOR = "rgba(0,0,0,0.08)"
-CHART_LABEL_ON_SLICE = "#1f2937"
+GAIN_GREEN_HIGH_DARK = "#86efac"
+GAIN_GREEN_LOW_DARK = "#22c55e"
+LOSS_RED_HIGH_DARK = "#fca5a5"
+LOSS_RED_LOW_DARK = "#ef4444"
+
+CHART_BG = CHART_CANVAS_DARK
+CHART_LABEL_COLOR = CHART_DATALABEL_ON_DARK
+CHART_AXIS_COLOR = CHART_AXIS_ON_DARK
+CHART_GRID_COLOR = CHART_GRID_ON_DARK
+CHART_LABEL_ON_SLICE = CHART_DATALABEL_ON_LIGHT
 PIE_CHART_WIDTH = 600
 PIE_CHART_HEIGHT = 420
 LINE_CHART_MAX_POINTS = 12
@@ -302,13 +327,44 @@ def _format_history_axis_labels(date_keys: list[str]) -> list[str]:
     return labels
 
 
-def _light_chart_scales(*, y_title: str, y_begin_at_zero: bool = False) -> dict:
-    tick = {"color": CHART_AXIS_COLOR, "font": {"size": 10}}
-    grid = {"color": CHART_GRID_COLOR}
+def _dark_chart_scales(*, y_title: str, y_begin_at_zero: bool = False) -> dict:
+    tick = {
+        "color": CHART_AXIS_ON_DARK,
+        "font": {"size": CHART_AXIS_TICK_SIZE, "weight": 500},
+    }
+    grid = {"color": CHART_GRID_ON_DARK}
     return {
         "y": {
             "beginAtZero": y_begin_at_zero,
-            "title": {"display": True, "text": y_title, "color": CHART_AXIS_COLOR, "font": {"size": 11}},
+            "title": {
+                "display": True,
+                "text": y_title,
+                "color": CHART_AXIS_TITLE_ON_DARK,
+                "font": {"size": CHART_AXIS_TITLE_SIZE, "weight": 600},
+            },
+            "ticks": tick,
+            "grid": grid,
+        },
+        "x": {
+            "ticks": {
+                **tick,
+                "maxTicksLimit": 6,
+                "maxRotation": 0,
+                "minRotation": 0,
+                "autoSkip": True,
+            },
+            "grid": {"display": False},
+        },
+    }
+
+
+def _light_chart_scales(*, y_title: str, y_begin_at_zero: bool = False) -> dict:
+    tick = {"color": "#374151", "font": {"size": 10}}
+    grid = {"color": "rgba(0,0,0,0.08)"}
+    return {
+        "y": {
+            "beginAtZero": y_begin_at_zero,
+            "title": {"display": True, "text": y_title, "color": "#374151", "font": {"size": 11}},
             "ticks": tick,
             "grid": grid,
         },
@@ -333,9 +389,14 @@ def _outlabeled_pie_options() -> dict:
             "datalabels": {"display": False},
             "outlabels": {
                 "text": "%l %p",
-                "color": CHART_LABEL_ON_SLICE,
+                "color": CHART_DATALABEL_ON_LIGHT,
                 "stretch": 35,
-                "font": {"resizable": True, "minSize": 11, "maxSize": 16, "weight": "bold"},
+                "font": {
+                    "resizable": True,
+                    "minSize": CHART_OUTLABEL_MIN_SIZE,
+                    "maxSize": CHART_OUTLABEL_MAX_SIZE,
+                    "weight": str(CHART_OUTLABEL_WEIGHT),
+                },
             },
         },
         "legend": {"display": False},
@@ -352,19 +413,28 @@ def _render_outlabeled_pie_chart(labels, data, colors):
         },
         "options": _outlabeled_pie_options(),
     }
-    return get_quickchart_short_url(chart_config, width=PIE_CHART_WIDTH, height=PIE_CHART_HEIGHT)
+    return get_quickchart_short_url(
+        chart_config,
+        width=PIE_CHART_WIDTH,
+        height=PIE_CHART_HEIGHT,
+        background_color=CHART_CANVAS_LIGHT,
+    )
 
 
-def colors_for_metric(values: list[float]) -> list[str]:
+def colors_for_metric(values: list[float], *, theme: str = "light") -> list[str]:
     """Gradual colors across the slice set — min→max spread shows disparity.
 
-    Green ramp for gains, red ramp for losses; lighter tints at the low end
-    so pie slices stay distinguishable on a white canvas.
+    Green ramp for gains, red ramp for losses. Use theme='dark' for bar charts
+    on {CHART_CANVAS_DARK}; default 'light' for white-canvas pies.
     """
     if not values:
         return []
-    gain_high, gain_low = GAIN_GREEN_HIGH, GAIN_GREEN_LOW
-    loss_high, loss_low = LOSS_RED_HIGH, LOSS_RED_LOW
+    if theme == "dark":
+        gain_high, gain_low = GAIN_GREEN_HIGH_DARK, GAIN_GREEN_LOW_DARK
+        loss_high, loss_low = LOSS_RED_HIGH_DARK, LOSS_RED_LOW_DARK
+    else:
+        gain_high, gain_low = GAIN_GREEN_HIGH, GAIN_GREEN_LOW
+        loss_high, loss_low = LOSS_RED_HIGH, LOSS_RED_LOW
     vals = [float(v) for v in values]
     vmin, vmax = min(vals), max(vals)
     if vmin == vmax:
@@ -468,7 +538,7 @@ def build_returns_bar_chart(sorted_ledger):
     if not data:
         return ""
 
-    colors = colors_for_metric(returns)
+    colors = colors_for_metric(returns, theme="dark")
 
     chart_config = {
         "type": "bar",
@@ -483,16 +553,16 @@ def build_returns_bar_chart(sorted_ledger):
                     "display": True,
                     "align": "end",
                     "anchor": "end",
-                    "color": CHART_LABEL_COLOR,
-                    "font": {"weight": "bold", "size": 12},
+                    "color": CHART_DATALABEL_ON_DARK,
+                    "font": {"weight": CHART_DATALABEL_WEIGHT, "size": CHART_DATALABEL_SIZE},
                     "formatter": BAR_DATALABEL_FORMATTER,
                 },
             },
-            "scales": _light_chart_scales(y_title="Return (%)", y_begin_at_zero=True),
+            "scales": _dark_chart_scales(y_title="Return (%)", y_begin_at_zero=True),
             "legend": {"display": False},
         },
     }
-    return get_quickchart_short_url(chart_config, background_color=CHART_BG)
+    return get_quickchart_short_url(chart_config, background_color=CHART_CANVAS_DARK)
 
 def _downsample(labels, series_list, max_points=90):
     """Evenly subsample parallel label + series lists, always keeping the last point."""
@@ -774,18 +844,23 @@ def build_benchmark_line_chart(history_data):
                 "title": {
                     "display": True,
                     "text": "Indexed performance (start = 100)",
-                    "font": {"size": 12},
-                    "color": CHART_LABEL_COLOR,
+                    "font": {"size": CHART_INNER_TITLE_SIZE, "weight": CHART_INNER_TITLE_WEIGHT},
+                    "color": CHART_INNER_TITLE_ON_DARK,
                 },
                 "legend": {
                     "position": "bottom",
-                    "labels": {"color": CHART_AXIS_COLOR, "font": {"size": 11}},
+                    "labels": {
+                        "color": CHART_LEGEND_COLOR_ON_DARK,
+                        "font": {"size": CHART_LEGEND_FONT_SIZE, "weight": CHART_LEGEND_WEIGHT},
+                    },
                 },
             },
-            "scales": _light_chart_scales(y_title="Index"),
+            "scales": _dark_chart_scales(y_title="Index"),
         },
     }
-    return get_quickchart_short_url(chart_config, width=640, height=340, background_color=CHART_BG)
+    return get_quickchart_short_url(
+        chart_config, width=640, height=340, background_color=CHART_CANVAS_DARK,
+    )
 
 def build_briefing_charts(sorted_ledger, account_holdings, account_returns, history_data):
     """Build every briefing chart URL once so callers can both render and health-check
@@ -914,7 +989,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                     <td valign="top" width="{{ '50%' if account_pie_url else '100%' }}" style="padding: 0 {{ '10px' if account_pie_url else '0' }} 0 0;">
                         <div class="chart-title">Unrealized Gains</div>
                         <div class="chart-container">
-                            <img class="chart-img" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart">
+                            <img class="chart-img chart-img-pie" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart">
                         </div>
                     </td>
                     {% endif %}
@@ -922,7 +997,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                     <td valign="top" width="{{ '50%' if pie_chart_url else '100%' }}" style="padding: 0 0 0 {{ '10px' if pie_chart_url else '0' }};">
                         <div class="chart-title">12M Return by Account</div>
                         <div class="chart-container">
-                            <img class="chart-img" src="{{ account_pie_url }}" alt="1 Yr Return Pie Chart">
+                            <img class="chart-img chart-img-pie" src="{{ account_pie_url }}" alt="1 Yr Return Pie Chart">
                         </div>
                     </td>
                     {% endif %}
@@ -932,6 +1007,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
 
             {% if sotu_quotes %}
             <h2>The State of the Union</h2>
+            <p class="muted" style="font-size:0.95em; margin-top:-5px;">Each panelist&rsquo;s Round 1 portfolio-level view &mdash; concentration, regime fit, and mandate &mdash; not per-ticker rebuttals.</p>
             {% for quote in sotu_quotes %}
                 <table width="100%" cellpadding="0" cellspacing="0" style="margin: 10px 0; border-left: 4px solid {{ quote.sotu_border }}; background-color: {{ quote.sotu_bg }}; border-radius: 4px;">
                     <tr>

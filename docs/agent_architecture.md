@@ -393,7 +393,7 @@ flowchart TB
 | `apply_chairman_guardrails()` | `src/core/guardrails.py` | Max 3 buys, 10% liquidation cap, 30-day wash-sale |
 | `apply_board_and_cap_coherence()` | `src/core/chairman_alignment.py` | Majority-buy promotion, false max-3 cleanup |
 | `audit_chairman_compliance()` | `src/core/compliance_audit.py` | Max buys, hedge, majority alignment, originator, alpha pick |
-| `build_state_of_union_quotes()` | `src/core/state_of_union.py` | SoTU from panel `overall_portfolio_critique`, not per-ticker quotes |
+| `build_state_of_union_quotes()` | `src/core/state_of_union.py` | SoTU from Round 1 `overall_portfolio_critique`; stance stars from Round 2 votes |
 | `reconcile_compliance()` | `src/qa_pipeline.py` | CRITICAL finding → force `is_compliant=false` |
 | `audit_chart_health()` | `src/output/reporting.py` | HTTP probe each chart URL |
 | `audit_briefing_html()` | `src/qa/visual_audit.py` | Email-unsafe CSS, missing alt, empty chart src |
