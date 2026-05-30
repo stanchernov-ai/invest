@@ -14,6 +14,11 @@ from src.core.rebuttal import build_round2_user_prompt
 from src.core.data_oracle import validate_price_feed
 from src.core.guardrails import apply_chairman_guardrails
 from src.core.state_of_union import build_state_of_union_quotes
+from src.core.boardroom_brawl import (
+    build_clerk_debate_digest,
+    fallback_boardroom_brawl,
+    is_boardroom_brawl_complete,
+)
 from src.core.vote_engine import (
     apply_conviction_scores,
     build_chairman_allocation,
@@ -124,7 +129,14 @@ class StateMachineOrchestrator:
                  
         return self.state
 
-    async def _run_agent(self, agent_key: str, context_msg: str, schema: type[BaseModel] = None, extra_instructions: list[str] | None = None) -> dict:
+    async def _run_agent(
+        self,
+        agent_key: str,
+        context_msg: str,
+        schema: type[BaseModel] = None,
+        extra_instructions: list[str] | None = None,
+        include_base_data: bool = True,
+    ) -> dict:
         member_info = agent_config["board_members"][agent_key]
         
         instructions = [
@@ -140,7 +152,11 @@ class StateMachineOrchestrator:
         if extra_instructions:
             instructions.extend(extra_instructions)
         system_prompt = "\n\n".join(instructions)
-        prompt_text = f"{self.state.base_data_prompt}\n\n{context_msg}"
+        prompt_text = (
+            f"{self.state.base_data_prompt}\n\n{context_msg}"
+            if include_base_data
+            else context_msg
+        )
         
         contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt_text)])]
         config_params = {"system_instruction": system_prompt, "temperature": 0.15}
@@ -242,8 +258,40 @@ class StateMachineOrchestrator:
         self.state.unicorn_trades = detect_unicorn_trades(summaries)
         self.state.sell_candidates = detect_sell_candidates(summaries)
         
-        history = "\n\n".join([m["content"] for m in self.state.messages])
-        cos_res = await self._run_agent("clerk", f"Synthesize structural friction points into JSON:\n\n{history}", schema=ChiefOfStaffSynthesis)
+        debate_digest = build_clerk_debate_digest(self.state.messages)
+        vote_digest = format_vote_digest(summaries, portfolio_symbols=self._portfolio_symbols())
+        clerk_prompt = (
+            f"{vote_digest}\n\n"
+            "Synthesize the board debate into boardroom_brawl JSON — exactly 3 paragraphs "
+            "separated by blank lines. Name panelists and describe Round 2 attacks.\n\n"
+            f"{debate_digest}"
+        )
+        cos_res = await self._run_agent(
+            "clerk", clerk_prompt, schema=ChiefOfStaffSynthesis, include_base_data=False,
+        )
+        brawl = (cos_res or {}).get("boardroom_brawl", "")
+        if cos_res and not is_boardroom_brawl_complete(brawl):
+            logger.warning("Clerk boardroom_brawl incomplete (%d chars) — retrying focused synthesis.", len(brawl))
+            retry_prompt = (
+                "Your previous boardroom_brawl was truncated or incomplete. "
+                "Return ONLY valid JSON with a complete boardroom_brawl field: exactly 3 full "
+                "paragraphs (blank line between each), 3-4 sentences per paragraph, ending with "
+                "proper punctuation. Name Warren Buffett, Peter Lynch, Jesse Livermore, Jensen Huang, "
+                "and Jim Simons where relevant.\n\n"
+                f"{debate_digest}"
+            )
+            retry_res = await self._run_agent(
+                "clerk", retry_prompt, schema=ChiefOfStaffSynthesis, include_base_data=False,
+            )
+            if retry_res and is_boardroom_brawl_complete(retry_res.get("boardroom_brawl", "")):
+                cos_res = retry_res
+                brawl = retry_res["boardroom_brawl"]
+            else:
+                cos_res = cos_res or {}
+                cos_res["boardroom_brawl"] = fallback_boardroom_brawl(
+                    self.state.messages, self.raw_verdicts,
+                )
+                logger.warning("Clerk retry still incomplete — using deterministic boardroom_brawl fallback.")
         if cos_res:
             cos_res["state_of_the_union_quotes"] = build_state_of_union_quotes(self.raw_verdicts)
         self.state.chief_of_staff_json = json.dumps(cos_res) if cos_res else "{}"

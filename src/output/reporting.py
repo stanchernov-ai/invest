@@ -610,9 +610,11 @@ def _alpha_pick_displayable(alpha_pick: dict) -> bool:
     return bool(quote) and quote.upper() not in {"N/A", "NONE"}
 
 
+from src.core.boardroom_brawl import is_boardroom_brawl_complete, split_debate_paragraphs
+
+
 def _debate_has_content(brawl_text: str) -> bool:
-    plain = re.sub(r"<[^>]+>", "", brawl_text or "")
-    return len(plain.strip()) > 80
+    return is_boardroom_brawl_complete(brawl_text)
 
 
 def build_benchmark_line_chart(history_data):
@@ -1026,10 +1028,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
 
             {% if show_debate %}
             <h2>The Debate</h2>
-            {% for paragraph in brawl_text.split('\\n') %}
-                {% if paragraph.strip() %}
-                    <p>{{ paragraph.strip() }}</p>
-                {% endif %}
+            {% for paragraph in debate_paragraphs %}
+                <p>{{ paragraph }}</p>
             {% endfor %}
             {% endif %}
             
@@ -1129,6 +1129,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     red_team_case = _sanitize_briefing_text(red_team_data.get('bear_case_narrative', ''))
     chairman_remarks = _sanitize_briefing_text(chairman_data.get('chairman_closing_remarks', ''))
     show_debate = _debate_has_content(brawl_text)
+    debate_paragraphs = split_debate_paragraphs(brawl_text)
     
     hedge_action = chairman_data.get('capital_allocation_narrative', '') if 'hedge' in chairman_data.get('capital_allocation_narrative', '').lower() else ''
     hedge_action = _sanitize_briefing_text(hedge_action)
@@ -1151,6 +1152,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         proj_text=proj_text,
         sotu_quotes=sotu_quotes,
         brawl_text=brawl_text,
+        debate_paragraphs=debate_paragraphs,
         unicorn_protocol_items=unicorn_protocol_items,
         grouped_actions=grouped_actions,
         alpha_pick=alpha_pick,

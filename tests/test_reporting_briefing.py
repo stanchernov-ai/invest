@@ -124,6 +124,10 @@ class BriefingCopyTests(unittest.TestCase):
     def test_debate_hidden_for_empty_content(self):
         self.assertFalse(reporting._debate_has_content("Short."))
 
+    def test_debate_hidden_for_truncated_mid_sentence(self):
+        truncated = "Buffett initiated by dismissing the entire portfolio as"
+        self.assertFalse(reporting._debate_has_content(truncated))
+
 
 class ChartColorTests(unittest.TestCase):
     def _channel_max(self, hex_color: str) -> int:
