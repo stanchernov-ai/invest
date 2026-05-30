@@ -95,6 +95,25 @@ class TestPersonaAudit(unittest.TestCase):
         self.assertIn("PASS", text)
         self.assertIn("5 tickers", text)
 
+    def test_cumulative_messages_do_not_bleed_peer_vocabulary(self):
+        """Prod debate checkpoints append R2 blocks; scan only the agent's section."""
+        cumulative = {
+            "content": (
+                "**[ROUND 2 REBUTTAL] Peter Lynch**:\n"
+                "* **Rebuttal Summary**: The portfolio's problem isn't high P/E ratios.\n"
+                "* **NET**: Pass (2/10). This is a story stock with no earnings.\n\n"
+                "**[ROUND 2 REBUTTAL] Jesse Livermore**:\n"
+                "* **Rebuttal Summary**: The tape is the only truth.\n"
+                "* **NVDA**: Strong Sell (10/10). Lagging the QQQ.\n\n"
+                "**[ROUND 2 REBUTTAL] Jim Simons**:\n"
+                "* **Rebuttal Summary**: Alpha decay requires reallocation.\n"
+                "* **NVDA**: Strong Buy (10/10). PEG 0.29 supports the edge.\n"
+            )
+        }
+        violations, _ = audit_debate_persona([cumulative], ["NVDA", "NET"])
+        drift = [v for v in violations if "PERSONA DRIFT" in v]
+        self.assertEqual(drift, [])
+
 
 if __name__ == "__main__":
     unittest.main()

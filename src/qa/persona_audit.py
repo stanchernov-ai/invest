@@ -5,6 +5,8 @@ the LLM focuses on nuanced drift, chairman scratchpad fidelity, and dissent qual
 """
 from __future__ import annotations
 
+import re
+
 PANELIST_MARKERS: dict[str, str] = {
     "buffett": "Warren Buffett",
     "lynch": "Peter Lynch",
@@ -56,16 +58,29 @@ def _verdict_bucket(verdict: str) -> str:
     return "hold"
 
 
+_ROUND2_HEADER_RE = re.compile(
+    r"\*\*\[ROUND 2 REBUTTAL\]\s+(.+?)\*\*:",
+    re.IGNORECASE,
+)
+
+
 def _extract_round2_text(messages: list[dict], agent_key: str) -> str:
+    """Return only this panelist's Round 2 block (not cumulative debate history)."""
     marker = PANELIST_MARKERS.get(agent_key, "")
     if not marker:
         return ""
-    parts: list[str] = []
-    for msg in messages or []:
+    header = f"**[ROUND 2 REBUTTAL] {marker}**:"
+    for msg in reversed(messages or []):
         content = msg.get("content") or ""
-        if marker in content and "ROUND 2" in content.upper():
-            parts.append(content)
-    return "\n".join(parts)
+        if header not in content:
+            continue
+        start = content.index(header)
+        section = content[start:]
+        next_match = _ROUND2_HEADER_RE.search(section, len(header))
+        if next_match:
+            section = section[: next_match.start()]
+        return section
+    return ""
 
 
 def _unanimous_ticker_stats(matrix: dict) -> dict:

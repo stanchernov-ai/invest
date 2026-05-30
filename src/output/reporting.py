@@ -867,6 +867,84 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             </table>
             {% endif %}
 
+            {% if pie_chart_url or account_pie_url %}
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 30px; border-collapse: separate; border-spacing: 0;">
+                <tr>
+                    {% if pie_chart_url %}
+                    <td valign="top" width="{{ '50%' if account_pie_url else '100%' }}" style="padding: 0 {{ '10px' if account_pie_url else '0' }} 0 0;">
+                        <div class="chart-title">Unrealized Gains</div>
+                        <div class="chart-container">
+                            <img class="chart-img" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart">
+                        </div>
+                    </td>
+                    {% endif %}
+                    {% if account_pie_url %}
+                    <td valign="top" width="{{ '50%' if pie_chart_url else '100%' }}" style="padding: 0 0 0 {{ '10px' if pie_chart_url else '0' }};">
+                        <div class="chart-title">12M Return by Account</div>
+                        <div class="chart-container">
+                            <img class="chart-img" src="{{ account_pie_url }}" alt="1 Yr Return Pie Chart">
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+            </table>
+            {% endif %}
+
+            {% if returns_rows %}
+            <h2>Time-Weighted Returns</h2>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: separate; border-spacing: 0; margin-bottom: 10px;">
+                <tr>
+                    <td valign="top">
+                        <table width="100%" style="border-collapse:collapse; background-color:#f8fafc; border:1px solid #e5e7eb; border-radius:6px;">
+                            <tr style="text-align:left; color:#6b7280; font-size:13px;">
+                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb;">Account</th>
+                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb; text-align:right;">YTD</th>
+                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb; text-align:right;">12 Mo</th>
+                            </tr>
+                            {% for r in returns_rows %}
+                            <tr>
+                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6;{% if r.name == 'Total' %} font-weight:bold;{% endif %}">{{ r.name }}</td>
+                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6; text-align:right; font-weight:bold; color:{{ r.ytd_color }};">{{ '%+.2f'|format(r.ytd) }}%</td>
+                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6; text-align:right; font-weight:bold; color:{{ r.twelve_color }};">{{ '%+.2f'|format(r.twelve) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </table>
+                        <p style="font-size:11px; color:#9ca3af; margin:8px 0 0 0;">Time-weighted return (securities only); neutralizes deposits, withdrawals, and trades. Updated {{ returns_updated }}.</p>
+                    </td>
+                </tr>
+            </table>
+            {% endif %}
+
+            {% if sotu_quotes %}
+            <h2>The State of the Union</h2>
+            {% for quote in sotu_quotes %}
+                {% set box_color = '#f9fafb' %}
+                {% set border_color = '#9ca3af' %}
+                
+                {% if '⭐⭐⭐⭐' in quote.board_member %}
+                    {% set box_color = '#dcfce7' %}
+                    {% set border_color = '#22c55e' %}
+                {% elif '⭐⭐⭐' in quote.board_member %}
+                    {% set box_color = '#dbeafe' %}
+                    {% set border_color = '#3b82f6' %}
+                {% elif '⭐⭐' in quote.board_member or '⭐' in quote.board_member %}
+                    {% set box_color = '#fee2e2' %}
+                    {% set border_color = '#ef4444' %}
+                {% endif %}
+                
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin: 10px 0; border-left: 4px solid {{ border_color }}; background-color: {{ box_color }}; border-radius: 4px;">
+                    <tr>
+                        <td width="65" valign="top" style="padding: 15px 0 15px 15px;">
+                            <img src="{{ quote.avatar_url }}" style="width: 50px; height: 50px; border-radius: 50%; display: block; max-width: 50px;" alt="{{ quote.board_member }} avatar">
+                        </td>
+                        <td valign="middle" style="padding: 15px; font-style: italic;">
+                            <strong>{{ quote.board_member }}:</strong> "{{ quote.quote }}"
+                        </td>
+                    </tr>
+                </table>
+            {% endfor %}
+            {% endif %}
+
             {% if show_alpha_pick %}
             <h2>🎯 The Alpha Pick</h2>
             <div class="metric-box" style="border-left-color: #f59e0b;">
@@ -945,84 +1023,6 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                     {% endfor %}
                 {% endif %}
             {% endfor %}
-
-            {% if pie_chart_url or account_pie_url %}
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 30px; border-collapse: separate; border-spacing: 0;">
-                <tr>
-                    {% if pie_chart_url %}
-                    <td valign="top" width="{{ '50%' if account_pie_url else '100%' }}" style="padding: 0 {{ '10px' if account_pie_url else '0' }} 0 0;">
-                        <div class="chart-title">Unrealized Gains</div>
-                        <div class="chart-container">
-                            <img class="chart-img" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart">
-                        </div>
-                    </td>
-                    {% endif %}
-                    {% if account_pie_url %}
-                    <td valign="top" width="{{ '50%' if pie_chart_url else '100%' }}" style="padding: 0 0 0 {{ '10px' if pie_chart_url else '0' }};">
-                        <div class="chart-title">12M Return by Account</div>
-                        <div class="chart-container">
-                            <img class="chart-img" src="{{ account_pie_url }}" alt="1 Yr Return Pie Chart">
-                        </div>
-                    </td>
-                    {% endif %}
-                </tr>
-            </table>
-            {% endif %}
-
-            {% if returns_rows %}
-            <h2>Time-Weighted Returns</h2>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: separate; border-spacing: 0; margin-bottom: 10px;">
-                <tr>
-                    <td valign="top">
-                        <table width="100%" style="border-collapse:collapse; background-color:#f8fafc; border:1px solid #e5e7eb; border-radius:6px;">
-                            <tr style="text-align:left; color:#6b7280; font-size:13px;">
-                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb;">Account</th>
-                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb; text-align:right;">YTD</th>
-                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb; text-align:right;">12 Mo</th>
-                            </tr>
-                            {% for r in returns_rows %}
-                            <tr>
-                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6;{% if r.name == 'Total' %} font-weight:bold;{% endif %}">{{ r.name }}</td>
-                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6; text-align:right; font-weight:bold; color:{{ r.ytd_color }};">{{ '%+.2f'|format(r.ytd) }}%</td>
-                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6; text-align:right; font-weight:bold; color:{{ r.twelve_color }};">{{ '%+.2f'|format(r.twelve) }}%</td>
-                            </tr>
-                            {% endfor %}
-                        </table>
-                        <p style="font-size:11px; color:#9ca3af; margin:8px 0 0 0;">Time-weighted return (securities only); neutralizes deposits, withdrawals, and trades. Updated {{ returns_updated }}.</p>
-                    </td>
-                </tr>
-            </table>
-            {% endif %}
-
-            {% if sotu_quotes %}
-            <h2>The State of the Union</h2>
-            {% for quote in sotu_quotes %}
-                {% set box_color = '#f9fafb' %}
-                {% set border_color = '#9ca3af' %}
-                
-                {% if '⭐⭐⭐⭐' in quote.board_member %}
-                    {% set box_color = '#dcfce7' %}
-                    {% set border_color = '#22c55e' %}
-                {% elif '⭐⭐⭐' in quote.board_member %}
-                    {% set box_color = '#dbeafe' %}
-                    {% set border_color = '#3b82f6' %}
-                {% elif '⭐⭐' in quote.board_member or '⭐' in quote.board_member %}
-                    {% set box_color = '#fee2e2' %}
-                    {% set border_color = '#ef4444' %}
-                {% endif %}
-                
-                <table width="100%" cellpadding="0" cellspacing="0" style="margin: 10px 0; border-left: 4px solid {{ border_color }}; background-color: {{ box_color }}; border-radius: 4px;">
-                    <tr>
-                        <td width="65" valign="top" style="padding: 15px 0 15px 15px;">
-                            <img src="{{ quote.avatar_url }}" style="width: 50px; height: 50px; border-radius: 50%; display: block; max-width: 50px;" alt="{{ quote.board_member }} avatar">
-                        </td>
-                        <td valign="middle" style="padding: 15px; font-style: italic;">
-                            <strong>{{ quote.board_member }}:</strong> "{{ quote.quote }}"
-                        </td>
-                    </tr>
-                </table>
-            {% endfor %}
-            {% endif %}
 
             {% if show_debate %}
             <h2>The Debate</h2>

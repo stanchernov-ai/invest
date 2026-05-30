@@ -234,15 +234,18 @@ class BriefingHtmlTests(unittest.TestCase):
             chart_urls={
                 "line_chart_url": "https://example.com/line.png",
                 "bar_chart_url": "https://example.com/bar.png",
+                "pie_chart_url": "https://example.com/pie.png",
             },
         )
         perf_pos = html.find("Performance vs. Benchmark")
-        action_pos = html.find("The Action Plan")
+        pie_pos = html.find("Unrealized Gains")
         twr_pos = html.find("Time-Weighted Returns")
         sotu_pos = html.find("The State of the Union")
-        self.assertLess(perf_pos, action_pos)
-        self.assertLess(action_pos, twr_pos)
+        action_pos = html.find("The Action Plan")
+        self.assertLess(perf_pos, pie_pos)
+        self.assertLess(pie_pos, twr_pos)
         self.assertLess(twr_pos, sotu_pos)
+        self.assertLess(sotu_pos, action_pos)
         self.assertIn("Symbol", html)
         self.assertIn("NVDA", html)
         self.assertIn("Invest AI Daily Briefing", html)
