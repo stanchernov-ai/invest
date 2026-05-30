@@ -12,11 +12,15 @@ from src.output.briefing_enrichment import enrich_chairman_for_briefing_sync, _i
 from src.core.board_roster import PANELIST_AVATAR_URLS, PANELIST_ROLES
 from src.output.briefing_style import (
     executive_briefing_css,
+    executive_briefing_inline_styles,
     qa_dashboard_css,
     qa_summary_box_html,
     sotu_quote_colors,
     verdict_pill_styles,
+    BG_CANVAS,
+    BG_CONTAINER,
     BG_SURFACE,
+    TEXT_PRIMARY,
     BORDER_SUBTLE,
     CHART_CANVAS_DARK,
     CHART_CANVAS_LIGHT,
@@ -930,6 +934,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         quote['sotu_border'] = sotu_border
 
     briefing_css = executive_briefing_css()
+    email_styles = executive_briefing_inline_styles()
     pill_styles = verdict_pill_styles()
 
     brawl_text = cos_data.get('boardroom_brawl', 'The board evaluated the portfolio without major conflict.')
@@ -945,14 +950,19 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {{ briefing_css }}
         </style>
     </head>
-    <body>
-        <div class="container">
-            <h1>Invest AI: Executive Briefing{% if briefing_date %} &mdash; {{ briefing_date }}{% endif %}</h1>
+    <body style="{{ email_styles.body }}">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{{ bg_canvas }}" style="background-color:{{ bg_canvas }};">
+            <tr>
+                <td align="center" style="{{ email_styles.canvas_cell }}">
+                    <table role="presentation" width="800" cellpadding="0" cellspacing="0" border="0" bgcolor="{{ bg_container }}" style="{{ email_styles.container_table }}">
+                        <tr>
+                            <td style="{{ email_styles.container_td }}">
+            <h1 style="{{ email_styles.h1 }}">Invest AI: Executive Briefing{% if briefing_date %} &mdash; {{ briefing_date }}{% endif %}</h1>
             
-            <div class="metric-box">
-                <strong>Portfolio Value:</strong> {{ total_val }}<br>
-                <strong>3M Trend — Portfolio:</strong> {{ portfolio_3m_trend }} &nbsp;|&nbsp; <strong>QQQ:</strong> {{ qqq_trend }}<br>
-                <strong>Current CAGR:</strong> {{ cagr_text }} &nbsp;|&nbsp; <strong>Projected Balance (Age 65):</strong> {{ proj_text }}
+            <div style="{{ email_styles.metric_box }}">
+                <strong style="{{ email_styles.strong }}">Portfolio Value:</strong> {{ total_val }}<br>
+                <strong style="{{ email_styles.strong }}">3M Trend — Portfolio:</strong> {{ portfolio_3m_trend }} &nbsp;|&nbsp; <strong style="{{ email_styles.strong }}">QQQ:</strong> {{ qqq_trend }}<br>
+                <strong style="{{ email_styles.strong }}">Current CAGR:</strong> {{ cagr_text }} &nbsp;|&nbsp; <strong style="{{ email_styles.strong }}">Projected Balance (Age 65):</strong> {{ proj_text }}
             </div>
 
             {% if line_chart_url or bar_chart_url %}
@@ -960,17 +970,17 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 <tr>
                     {% if line_chart_url %}
                     <td valign="top" width="{{ '50%' if bar_chart_url else '100%' }}" style="padding: 0 {{ '10px' if bar_chart_url else '0' }} 0 0;">
-                        <div class="chart-title">Performance vs. Benchmark (indexed)</div>
-                        <div class="chart-container">
-                            <img class="chart-img" src="{{ line_chart_url }}" alt="Benchmark Performance Line Chart">
+                        <div style="{{ email_styles.chart_title }}">Performance vs. Benchmark (indexed)</div>
+                        <div style="{{ email_styles.chart_container }}">
+                            <img class="chart-img" src="{{ line_chart_url }}" alt="Benchmark Performance Line Chart" style="{{ email_styles.chart_img }}">
                         </div>
                     </td>
                     {% endif %}
                     {% if bar_chart_url %}
                     <td valign="top" width="{{ '50%' if line_chart_url else '100%' }}" style="padding: 0 0 0 {{ '10px' if line_chart_url else '0' }};">
-                        <div class="chart-title">Personal Return by Asset</div>
-                        <div class="chart-container">
-                            <img class="chart-img" src="{{ bar_chart_url }}" alt="Portfolio Returns Bar Chart">
+                        <div style="{{ email_styles.chart_title }}">Personal Return by Asset</div>
+                        <div style="{{ email_styles.chart_container }}">
+                            <img class="chart-img" src="{{ bar_chart_url }}" alt="Portfolio Returns Bar Chart" style="{{ email_styles.chart_img }}">
                         </div>
                     </td>
                     {% endif %}
@@ -983,17 +993,17 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 <tr>
                     {% if pie_chart_url %}
                     <td valign="top" width="{{ '50%' if account_pie_url else '100%' }}" style="padding: 0 {{ '10px' if account_pie_url else '0' }} 0 0;">
-                        <div class="chart-title">Unrealized Gains</div>
-                        <div class="chart-container">
-                            <img class="chart-img" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart">
+                        <div style="{{ email_styles.chart_title }}">Unrealized Gains</div>
+                        <div style="{{ email_styles.chart_container }}">
+                            <img class="chart-img" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart" style="{{ email_styles.chart_img }}">
                         </div>
                     </td>
                     {% endif %}
                     {% if account_pie_url %}
                     <td valign="top" width="{{ '50%' if pie_chart_url else '100%' }}" style="padding: 0 0 0 {{ '10px' if pie_chart_url else '0' }};">
-                        <div class="chart-title">12M Return by Account</div>
-                        <div class="chart-container">
-                            <img class="chart-img" src="{{ account_pie_url }}" alt="1 Yr Return Pie Chart">
+                        <div style="{{ email_styles.chart_title }}">12M Return by Account</div>
+                        <div style="{{ email_styles.chart_container }}">
+                            <img class="chart-img" src="{{ account_pie_url }}" alt="1 Yr Return Pie Chart" style="{{ email_styles.chart_img }}">
                         </div>
                     </td>
                     {% endif %}
@@ -1002,16 +1012,16 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {% endif %}
 
             {% if sotu_quotes %}
-            <h2>The State of the Union</h2>
-            <p class="muted" style="font-size:0.95em; margin-top:-5px;">Each panelist&rsquo;s Round 1 portfolio-level view &mdash; concentration, regime fit, and mandate &mdash; not per-ticker rebuttals.</p>
+            <h2 style="{{ email_styles.h2 }}">The State of the Union</h2>
+            <p style="{{ email_styles.muted_p }}">Each panelist&rsquo;s Round 1 portfolio-level view &mdash; concentration, regime fit, and mandate &mdash; not per-ticker rebuttals.</p>
             {% for quote in sotu_quotes %}
                 <table width="100%" cellpadding="0" cellspacing="0" style="margin: 10px 0; border-left: 4px solid {{ quote.sotu_border }}; background-color: {{ quote.sotu_bg }}; border-radius: 4px;">
                     <tr>
                         <td width="65" valign="top" style="padding: 15px 0 15px 15px;">
                             <img src="{{ quote.avatar_url }}" style="width: 50px; height: 50px; border-radius: 50%; display: block; max-width: 50px;" alt="{{ quote.board_member }} avatar">
                         </td>
-                        <td valign="middle" style="padding: 15px; font-style: italic;">
-                            <strong>{{ quote.board_member }}:</strong> "{{ quote.quote }}"
+                        <td valign="middle" style="{{ email_styles.sotu_quote }}">
+                            <strong style="{{ email_styles.strong }}">{{ quote.board_member }}:</strong> "{{ quote.quote }}"
                         </td>
                     </tr>
                 </table>
@@ -1019,8 +1029,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {% endif %}
 
             {% if show_alpha_pick %}
-            <h2>🎯 The Alpha Pick</h2>
-            <div class="metric-box alpha-accent">
+            <h2 style="{{ email_styles.h2 }}">🎯 The Alpha Pick</h2>
+            <div style="{{ email_styles.metric_box }}">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
                     <tr>
                         {% if alpha_pick.image %}
@@ -1029,25 +1039,25 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                         </td>
                         {% endif %}
                         <td valign="top">
-                            <p style="margin-top: 0; font-size: 1.1em;"><strong>{{ alpha_pick.symbol }}</strong>: "{{ alpha_pick.champion_quote }}"</p>
+                            <p style="margin-top: 0; font-size: 1.1em; color: {{ text_primary }};"><strong style="{{ email_styles.strong }}">{{ alpha_pick.symbol }}</strong>: "{{ alpha_pick.champion_quote }}"</p>
                         </td>
                     </tr>
                 </table>
                 
                 {% if red_team_case %}
-                <h3 class="bear-heading" style="margin-top: 20px; margin-bottom: 10px; font-size: 1.05em; border-bottom: none;">⚠️ The Bear Case Rebuttal</h3>
-                <div class="red-team-box">
+                <h3 style="{{ email_styles.h3 }} {{ email_styles.bear_heading }}; margin-top: 20px; margin-bottom: 10px; border-bottom: none;">⚠️ The Bear Case Rebuttal</h3>
+                <div style="{{ email_styles.red_team_box }}">
                     {{ red_team_case }}
                 </div>
                 {% endif %}
             </div>
             {% endif %}
 
-            <h2>The Action Plan</h2>
+            <h2 style="{{ email_styles.h2 }}">The Action Plan</h2>
 
             {% if hedge_action %}
-            <div class="hedge-box">
-                <strong>🛡️ Risk Management Mandate:</strong> {{ hedge_action }}
+            <div style="{{ email_styles.hedge_box }}">
+                <strong style="{{ email_styles.strong }}">🛡️ Risk Management Mandate:</strong> {{ hedge_action }}
             </div>
             {% endif %}
 
@@ -1055,7 +1065,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {% for category in action_categories %}
                 {% if grouped_actions[category] %}
                     {% for pos in grouped_actions[category] %}
-                        <div class="section-divider" style="margin-bottom: 20px; padding-bottom: 20px;">
+                        <div style="{{ email_styles.section_divider }}">
                             <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
                                 <tr>
                                     {% if pos.image %}
@@ -1064,14 +1074,14 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                                     </td>
                                     {% endif %}
                                     <td valign="middle">
-                                        <span class="verdict-pill" style="{{ pill_styles[category] }} margin-bottom: 0;">{{ category }} : {{ pos.symbol }}</span>
+                                        <span style="{{ pill_styles[category] }} display:inline-block; padding:6px 14px; border-radius:6px; font-weight:bold; font-size:13px;">{{ category }} : {{ pos.symbol }}</span>
                                     </td>
                                 </tr>
                             </table>
-                            <p><strong>Strategic Context:</strong> {{ pos.strategic_context or pos.synthesis }}</p>
+                            <p style="{{ email_styles.p }}"><strong style="{{ email_styles.strong }}">Strategic Context:</strong> {{ pos.strategic_context or pos.synthesis }}</p>
                             {% if pos.narrative and pos.narrative.champion_quote %}
-                                <p><span class="champion">The Champion ({{ pos.narrative.champion }}):</span> "{{ pos.narrative.champion_quote }}"</p>
-                                <p><span class="dissenter">The Dissent ({{ pos.narrative.dissenter or 'None' }}):</span> "{{ pos.narrative.dissenter_quote or 'N/A' }}"</p>
+                                <p style="{{ email_styles.p }}"><span style="{{ email_styles.champion }}">The Champion ({{ pos.narrative.champion }}):</span> "{{ pos.narrative.champion_quote }}"</p>
+                                <p style="{{ email_styles.p }}"><span style="{{ email_styles.dissenter }}">The Dissent ({{ pos.narrative.dissenter or 'None' }}):</span> "{{ pos.narrative.dissenter_quote or 'N/A' }}"</p>
                             {% endif %}
                         </div>
                     {% endfor %}
@@ -1079,17 +1089,17 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {% endfor %}
 
             {% if show_debate %}
-            <h2>The Debate</h2>
+            <h2 style="{{ email_styles.h2 }}">The Debate</h2>
             {% for paragraph in debate_paragraphs %}
-                <p>{{ paragraph }}</p>
+                <p style="{{ email_styles.p }}">{{ paragraph }}</p>
             {% endfor %}
             {% endif %}
             
             {% if unicorn_protocol_items %}
-            <h2>🦄 Unicorn Protocol</h2>
-            <p class="muted" style="font-size:0.95em; margin-top:-5px;">Unanimous board verdict — full context with Red Team rebuttal.</p>
+            <h2 style="{{ email_styles.h2 }}">🦄 Unicorn Protocol</h2>
+            <p style="{{ email_styles.muted_p }}">Unanimous board verdict — full context with Red Team rebuttal.</p>
             {% for item in unicorn_protocol_items %}
-                <div class="section-divider" style="margin-bottom: 24px; padding-bottom: 20px;">
+                <div style="{{ email_styles.section_divider }}">
                     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
                         <tr>
                             {% if item.image %}
@@ -1098,55 +1108,60 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                             </td>
                             {% endif %}
                             <td valign="middle">
-                                <span class="verdict-pill" style="{{ pill_styles[item.verdict] if item.verdict in pill_styles else pill_styles['HOLD'] }} margin-bottom: 0;">{{ item.verdict }} : {{ item.symbol }}</span>
+                                <span style="{{ pill_styles[item.verdict] if item.verdict in pill_styles else pill_styles['HOLD'] }} display:inline-block; padding:6px 14px; border-radius:6px; font-weight:bold; font-size:13px;">{{ item.verdict }} : {{ item.symbol }}</span>
                             </td>
                         </tr>
                     </table>
                     {% if item.synthesis %}
-                    <p><strong>Strategic Context:</strong> {{ item.synthesis }}</p>
+                    <p style="{{ email_styles.p }}"><strong style="{{ email_styles.strong }}">Strategic Context:</strong> {{ item.synthesis }}</p>
                     {% endif %}
                     {% if item.champion_quote %}
-                    <p><span class="champion">The Champion ({{ item.champion }}):</span> "{{ item.champion_quote }}"</p>
+                    <p style="{{ email_styles.p }}"><span style="{{ email_styles.champion }}">The Champion ({{ item.champion }}):</span> "{{ item.champion_quote }}"</p>
                     {% endif %}
                     {% if item.red_team_rebuttal %}
-                    <p class="bear-heading" style="margin-top: 12px; margin-bottom: 6px; font-weight: bold;">⚠️ Red Team Rebuttal</p>
-                    <div class="red-team-box">{{ item.red_team_rebuttal }}</div>
+                    <p style="{{ email_styles.bear_heading }}; margin-top: 12px; margin-bottom: 6px; font-weight: bold;">⚠️ Red Team Rebuttal</p>
+                    <div style="{{ email_styles.red_team_box }}">{{ item.red_team_rebuttal }}</div>
                     {% endif %}
                 </div>
             {% endfor %}
             {% endif %}
             
             {% if chairman_remarks %}
-            <h2>Chairman's Closing Thoughts</h2>
-            <div class="chairman-box">
-                <p style="margin: 0;">"{{ chairman_remarks }}"</p>
+            <h2 style="{{ email_styles.h2 }}">Chairman's Closing Thoughts</h2>
+            <div style="{{ email_styles.chairman_box }}">
+                <p style="margin: 0; color: {{ text_primary }};">"{{ chairman_remarks }}"</p>
             </div>
             {% endif %}
 
-            <h2>Upcoming Catalysts</h2>
-            <ul>
+            <h2 style="{{ email_styles.h2 }}">Upcoming Catalysts</h2>
+            <ul style="margin: 0; padding-left: 20px;">
             {% for event in events %}
-                <li><strong>{{ event.symbol }}</strong>: {{ event.event_detail }} <em>{{ event.impact }}</em></li>
+                <li style="{{ email_styles.li }}"><strong style="{{ email_styles.strong }}">{{ event.symbol }}</strong>: {{ event.event_detail }} <em>{{ event.impact }}</em></li>
             {% else %}
-                <li>No major immediate catalysts flagged.</li>
+                <li style="{{ email_styles.li }}">No major immediate catalysts flagged.</li>
             {% endfor %}
             </ul>
 
-            <div class="footer">
+            <div style="{{ email_styles.footer }}">
                 Invest AI Daily Briefing<br>
                 Data provided by Financial Modeling Prep and brokerage activity logs.
             </div>
             
             {% if qa_summary_text %}
-            <div class="qa-box">
-                <strong>Automated QA Audit</strong>
-                <span class="muted">&mdash; see the QA Audit Dashboard for details on any &#10060;.</span><br><br>
+            <div style="{{ email_styles.qa_box }}">
+                <strong style="{{ email_styles.strong }}">Automated QA Audit</strong>
+                <span style="color: {{ text_primary }};">&mdash; see the QA Audit Dashboard for details on any &#10060;.</span><br><br>
                 {{ qa_summary_text }}
             </div>
             {% else %}
             <!-- QA_SUMMARY_ANCHOR -->
             {% endif %}
-        </div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
     </body>
     </html>
     """
@@ -1199,8 +1214,12 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     template = Template(html_template)
     rendered_html = template.render(
         briefing_css=briefing_css,
+        email_styles=email_styles,
         pill_styles=pill_styles,
+        bg_canvas=BG_CANVAS,
+        bg_container=BG_CONTAINER,
         bg_surface=BG_SURFACE,
+        text_primary=TEXT_PRIMARY,
         total_val=fmt_dol(total_val),
         qqq_trend=fmt(qqq_trend),
         portfolio_3m_trend=fmt(portfolio_3m_trend),

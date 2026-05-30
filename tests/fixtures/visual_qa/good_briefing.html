@@ -8,38 +8,25 @@
       --brand-sage: #95b8a2;
       --border-subtle: #3f3f46;
     }
-    body { background-color: #121212; color: #a1a1aa; }
-    .container { background-color: #1e1e1e; padding: 20px; border: 1px solid #3f3f46; }
-    h1 { color: #95b8a2; }
-    .chart-title { color: #95b8a2; font-weight: 600; margin: 0 0 10px 0; }
-    .chart-container { border: 1px solid #3f3f46; padding: 10px; background-color: #27272a; }
-    .chart-img {
-      max-width: 100%;
-      height: auto;
-      display: block;
-      margin: 0 auto;
-    }
   </style>
 </head>
-<body>
-  <div class="container">
-    <h1>Invest AI: Executive Briefing</h1>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-      <tr>
-        <td valign="top" width="50%">
-          <div class="chart-title">Performance vs. Benchmark</div>
-          <div class="chart-container">
-            <img class="chart-img" src="https://quickchart.io/chart/render/abc123" alt="Benchmark Performance Line Chart">
-          </div>
-        </td>
-        <td valign="top" width="50%">
-          <div class="chart-title">Performance vs. Benchmark</div>
-          <div class="chart-container">
-            <img class="chart-img" src="https://quickchart.io/chart/render/def456" alt="Portfolio Returns Bar Chart">
-          </div>
-        </td>
-      </tr>
-    </table>
-  </div>
+<body style="margin:0;padding:0;background-color:#121212;color:#a1a1aa;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#121212" style="background-color:#121212;">
+    <tr>
+      <td align="center" style="padding:20px;background-color:#121212;">
+        <table role="presentation" width="800" cellpadding="0" cellspacing="0" border="0" bgcolor="#1e1e1e" style="max-width:800px;width:100%;background-color:#1e1e1e;border:1px solid #3f3f46;">
+          <tr>
+            <td style="padding:30px;background-color:#1e1e1e;color:#a1a1aa;">
+              <h1 style="color:#95b8a2;">Invest AI: Executive Briefing</h1>
+              <div style="color:#95b8a2;font-weight:600;margin:0 0 10px 0;border-bottom:1px solid #3f3f46;">Performance vs. Benchmark</div>
+              <div style="text-align:center;border:1px solid #3f3f46;padding:10px;background-color:#27272a;">
+                <img class="chart-img" src="https://quickchart.io/chart/render/abc123" alt="Benchmark Performance Line Chart" style="max-width:100%;height:auto;display:block;margin:0 auto;">
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>

@@ -13,6 +13,15 @@ class BriefingStyleTests(unittest.TestCase):
         self.assertIn(".chart-img", css)
         self.assertNotIn("filter:", css)
 
+    def test_inline_styles_cover_stealth_wealth_palette(self):
+        styles = briefing_style.executive_briefing_inline_styles()
+        self.assertIn(briefing_style.BG_CANVAS, styles["body"])
+        self.assertIn(briefing_style.BG_CONTAINER, styles["container_td"])
+        self.assertIn(briefing_style.BG_SURFACE, styles["metric_box"])
+        self.assertIn(briefing_style.BRAND_SAGE, styles["h1"])
+        self.assertIn(briefing_style.TEXT_PRIMARY, styles["p"])
+        self.assertIn(briefing_style.TEXT_HIGHLIGHT, styles["strong"])
+
     def test_verdict_pills_use_semantic_colors(self):
         pills = briefing_style.verdict_pill_styles()
         self.assertIn(briefing_style.BULL_BG, pills["BUY"])
@@ -33,7 +42,7 @@ class BriefingStyleTests(unittest.TestCase):
         bear = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['aurelius']} ⭐")
         self.assertTrue(bear[0].startswith("rgba("))
 
-    def test_briefing_html_includes_dark_theme(self):
+    def test_briefing_html_includes_inline_dark_theme(self):
         html = reporting.generate_html_briefing(
             total_val=150_000,
             qqq_trend=5.0,
@@ -51,8 +60,10 @@ class BriefingStyleTests(unittest.TestCase):
             sorted_ledger=[],
             chart_urls={},
         )
-        self.assertIn("#121212", html)
-        self.assertIn("#95b8a2", html)
+        self.assertIn('background-color:#121212', html.replace(" ", ""))
+        self.assertIn('background-color:#1e1e1e', html.replace(" ", ""))
+        self.assertIn(briefing_style.BRAND_SAGE, html)
+        self.assertIn('bgcolor="#121212"', html)
         self.assertIn("chart-img", html)
         self.assertNotIn("chart-img-pie", html)
 

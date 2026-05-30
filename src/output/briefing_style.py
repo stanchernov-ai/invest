@@ -106,6 +106,75 @@ def sotu_quote_colors(board_member_label: str) -> tuple[str, str]:
     return _hex_to_rgba(BG_SURFACE, SOTU_BG_ALPHA), BORDER_SUBTLE
 
 
+def executive_briefing_inline_styles() -> dict[str, str]:
+    """Inline style map for Gmail/Outlook-safe Stealth Wealth rendering.
+
+    Email clients strip ``<head>`` rules and CSS variables; duplicate critical
+    colors as inline ``style`` + ``bgcolor`` on wrapper tables.
+    """
+    font = "font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;"
+    return {
+        "body": f"margin:0;padding:0;{font}background-color:{BG_CANVAS};color:{TEXT_PRIMARY};",
+        "canvas_cell": f"padding:20px;background-color:{BG_CANVAS};",
+        "container_table": (
+            f"max-width:800px;width:100%;background-color:{BG_CONTAINER};"
+            f"border:1px solid {BORDER_SUBTLE};border-collapse:collapse;"
+        ),
+        "container_td": f"padding:30px;background-color:{BG_CONTAINER};color:{TEXT_PRIMARY};{font}",
+        "h1": (
+            f"color:{BRAND_SAGE};border-bottom:2px solid {BORDER_SUBTLE};padding-bottom:10px;"
+            f"margin:0 0 20px 0;font-size:1.6em;{font}"
+        ),
+        "h2": (
+            f"color:{BRAND_SAGE};border-bottom:1px solid {BORDER_SUBTLE};padding-bottom:5px;"
+            f"margin:30px 0 15px 0;font-size:1.25em;{font}"
+        ),
+        "h3": f"color:{TEXT_HIGHLIGHT};margin:25px 0 10px 0;font-size:1.05em;{font}",
+        "strong": f"color:{TEXT_HIGHLIGHT};",
+        "p": f"color:{TEXT_PRIMARY};margin:0 0 12px 0;line-height:1.5;{font}",
+        "muted_p": f"color:{TEXT_PRIMARY};font-size:0.95em;margin-top:-5px;{font}",
+        "metric_box": (
+            f"background-color:{BG_SURFACE};padding:15px;border-left:4px solid {BRAND_SAGE};"
+            f"margin-bottom:20px;{font}color:{TEXT_PRIMARY};"
+        ),
+        "hedge_box": (
+            f"background-color:{WARN_BG};padding:15px;border-left:4px solid {WARN_TEXT};"
+            f"margin-bottom:20px;color:{WARN_TEXT};{font}"
+        ),
+        "red_team_box": (
+            f"background-color:{BEAR_BG};padding:12px;border-left:4px solid {BEAR_TEXT};"
+            f"color:{BEAR_TEXT};{font}"
+        ),
+        "chairman_box": (
+            f"background-color:{BG_SURFACE};padding:15px;border-left:4px solid {BRAND_SAGE};"
+            f"font-style:italic;color:{TEXT_PRIMARY};{font}"
+        ),
+        "chart_title": (
+            f"color:{BRAND_SAGE};font-size:1.3em;font-weight:600;margin:0 0 10px 0;"
+            f"padding-bottom:5px;border-bottom:1px solid {BORDER_SUBTLE};{font}"
+        ),
+        "chart_container": (
+            f"text-align:center;border:1px solid {BORDER_SUBTLE};padding:10px;"
+            f"background-color:{BG_SURFACE};margin:0;"
+        ),
+        "chart_img": "max-width:100%;height:auto;display:block;margin:0 auto;",
+        "champion": f"color:{BULL_TEXT};font-weight:bold;",
+        "dissenter": f"color:{BEAR_TEXT};font-weight:bold;",
+        "bear_heading": f"color:{BEAR_TEXT};",
+        "section_divider": f"border-bottom:1px solid {BORDER_SUBTLE};margin-bottom:20px;padding-bottom:20px;",
+        "footer": (
+            f"margin-top:40px;font-size:0.8em;color:{TEXT_PRIMARY};text-align:center;"
+            f"border-top:1px solid {BORDER_SUBTLE};padding-top:20px;{font}"
+        ),
+        "li": f"color:{TEXT_PRIMARY};margin-bottom:6px;{font}",
+        "sotu_quote": f"padding:15px;font-style:italic;color:{TEXT_PRIMARY};{font}",
+        "qa_box": (
+            f"margin-top:40px;font-size:0.85em;line-height:1.7;color:{TEXT_PRIMARY};"
+            f"border-top:1px dashed {BORDER_SUBTLE};padding-top:15px;{font}"
+        ),
+    }
+
+
 def executive_briefing_css() -> str:
     """Full `<style>` body for the investor executive briefing email."""
     return f"""

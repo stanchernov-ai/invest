@@ -31,12 +31,22 @@ def audit_briefing_theme(html: str) -> list[dict]:
     if not (html or "").strip():
         return findings
 
-    if BG_CANVAS not in html and "--bg-canvas" not in html:
+    if BG_CANVAS not in html:
         findings.append({
             "severity": "WARNING",
             "category": "Brand Palette",
-            "description": f"Dark canvas color {BG_CANVAS} not found in briefing CSS.",
-            "recommendation": "Use src/output/briefing_style.py executive_briefing_css() in the template.",
+            "description": f"Dark canvas color {BG_CANVAS} not found in briefing HTML.",
+            "recommendation": "Use executive_briefing_inline_styles() on body and outer wrapper table.",
+        })
+    soup = BeautifulSoup(html or "", "html.parser")
+    body = soup.find("body")
+    body_style = (body.get("style") or "") if body else ""
+    if body and BG_CANVAS not in body_style:
+        findings.append({
+            "severity": "CRITICAL",
+            "category": "Brand Palette",
+            "description": "Body tag missing inline Stealth Wealth canvas background (Gmail strips head CSS).",
+            "recommendation": f"Set body style background-color:{BG_CANVAS} via executive_briefing_inline_styles().",
         })
     if BRAND_SAGE not in html:
         findings.append({
