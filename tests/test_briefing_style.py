@@ -37,6 +37,7 @@ class BriefingStyleTests(unittest.TestCase):
         bull = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['hypatia']} ⭐⭐⭐⭐")
         self.assertTrue(bull[0].startswith("rgba("))
         self.assertIn(str(briefing_style.SOTU_BG_ALPHA), bull[0])
+        self.assertIn("110,231,183", bull[0])  # light bull tint, not dark pill bg
         sage = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['davinci']} ⭐⭐⭐")
         self.assertEqual(sage[1], briefing_style.BRAND_SAGE)
         bear = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['aurelius']} ⭐")

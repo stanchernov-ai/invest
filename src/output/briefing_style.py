@@ -56,8 +56,14 @@ CHART_OUTLABEL_WEIGHT = 700
 CHART_OUTLABEL_MIN_SIZE = 13
 CHART_OUTLABEL_MAX_SIZE = 18
 
-# State of the Union quote rows — backgrounds at least 50% transparent (borders stay solid).
-SOTU_BG_ALPHA = 0.5
+# State of the Union — light sentiment washes on #121212 (not pill BG colors).
+# Dark-theme rule: tint with *lighter* semantic text hues at low alpha, never darken further.
+SOTU_BG_ALPHA = 0.14
+SOTU_BULL_TINT = BULL_TEXT
+SOTU_BEAR_TINT = BEAR_TEXT
+SOTU_NEUTRAL_TINT = BRAND_SAGE
+SOTU_AVATAR_SIZE = 84
+SOTU_AVATAR_COLUMN_WIDTH = 108
 
 
 def _hex_to_rgba(hex_color: str, alpha: float) -> str:
@@ -98,12 +104,12 @@ def sotu_quote_colors(board_member_label: str) -> tuple[str, str]:
     """Return (background, border-left) for State of the Union quote rows."""
     label = board_member_label or ""
     if "⭐⭐⭐⭐" in label:
-        return _hex_to_rgba(BULL_BG, SOTU_BG_ALPHA), BULL_TEXT
+        return _hex_to_rgba(SOTU_BULL_TINT, SOTU_BG_ALPHA), BULL_TEXT
     if "⭐⭐⭐" in label:
-        return _hex_to_rgba(BG_SURFACE, SOTU_BG_ALPHA), BRAND_SAGE
+        return _hex_to_rgba(SOTU_NEUTRAL_TINT, SOTU_BG_ALPHA), BRAND_SAGE
     if "⭐⭐" in label or "⭐" in label:
-        return _hex_to_rgba(BEAR_BG, SOTU_BG_ALPHA), BEAR_TEXT
-    return _hex_to_rgba(BG_SURFACE, SOTU_BG_ALPHA), BORDER_SUBTLE
+        return _hex_to_rgba(SOTU_BEAR_TINT, SOTU_BG_ALPHA), BEAR_TEXT
+    return _hex_to_rgba(SOTU_NEUTRAL_TINT, SOTU_BG_ALPHA * 0.75), BORDER_SUBTLE
 
 
 def executive_briefing_inline_styles() -> dict[str, str]:
@@ -167,7 +173,21 @@ def executive_briefing_inline_styles() -> dict[str, str]:
             f"border-top:1px solid {BORDER_SUBTLE};padding-top:20px;{font}"
         ),
         "li": f"color:{TEXT_PRIMARY};margin-bottom:6px;{font}",
-        "sotu_quote": f"padding:15px;font-style:italic;color:{TEXT_PRIMARY};{font}",
+        "sotu_avatar_cell": (
+            f"padding:12px 0 12px 12px;vertical-align:top;width:{SOTU_AVATAR_COLUMN_WIDTH}px;"
+        ),
+        "sotu_avatar_ring": (
+            f"width:{SOTU_AVATAR_SIZE}px;height:{SOTU_AVATAR_SIZE}px;"
+            f"border-radius:50%;overflow:hidden;display:block;"
+            f"border:2px solid {BORDER_SUBTLE};background-color:{BG_SURFACE};"
+        ),
+        "sotu_avatar_img": (
+            f"width:{int(SOTU_AVATAR_SIZE * 1.22)}px;height:{int(SOTU_AVATAR_SIZE * 1.22)}px;"
+            f"display:block;margin:-{int(SOTU_AVATAR_SIZE * 0.11)}px;"
+        ),
+        "sotu_quote": (
+            f"padding:12px 15px 12px 4px;font-style:italic;color:{TEXT_PRIMARY};{font}"
+        ),
         "qa_box": (
             f"margin-top:40px;font-size:0.85em;line-height:1.7;color:{TEXT_PRIMARY};"
             f"border-top:1px dashed {BORDER_SUBTLE};padding-top:15px;{font}"

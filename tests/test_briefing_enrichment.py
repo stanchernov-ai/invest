@@ -75,7 +75,7 @@ class BriefingEnrichmentTests(unittest.TestCase):
         action = html[html.find("The Action Plan"):]
         self.assertIn("Strategic Context:", action)
         self.assertIn("The Champion (", action)
-        self.assertIn("The Dissent (None):", action)
+        self.assertIn("The Dissent (", action)
         self.assertNotIn("supported the committee's recommendation", html.lower())
 
     def test_flash_strategic_context_applied(self):

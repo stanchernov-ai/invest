@@ -17,6 +17,7 @@ from src.output.briefing_style import (
     qa_summary_box_html,
     sotu_quote_colors,
     verdict_pill_styles,
+    SOTU_AVATAR_COLUMN_WIDTH,
     BG_CANVAS,
     BG_CONTAINER,
     BG_SURFACE,
@@ -592,6 +593,14 @@ def _rebase_index_series(values):
 
 _BRIEFING_JARGON_RULES: list[tuple[str, str]] = [
     (
+        r"\[SYSTEM OVERRIDE:\s*10%\s*Liquidation Cap Reached\.\s*Fractional trim only[^\]]+\]",
+        "Trim size was capped by the daily liquidation limit; the verdict was adjusted accordingly.",
+    ),
+    (
+        r"\[SYSTEM OVERRIDE:\s*10%\s*Liquidation Cap Reached\.\s*Deferred trim[^\]]+\]",
+        "Deferred trim after reaching the daily liquidation limit.",
+    ),
+    (
         r"\[SYSTEM OVERRIDE:\s*10%\s*Liquidation Cap Reached\.\s*Hold enforced\.\]",
         "Position held to respect the portfolio's daily liquidation limit.",
     ),
@@ -1015,10 +1024,12 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             <h2 style="{{ email_styles.h2 }}">The State of the Union</h2>
             <p style="{{ email_styles.muted_p }}">Each panelist&rsquo;s Round 1 portfolio-level view &mdash; concentration, regime fit, and mandate &mdash; not per-ticker rebuttals.</p>
             {% for quote in sotu_quotes %}
-                <table width="100%" cellpadding="0" cellspacing="0" style="margin: 10px 0; border-left: 4px solid {{ quote.sotu_border }}; background-color: {{ quote.sotu_bg }}; border-radius: 4px;">
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin: 10px 0; border-left: 4px solid {{ quote.sotu_border }}; background-color: {{ quote.sotu_bg }}; border-radius: 6px;">
                     <tr>
-                        <td width="65" valign="top" style="padding: 15px 0 15px 15px;">
-                            <img src="{{ quote.avatar_url }}" style="width: 50px; height: 50px; border-radius: 50%; display: block; max-width: 50px;" alt="{{ quote.board_member }} avatar">
+                        <td width="{{ sotu_avatar_col_width }}" valign="top" style="{{ email_styles.sotu_avatar_cell }}">
+                            <div style="{{ email_styles.sotu_avatar_ring }}">
+                                <img src="{{ quote.avatar_url }}" style="{{ email_styles.sotu_avatar_img }}" alt="{{ quote.board_member }} avatar">
+                            </div>
                         </td>
                         <td valign="middle" style="{{ email_styles.sotu_quote }}">
                             <strong style="{{ email_styles.strong }}">{{ quote.board_member }}:</strong> "{{ quote.quote }}"
@@ -1226,6 +1237,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         cagr_text=cagr_text,
         proj_text=proj_text,
         sotu_quotes=sotu_quotes,
+        sotu_avatar_col_width=SOTU_AVATAR_COLUMN_WIDTH,
         brawl_text=brawl_text,
         debate_paragraphs=debate_paragraphs,
         unicorn_protocol_items=unicorn_protocol_items,
