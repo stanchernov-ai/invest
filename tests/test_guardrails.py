@@ -150,10 +150,11 @@ class TestLiquidationCap(unittest.TestCase):
             portfolio_holdings=holdings,
         )
         pos = result["portfolio_positions"][0]
-        self.assertEqual(pos["final_verdict"], "TRIM")
+        self.assertEqual(pos["final_verdict"], "Trim")
         self.assertIn("10% limit", pos["synthesis"])
 
-    def test_cancels_excess_liquidations(self):
+    def test_deferred_trims_stay_trim_when_cap_exhausted(self):
+        """CHAIR-1: board-mandated trims must not become HOLD when the 10% cap is full."""
         chairman = {
             "capital_flow_audit": {"liquidated_tickers": ["A", "B"], "target_tickers": []},
             "portfolio_positions": [_pos("A", "Sell"), _pos("B", "Trim")],
@@ -166,8 +167,41 @@ class TestLiquidationCap(unittest.TestCase):
             portfolio_holdings=holdings,
         )
         verdicts = {p["symbol"]: p["final_verdict"] for p in result["portfolio_positions"]}
-        self.assertEqual(verdicts["A"], "TRIM")
-        self.assertEqual(verdicts["B"], "HOLD")
+        self.assertEqual(verdicts["A"], "Trim")
+        self.assertEqual(verdicts["B"], "Trim")
+        self.assertIn("B", result["capital_flow_audit"]["liquidated_tickers"])
+
+    def test_chair1_prod_scenario_googl_first_then_avgo_asml(self):
+        """Run 20260530_010432: GOOGL Sell + TSM Trim consume cap; AVGO/ASML stay Trim."""
+        chairman = {
+            "capital_flow_audit": {
+                "liquidated_tickers": ["GOOGL", "TSM", "AVGO", "ASML"],
+                "target_tickers": [],
+            },
+            "portfolio_positions": [
+                _pos("GOOGL", "Sell"),
+                _pos("TSM", "Trim"),
+                _pos("AVGO", "Trim"),
+                _pos("ASML", "Trim"),
+            ],
+            "watchlist_positions": [],
+        }
+        holdings = {
+            "GOOGL": 14_013.25,
+            "TSM": 13_742.32,
+            "AVGO": 32_113.83,
+            "ASML": 12_500.50,
+        }
+        result = enforce_liquidation_cap(
+            chairman,
+            total_portfolio_value=149_267.96,
+            portfolio_holdings=holdings,
+        )
+        verdicts = {p["symbol"]: p["final_verdict"] for p in result["portfolio_positions"]}
+        self.assertEqual(verdicts["AVGO"], "Trim")
+        self.assertEqual(verdicts["ASML"], "Trim")
+        self.assertEqual(verdicts["TSM"], "Trim")
+        self.assertIn(verdicts["GOOGL"], ("Sell", "Trim"))
 
 
 class TestApplyChairmanGuardrails(unittest.TestCase):

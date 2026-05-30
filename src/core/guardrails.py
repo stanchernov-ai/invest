@@ -184,12 +184,19 @@ def enforce_liquidation_cap(
             continue
 
         if cap_remaining <= 0:
-            pos["final_verdict"] = "HOLD"
-            _prepend_override(pos, "[SYSTEM OVERRIDE: 10% Liquidation Cap Reached. Hold enforced.]")
+            # CHAIR-1: board reduce mandates stay TRIM when cap is exhausted — never demote to HOLD.
+            if verdict != "TRIM":
+                pos["final_verdict"] = "Trim"
+            _prepend_override(
+                pos,
+                "[SYSTEM OVERRIDE: 10% Liquidation Cap Reached. Fractional trim only — "
+                "remaining allowance $0.]",
+            )
+            valid_liquidations.append(sym)
             continue
 
         if verdict == "SELL" and holding_value > cap_remaining:
-            pos["final_verdict"] = "TRIM"
+            pos["final_verdict"] = "Trim"
             _prepend_override(
                 pos,
                 f"[SYSTEM OVERRIDE: Sell mathematically capped at ${cap_remaining:,.2f} "
@@ -212,8 +219,12 @@ def enforce_liquidation_cap(
 
     for sym, pos in pos_dict.items():
         if _normalize_verdict(pos.get("final_verdict", "")) in SELL_VERDICTS and sym not in valid_liquidations:
-            pos["final_verdict"] = "HOLD"
-            _prepend_override(pos, "[SYSTEM OVERRIDE: 10% Liquidation Cap Reached. Action canceled.]")
+            pos["final_verdict"] = "Trim"
+            _prepend_override(
+                pos,
+                "[SYSTEM OVERRIDE: 10% Liquidation Cap Reached. Deferred trim — cap exhausted.]",
+            )
+            valid_liquidations.append(sym)
 
     chairman["capital_flow_audit"]["liquidated_tickers"] = valid_liquidations
     return chairman
