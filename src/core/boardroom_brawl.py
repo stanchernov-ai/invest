@@ -4,12 +4,18 @@ from __future__ import annotations
 import re
 
 from src.core.agents import agent_config
-from src.core.board_roster import PANELIST_KEYS, PANELIST_ROLES
+from src.core.board_roster import (
+    PANELIST_KEYS,
+    PANELIST_ROLES,
+    PANELIST_AVATAR_URLS,
+    resolve_panelist_key,
+    shorten_panelist_references,
+)
 
 _OVERVIEW_MARKERS = ("**Portfolio Overview**", "**Rebuttal Summary**")
 _ROUND1 = re.compile(r"\*\*\[ROUND 1\]", re.I)
 _ROUND2 = re.compile(r"\*\*\[ROUND 2", re.I)
-_HEADER = re.compile(r"^\*\*\[(ROUND \d+[^\]]*)\]\s*(.+?)\*\*\s*$", re.M)
+_HEADER = re.compile(r"^\*\*\[(ROUND\s+\d+[^\]]*)\]\s*(.+?)\*\*:?\s*$", re.I | re.M)
 
 
 def build_clerk_debate_digest(messages: list[dict]) -> str:
@@ -54,6 +60,92 @@ def split_debate_paragraphs(brawl_text: str) -> list[str]:
         if len(parts) >= 2:
             return parts
     return [p.strip() for p in text.split("\n") if p.strip()]
+
+
+def _extract_debate_excerpt(content: str) -> str:
+    """Portfolio Overview (R1) or Rebuttal Summary (R2) — one digestible turn per message."""
+    for line in content.split("\n"):
+        stripped = line.strip()
+        for marker in _OVERVIEW_MARKERS:
+            if marker in stripped and ":" in stripped:
+                text = stripped.split(":", 1)[-1].strip()
+                if text:
+                    return text
+    return ""
+
+
+def _parse_debate_message(content: str) -> tuple[str, str, str] | None:
+    """Return (round_label, panelist_key, speaker_name) from a board message."""
+    first_line = (content or "").split("\n", 1)[0].strip()
+    match = _HEADER.match(first_line)
+    if not match:
+        return None
+    round_label = match.group(1).strip().upper()
+    speaker = match.group(2).strip().rstrip(":")
+    panelist_key = resolve_panelist_key(speaker)
+    if not panelist_key:
+        return None
+    return round_label, panelist_key, PANELIST_ROLES[panelist_key]
+
+
+def debate_turn_heading(round_label: str) -> str:
+    """Investor-facing debate phase — never show raw Round 1 / Round 2 labels."""
+    label = (round_label or "").upper()
+    if label.startswith("ROUND 1"):
+        return "Portfolio Overview"
+    if "ROUND 2" in label:
+        return "Rebuttal"
+    return ""
+
+
+def build_debate_dialogue_turns(messages: list[dict]) -> list[dict]:
+    """Structured chat turns from raw board messages — portfolio overview + rebuttal only."""
+    turns: list[dict] = []
+    for msg in messages or []:
+        content = (msg.get("content") or "").strip()
+        if not content:
+            continue
+        parsed = _parse_debate_message(content)
+        excerpt = _extract_debate_excerpt(content)
+        if not parsed or not excerpt:
+            continue
+        round_label, panelist_key, speaker = parsed
+        turns.append({
+            "speaker": speaker,
+            "panelist_key": panelist_key,
+            "turn_heading": debate_turn_heading(round_label),
+            "text": shorten_panelist_references(excerpt),
+            "avatar_url": PANELIST_AVATAR_URLS[panelist_key],
+            "align": "left",
+        })
+    for idx, turn in enumerate(turns):
+        turn["align"] = "left" if idx % 2 == 0 else "right"
+        turn["index"] = idx
+    return turns
+
+
+def build_debate_display_blocks(
+    brawl_text: str,
+    *,
+    raw_board_messages: list[dict] | None = None,
+) -> list[dict]:
+    """Chat-style debate turns; falls back to clerk narrative paragraphs when messages unavailable."""
+    turns = build_debate_dialogue_turns(raw_board_messages or [])
+    if turns:
+        return [{"kind": "turn", **turn} for turn in turns]
+
+    paragraphs = split_debate_paragraphs(brawl_text)
+    blocks: list[dict] = []
+    round_header_re = re.compile(r"^\s*\*\*\[ROUND\s+(?:ONE|TWO|\d+)", re.I)
+    for idx, para in enumerate(paragraphs):
+        kind = "body"
+        first_line = para.split("\n", 1)[0].strip()
+        if round_header_re.match(first_line):
+            para = para.split("\n", 1)[-1].strip() if "\n" in para else ""
+            if not para:
+                continue
+        blocks.append({"html": para, "kind": kind, "label": "", "index": idx})
+    return blocks
 
 
 def fallback_boardroom_brawl(messages: list[dict], raw_verdicts: dict[str, dict]) -> str:

@@ -132,9 +132,10 @@ async def run_deliver(run_id: str) -> dict:
             chairman_data=c_data, cos_data=cos_data, matrix_md=matrix_md, unicorn_trades=unicorn_trades,
             sorted_ledger=sorted_ledger, red_team_data=red_team_data, history_data=history_data,
             qa_summary_text="", account_holdings=account_holdings, account_returns=account_returns,
-            advanced_data=advanced_data, chart_urls=chart_urls,
+            advanced_data=advanced_data,             chart_urls=chart_urls,
             raw_verdicts=raw_verdicts or None,
             portfolio_symbols=portfolio_symbols,
+            raw_board_messages=raw_board_messages,
         )
         graphics_report = await qa_pipeline.run_graphics_designer_qa(briefing_html, chart_health)
         qa_reports.append(graphics_report)
@@ -154,23 +155,19 @@ async def run_deliver(run_id: str) -> dict:
         )
         qa_reports.append(integrity_report)
 
-        final_qa_summary_text = "<br>".join([
-            f"<strong>{r['agent_role']}</strong> {'&#9989;' if r['is_compliant'] else '&#10060;'}"
-            for r in qa_reports
-        ])
-
         storage_client.save_report(f"qa_reports_{run_id}.json", json.dumps(qa_reports, indent=2, default=str))
 
-        html_payload = reporting.inject_qa_summary_into_briefing(briefing_html, final_qa_summary_text)
+        # GFX-6: investor email is briefing-only; QA lives on the separate dashboard email.
+        investor_briefing_html = reporting.inject_qa_summary_into_briefing(briefing_html, "")
         qa_dashboard_html = reporting.generate_qa_dashboard_html(
             qa_reports, run_id, review_url=review_url
         )
 
         storage_client.save_report(f"qa_dashboard_{run_id}.html", qa_dashboard_html)
-        storage_client.save_report(f"executive_briefing_{run_id}.html", html_payload)
+        storage_client.save_report(f"executive_briefing_{run_id}.html", investor_briefing_html)
         storage_client.save_report(f"raw_debate_log_{run_id}.md", raw_log_combined)
 
-        notifier.send_executive_briefing(html_payload)
+        notifier.send_executive_briefing(investor_briefing_html)
         notifier.send_qa_dashboard(qa_dashboard_html)
 
         # Merge telemetry from all three phases into the canonical run file.

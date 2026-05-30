@@ -56,14 +56,144 @@ CHART_OUTLABEL_WEIGHT = 700
 CHART_OUTLABEL_MIN_SIZE = 13
 CHART_OUTLABEL_MAX_SIZE = 18
 
-# State of the Union — light sentiment washes on #121212 (not pill BG colors).
-# Dark-theme rule: tint with *lighter* semantic text hues at low alpha, never darken further.
-SOTU_BG_ALPHA = 0.14
-SOTU_BULL_TINT = BULL_TEXT
-SOTU_BEAR_TINT = BEAR_TEXT
-SOTU_NEUTRAL_TINT = BRAND_SAGE
-SOTU_AVATAR_SIZE = 84
-SOTU_AVATAR_COLUMN_WIDTH = 108
+NEUTRAL_BLUE = "#93c5fd"
+
+# Chart charge semantics — hardcoded sign colors (aligned with SoTU / verdict pills).
+CHART_GAIN = BULL_TEXT           # #6ee7b7
+CHART_LOSS = BEAR_TEXT           # #fca5a5
+CHART_NEUTRAL = NEUTRAL_BLUE
+CHART_NEUTRAL_EPS = 0.05         # |return| ≤ this → neutral blue (%)
+CHART_GAIN_VARIANTS = (CHART_GAIN, "#34d399", "#22c55e", "#4ade80")
+CHART_LOSS_VARIANTS = (CHART_LOSS, "#f87171", "#ef4444", "#fb7185")
+CHART_LINE_PORTFOLIO = CHART_GAIN
+CHART_LINE_BENCHMARK = "#71717a"
+CHART_LINE_NASDAQ = CHART_NEUTRAL
+
+# Side-by-side row (Performance + Returns) — identical PNG geometry for visual balance.
+BRIEFING_PAIR_CHART_WIDTH = 388
+BRIEFING_PAIR_CHART_HEIGHT = 300
+BAR_CHART_WIDTH = BRIEFING_PAIR_CHART_WIDTH
+BAR_CHART_HEIGHT = BRIEFING_PAIR_CHART_HEIGHT
+LINE_CHART_WIDTH = BRIEFING_PAIR_CHART_WIDTH
+LINE_CHART_HEIGHT = BRIEFING_PAIR_CHART_HEIGHT
+
+BAR_DATALABEL_SIZE = 12
+BAR_DATALABEL_COLOR = "#18181b"
+BAR_DATALABEL_ANCHOR = "end"
+BAR_DATALABEL_ALIGN = "start"
+BAR_DATALABEL_OFFSET = -14
+BAR_MIN_BAR_LENGTH = 28
+BAR_CHART_LAYOUT_PADDING = {"top": 32, "bottom": 14, "left": 8, "right": 12}
+BAR_Y_SCALE_GRACE = "12%"
+# QuickChart tickFormat plugin — JS formatters in datalabels are ignored on POST renders.
+BAR_TICK_FORMAT = {
+    "suffix": "%",
+    "minimumFractionDigits": 0,
+    "maximumFractionDigits": 0,
+    "applyToDataLabels": True,
+}
+
+PIE_CHART_WIDTH = BRIEFING_PAIR_CHART_WIDTH
+PIE_CHART_HEIGHT = 360
+PIE_OUTLABEL_COLOR = "#18181b"
+PIE_OUTLABEL_MIN_SIZE = 14
+PIE_OUTLABEL_MAX_SIZE = 18
+PIE_OUTLABEL_STRETCH = 24
+
+# Magnitude ramps on dark canvas: lighter tint = smaller |return|, deeper = larger |return|.
+CHART_GAIN_LIGHT = "#86efac"
+CHART_GAIN_DARK = "#166534"
+CHART_LOSS_LIGHT = "#fca5a5"
+CHART_LOSS_DARK = "#991b1b"
+
+
+def _clamp01(t: float) -> float:
+    return max(0.0, min(1.0, t))
+
+
+def _lerp_hex(color_low: str, color_high: str, t: float) -> str:
+    """Blend two #RRGGBB colors; t=0 → low, t=1 → high."""
+    t = _clamp01(t)
+
+    def _rgb(hex_color: str) -> tuple[int, int, int]:
+        h = hex_color.lstrip("#")
+        return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+    r1, g1, b1 = _rgb(color_low)
+    r2, g2, b2 = _rgb(color_high)
+    return "#%02x%02x%02x" % (
+        int(round(r1 + (r2 - r1) * t)),
+        int(round(g1 + (g2 - g1) * t)),
+        int(round(b1 + (b2 - b1) * t)),
+    )
+
+
+def chart_magnitude_colors(values: list[float]) -> list[str]:
+    """Map return % to green/red intensity — darker = larger |gain| within each sign."""
+    if not values:
+        return []
+    floats = [float(v) for v in values]
+    pos = [v for v in floats if v > CHART_NEUTRAL_EPS]
+    neg = [v for v in floats if v < -CHART_NEUTRAL_EPS]
+    pos_min, pos_max = (min(pos), max(pos)) if pos else (0.0, 0.0)
+    neg_min, neg_max = (min(neg), max(neg)) if neg else (0.0, 0.0)
+
+    colors: list[str] = []
+    for v in floats:
+        if v > CHART_NEUTRAL_EPS:
+            if len(pos) <= 1 or pos_max == pos_min:
+                t = 0.65
+            else:
+                t = (v - pos_min) / (pos_max - pos_min)
+            colors.append(_lerp_hex(CHART_GAIN_LIGHT, CHART_GAIN_DARK, t))
+        elif v < -CHART_NEUTRAL_EPS:
+            if len(neg) <= 1 or neg_min == neg_max:
+                t = 0.65
+            else:
+                t = (neg_max - v) / (neg_max - neg_min)
+            colors.append(_lerp_hex(CHART_LOSS_LIGHT, CHART_LOSS_DARK, t))
+        else:
+            colors.append(CHART_NEUTRAL)
+    return colors
+
+
+def chart_charge_colors(values: list[float]) -> list[str]:
+    """Map metric values to green (gain) / blue (flat) / red (loss) — no lerp ambiguity."""
+    if not values:
+        return []
+    pos_i = neg_i = 0
+    colors: list[str] = []
+    for raw in values:
+        v = float(raw)
+        if v > CHART_NEUTRAL_EPS:
+            colors.append(CHART_GAIN_VARIANTS[pos_i % len(CHART_GAIN_VARIANTS)])
+            pos_i += 1
+        elif v < -CHART_NEUTRAL_EPS:
+            colors.append(CHART_LOSS_VARIANTS[neg_i % len(CHART_LOSS_VARIANTS)])
+            neg_i += 1
+        else:
+            colors.append(CHART_NEUTRAL)
+    return colors
+
+
+SOTU_GLOW_ALPHA = 0.18
+SOTU_BULL_BG = "#052e24"       # dark emerald — between canvas and BULL_BG pill
+SOTU_BULL_EDGE = "#0d4a3d"     # muted green rim
+SOTU_BULL_GLOW_RGB = "110,231,183"  # BULL_TEXT accent
+SOTU_BEAR_BG = "#3b0a0a"       # dark crimson — aligned with BEAR_BG
+SOTU_BEAR_EDGE = "#6b1515"
+SOTU_BEAR_GLOW_RGB = "252,165,165"  # BEAR_TEXT accent
+SOTU_NEUTRAL_BG = "#0f1a2e"    # dark navy — between bear and bull on #121212
+SOTU_NEUTRAL_EDGE = "#1e3a5f"
+SOTU_NEUTRAL_GLOW_RGB = "147,197,253"
+SOTU_NEUTRAL_TEXT = NEUTRAL_BLUE
+SOTU_AVATAR_SIZE = 96
+SOTU_AVATAR_COLUMN_WIDTH = 112
+# Circular clip hides square PNG corners; ~1.06 fills the disc with gold without cropping the halo.
+SOTU_AVATAR_ZOOM = 1.06
+DEBATE_AVATAR_SIZE = 48
+DEBATE_AVATAR_ZOOM = 1.06
+ACTION_PLAN_AVATAR_SIZE = 40
 
 
 def _hex_to_rgba(hex_color: str, alpha: float) -> str:
@@ -100,16 +230,119 @@ def verdict_pill_styles() -> dict[str, str]:
     }
 
 
+def _rgba_rgb(rgb: str, alpha: float) -> str:
+    return f"rgba({rgb},{alpha})"
+
+
+def _sotu_stance(board_member_label: str) -> str:
+    """Hardcoded stance from Round 2 label text — never infer from star count."""
+    label = (board_member_label or "").lower()
+    if "bearish" in label:
+        return "bearish"
+    if "bullish" in label:
+        return "bullish"
+    if "neutral" in label:
+        return "neutral"
+    return "neutral"
+
+
+def sotu_quote_style(board_member_label: str) -> tuple[str, str, str]:
+    """Return (background, border-left, row_glow_style) for State of the Union quote rows."""
+    stance = _sotu_stance(board_member_label)
+    if stance == "bullish":
+        bg, edge, glow_rgb, border = SOTU_BULL_BG, SOTU_BULL_EDGE, SOTU_BULL_GLOW_RGB, BULL_TEXT
+    elif stance == "bearish":
+        bg, edge, glow_rgb, border = SOTU_BEAR_BG, SOTU_BEAR_EDGE, SOTU_BEAR_GLOW_RGB, BEAR_TEXT
+    else:
+        bg, edge, glow_rgb, border = (
+            SOTU_NEUTRAL_BG,
+            SOTU_NEUTRAL_EDGE,
+            SOTU_NEUTRAL_GLOW_RGB,
+            SOTU_NEUTRAL_TEXT,
+        )
+    glow = (
+        f"box-shadow: inset 0 0 28px {_rgba_rgb(glow_rgb, SOTU_GLOW_ALPHA)}, "
+        f"0 0 14px {_rgba_rgb(glow_rgb, SOTU_GLOW_ALPHA * 0.45)}; "
+        f"border-top: 1px solid {edge}; "
+        f"border-right: 1px solid {edge}; "
+        f"border-bottom: 1px solid {edge};"
+    )
+    return bg, border, glow
+
+
 def sotu_quote_colors(board_member_label: str) -> tuple[str, str]:
-    """Return (background, border-left) for State of the Union quote rows."""
-    label = board_member_label or ""
-    if "⭐⭐⭐⭐" in label:
-        return _hex_to_rgba(SOTU_BULL_TINT, SOTU_BG_ALPHA), BULL_TEXT
-    if "⭐⭐⭐" in label:
-        return _hex_to_rgba(SOTU_NEUTRAL_TINT, SOTU_BG_ALPHA), BRAND_SAGE
-    if "⭐⭐" in label or "⭐" in label:
-        return _hex_to_rgba(SOTU_BEAR_TINT, SOTU_BG_ALPHA), BEAR_TEXT
-    return _hex_to_rgba(SOTU_NEUTRAL_TINT, SOTU_BG_ALPHA * 0.75), BORDER_SUBTLE
+    """Return (background, border-left) — backward-compatible wrapper."""
+    bg, border, _ = sotu_quote_style(board_member_label)
+    return bg, border
+
+
+def ticker_logo_inline_style(*, size: int = 28) -> str:
+    """Light chip behind FMP logos so dark PNGs read on ``#27272a`` cards."""
+    chip = "#e4e4e7"
+    return (
+        f"width:{size}px;height:{size}px;border-radius:6px;display:block;"
+        f"max-width:{size}px;background-color:{chip};padding:3px;"
+        f"border:1px solid {BORDER_SUBTLE};"
+    )
+
+
+def portrait_clip_styles(
+    panelist_key: str | None = None,
+    *,
+    size: int = SOTU_AVATAR_SIZE,
+    zoom: float | None = None,
+    ring_background: str = BG_CONTAINER,
+) -> dict[str, str]:
+    """Email-safe circular portrait — clip square PNG corners, keep gold ring visible."""
+    _ = panelist_key  # reserved for per-panelist zoom overrides
+    if size <= DEBATE_AVATAR_SIZE:
+        scale = zoom if zoom is not None else DEBATE_AVATAR_ZOOM
+    else:
+        scale = zoom if zoom is not None else SOTU_AVATAR_ZOOM
+    img_size = max(1, int(round(size * scale)))
+    inset = max(0, int((img_size - size) // 2))
+    font = "font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;"
+    return {
+        "ring": (
+            f"width:{size}px;height:{size}px;border-radius:50%;overflow:hidden;"
+            f"display:block;line-height:0;background-color:{ring_background};"
+        ),
+        "cell": (
+            f"width:{size}px;height:{size}px;text-align:center;vertical-align:middle;"
+            f"padding:0;margin:0;line-height:{size}px;{font}"
+        ),
+        "img": (
+            f"width:{img_size}px;height:{img_size}px;display:block;border:0;"
+            f"margin:-{inset}px 0 0 -{inset}px;"
+        ),
+    }
+
+
+def sotu_avatar_img_style(panelist_key: str | None = None) -> str:
+    """Email-safe face crop — zoom bust art without object-fit."""
+    return portrait_clip_styles(panelist_key, size=SOTU_AVATAR_SIZE)["img"]
+
+
+def format_investor_qa_summary(qa_reports: list[dict]) -> str:
+    """Stealth Wealth QA strip — no emoji pass/fail marks in the investor email."""
+    if not qa_reports:
+        return ""
+    rows: list[str] = []
+    for report in qa_reports:
+        role = (report.get("agent_role") or "QA Agent").strip()
+        compliant = bool(report.get("is_compliant"))
+        if compliant:
+            badge = f'<span style="color:{BULL_TEXT};font-size:0.8em;letter-spacing:0.04em;">PASS</span>'
+        else:
+            badge = (
+                f'<span style="color:{TEXT_PRIMARY};font-size:0.8em;letter-spacing:0.04em;">'
+                f"ADVISORY</span>"
+            )
+        rows.append(
+            f'<span style="color:{BRAND_SAGE};font-size:0.65em;vertical-align:middle;">&#9679;</span> '
+            f'<strong style="color:{TEXT_HIGHLIGHT};">{role}</strong> {badge}'
+        )
+    return "<br>".join(rows)
 
 
 def executive_briefing_inline_styles() -> dict[str, str]:
@@ -156,14 +389,19 @@ def executive_briefing_inline_styles() -> dict[str, str]:
             f"font-style:italic;color:{TEXT_PRIMARY};{font}"
         ),
         "chart_title": (
-            f"color:{BRAND_SAGE};font-size:1.3em;font-weight:600;margin:0 0 10px 0;"
-            f"padding-bottom:5px;border-bottom:1px solid {BORDER_SUBTLE};{font}"
+            f"color:{TEXT_PRIMARY};font-size:0.68em;font-weight:600;"
+            f"letter-spacing:0.12em;text-transform:uppercase;margin:0 0 6px 0;"
+            f"line-height:1.35;{font}"
         ),
         "chart_container": (
-            f"text-align:center;border:1px solid {BORDER_SUBTLE};padding:10px;"
-            f"background-color:{BG_SURFACE};margin:0;"
+            f"text-align:center;border:1px solid {BORDER_SUBTLE};padding:6px;"
+            f"background-color:{BG_CANVAS};margin:0;"
         ),
-        "chart_img": "max-width:100%;height:auto;display:block;margin:0 auto;",
+        "chart_img": "max-width:100%;height:auto;display:block;margin:0 auto;border:0;",
+        "chart_img_pair": (
+            f"width:100%;max-width:{BRIEFING_PAIR_CHART_WIDTH}px;height:auto;"
+            f"display:block;margin:0 auto;border:0;"
+        ),
         "champion": f"color:{BULL_TEXT};font-weight:bold;",
         "dissenter": f"color:{BEAR_TEXT};font-weight:bold;",
         "bear_heading": f"color:{BEAR_TEXT};",
@@ -173,24 +411,38 @@ def executive_briefing_inline_styles() -> dict[str, str]:
             f"border-top:1px solid {BORDER_SUBTLE};padding-top:20px;{font}"
         ),
         "li": f"color:{TEXT_PRIMARY};margin-bottom:6px;{font}",
+        "ticker_logo_sm": ticker_logo_inline_style(size=28),
+        "ticker_logo_md": ticker_logo_inline_style(size=48),
         "sotu_avatar_cell": (
-            f"padding:12px 0 12px 12px;vertical-align:top;width:{SOTU_AVATAR_COLUMN_WIDTH}px;"
+            f"padding:14px 0 14px 14px;vertical-align:top;width:{SOTU_AVATAR_COLUMN_WIDTH}px;"
         ),
         "sotu_avatar_ring": (
             f"width:{SOTU_AVATAR_SIZE}px;height:{SOTU_AVATAR_SIZE}px;"
-            f"border-radius:50%;overflow:hidden;display:block;"
-            f"border:2px solid {BORDER_SUBTLE};background-color:{BG_SURFACE};"
-        ),
-        "sotu_avatar_img": (
-            f"width:{int(SOTU_AVATAR_SIZE * 1.22)}px;height:{int(SOTU_AVATAR_SIZE * 1.22)}px;"
-            f"display:block;margin:-{int(SOTU_AVATAR_SIZE * 0.11)}px;"
+            f"border-radius:50%;overflow:hidden;display:block;line-height:0;"
+            f"background-color:{BG_CONTAINER};"
         ),
         "sotu_quote": (
-            f"padding:12px 15px 12px 4px;font-style:italic;color:{TEXT_PRIMARY};{font}"
+            f"padding:14px 16px 14px 6px;font-style:italic;color:{TEXT_PRIMARY};line-height:1.55;{font}"
+        ),
+        "debate_bubble": (
+            f"background-color:{BG_SURFACE};padding:14px 16px;border-radius:10px;"
+            f"border:1px solid {BORDER_SUBTLE};color:{TEXT_PRIMARY};line-height:1.55;{font}"
+        ),
+        "debate_speaker": (
+            f"color:{BRAND_SAGE};font-size:0.82em;font-weight:600;margin:0 0 6px 0;{font}"
+        ),
+        "debate_text": f"margin:0;color:{TEXT_PRIMARY};line-height:1.55;{font}",
+        "debate_round_label": (
+            f"color:{BRAND_SAGE};font-size:0.75em;font-weight:600;letter-spacing:0.08em;"
+            f"text-transform:uppercase;margin:0 0 8px 0;{font}"
         ),
         "qa_box": (
-            f"margin-top:40px;font-size:0.85em;line-height:1.7;color:{TEXT_PRIMARY};"
-            f"border-top:1px dashed {BORDER_SUBTLE};padding-top:15px;{font}"
+            f"margin-top:40px;font-size:0.82em;line-height:1.8;color:{TEXT_PRIMARY};"
+            f"border-top:1px solid {BORDER_SUBTLE};padding-top:18px;{font}"
+        ),
+        "qa_box_title": (
+            f"color:{BRAND_SAGE};font-size:0.72em;font-weight:600;letter-spacing:0.1em;"
+            f"text-transform:uppercase;margin:0 0 10px 0;{font}"
         ),
     }
 
@@ -270,23 +522,45 @@ def executive_briefing_css() -> str:
                 margin: 0;
                 text-align: center;
                 border: 1px solid var(--border-subtle);
-                padding: 10px;
+                padding: 8px;
                 border-radius: 5px;
-                background-color: var(--bg-surface);
+                background-color: var(--bg-canvas);
             }}
             .chart-title {{
-                color: var(--brand-sage);
-                font-size: 1.3em;
+                color: var(--text-primary);
+                font-size: 0.68em;
                 font-weight: 600;
-                margin: 0 0 10px 0;
-                padding-bottom: 5px;
-                border-bottom: 1px solid var(--border-subtle);
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                margin: 0 0 6px 0;
+                line-height: 1.35;
             }}
             .chart-img {{
                 max-width: 100%;
                 height: auto;
                 display: block;
                 margin: 0 auto;
+            }}
+            .sotu-row {{ border-radius: 8px; }}
+            .debate-bubble {{ margin: 12px 0; }}
+            @media only screen and (max-width: 620px) {{
+                body {{ padding: 12px !important; }}
+                .container {{ padding: 18px !important; }}
+                .sotu-avatar-col {{
+                    display: block !important;
+                    width: 100% !important;
+                    text-align: center;
+                    padding: 14px 0 8px 0 !important;
+                }}
+                .sotu-quote-col {{
+                    display: block !important;
+                    width: 100% !important;
+                    padding: 0 14px 14px 14px !important;
+                }}
+                .chart-img {{
+                    width: 100% !important;
+                    max-width: 100% !important;
+                }}
             }}
             .section-divider {{ border-bottom: 1px solid var(--border-subtle); }}
             .muted {{ color: var(--text-primary); }}
@@ -384,9 +658,11 @@ def qa_dashboard_css() -> str:
 def qa_summary_box_html(qa_summary_text: str) -> str:
     """HTML fragment for post-render QA summary injection."""
     return (
-        '<div class="qa-box">\n'
-        "                <strong>Automated QA Audit</strong>\n"
-        "                <span class=\"muted\">&mdash; see the QA Audit Dashboard for details on any &#10060;.</span><br><br>\n"
+        f'<div class="qa-box" style="margin-top:40px;font-size:0.82em;line-height:1.8;color:{TEXT_PRIMARY};'
+        f'border-top:1px solid {BORDER_SUBTLE};padding-top:18px;">\n'
+        f'                <div style="color:{BRAND_SAGE};font-size:0.72em;font-weight:600;'
+        f'letter-spacing:0.1em;text-transform:uppercase;margin:0 0 10px 0;">'
+        f"Internal QA Ledger</div>\n"
         f"                {qa_summary_text}\n"
         "            </div>"
     )

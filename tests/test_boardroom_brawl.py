@@ -1,8 +1,11 @@
 import unittest
 
-from src.core.board_roster import PANELIST_ROLES
+from src.core.board_roster import PANELIST_ROLES, shorten_panelist_references
 from src.core.boardroom_brawl import (
     build_clerk_debate_digest,
+    build_debate_dialogue_turns,
+    build_debate_display_blocks,
+    debate_turn_heading,
     fallback_boardroom_brawl,
     is_boardroom_brawl_complete,
     split_debate_paragraphs,
@@ -64,6 +67,82 @@ class SplitDebateParagraphTests(unittest.TestCase):
     def test_splits_on_blank_lines(self):
         parts = split_debate_paragraphs(_valid_brawl())
         self.assertEqual(len(parts), 3)
+
+    def test_build_debate_display_blocks(self):
+        blocks = build_debate_display_blocks(_valid_brawl())
+        self.assertEqual(len(blocks), 3)
+        self.assertEqual(blocks[0]["kind"], "body")
+
+    def test_build_debate_dialogue_turns_from_messages(self):
+        hypatia = PANELIST_ROLES["hypatia"]
+        suntzu = PANELIST_ROLES["suntzu"]
+        messages = [
+            {
+                "content": (
+                    f"**[ROUND 1] {hypatia}**:\n"
+                    "* **Portfolio Overview**: Moats matter more than momentum.\n"
+                    "* **NVDA**: Sell.\n"
+                ),
+            },
+            {
+                "content": (
+                    f"**[ROUND 2 REBUTTAL] {suntzu}**:\n"
+                    "* **Rebuttal Summary**: hypatia ignores the tape.\n"
+                    "* **NVDA**: Strong Buy.\n"
+                ),
+            },
+        ]
+        turns = build_debate_dialogue_turns(messages)
+        self.assertEqual(len(turns), 2)
+        self.assertEqual(turns[0]["speaker"], hypatia)
+        self.assertEqual(turns[0]["turn_heading"], "Portfolio Overview")
+        self.assertEqual(turns[1]["turn_heading"], "Rebuttal")
+        self.assertNotIn("round_label", turns[0])
+        self.assertEqual(turns[0]["align"], "left")
+        self.assertEqual(turns[1]["align"], "right")
+        self.assertIn("Moats matter", turns[0]["text"])
+
+        blocks = build_debate_display_blocks("", raw_board_messages=messages)
+        self.assertEqual(blocks[0]["kind"], "turn")
+        self.assertEqual(len(blocks), 2)
+
+
+class DebateTurnHeadingTests(unittest.TestCase):
+    def test_maps_round_tags_to_phase_names(self):
+        self.assertEqual(debate_turn_heading("ROUND 1"), "Portfolio Overview")
+        self.assertEqual(debate_turn_heading("ROUND 2 REBUTTAL"), "Rebuttal")
+        self.assertEqual(debate_turn_heading(""), "")
+
+
+class ShortPeerNameTests(unittest.TestCase):
+    def test_shorten_panelist_references(self):
+        text = (
+            "Leonardo da Vinci describes NVIDIA as a masterwork, yet Marcus Aurelius "
+            "and Hypatia of Alexandria disagree."
+        )
+        shortened = shorten_panelist_references(text)
+        self.assertIn("Leonardo describes", shortened)
+        self.assertNotIn("da Vinci", shortened)
+        self.assertIn("Marcus", shortened)
+        self.assertNotIn("Marcus Aurelius", shortened)
+        self.assertIn("Hypatia", shortened)
+        self.assertNotIn("Hypatia of Alexandria", shortened)
+
+    def test_debate_turns_keep_speaker_header_full_name(self):
+        hypatia = PANELIST_ROLES["hypatia"]
+        davinci = PANELIST_ROLES["davinci"]
+        messages = [
+            {
+                "content": (
+                    f"**[ROUND 2 REBUTTAL] {hypatia}**:\n"
+                    f"* **Rebuttal Summary**: {davinci} describes NVIDIA as a masterwork.\n"
+                ),
+            },
+        ]
+        turns = build_debate_dialogue_turns(messages)
+        self.assertEqual(turns[0]["speaker"], hypatia)
+        self.assertIn("Leonardo describes", turns[0]["text"])
+        self.assertNotIn("da Vinci", turns[0]["text"])
 
 
 class FallbackBrawlTests(unittest.TestCase):

@@ -6,6 +6,38 @@ from src.output import briefing_style, reporting
 
 
 class BriefingStyleTests(unittest.TestCase):
+    def test_chart_magnitude_colors_rank_by_return(self):
+        colors = briefing_style.chart_magnitude_colors([9.0, 18.0, 40.0])
+        self.assertEqual(len(colors), 3)
+        # Higher return → darker green (lower channel sum on mint→emerald ramp).
+        self.assertGreater(sum(int(colors[0][i:i + 2], 16) for i in (1, 3, 5)),
+                           sum(int(colors[2][i:i + 2], 16) for i in (1, 3, 5)))
+
+    def test_chart_magnitude_colors_sign_semantics(self):
+        colors = briefing_style.chart_magnitude_colors([12.0, -8.0, 0.02])
+        self.assertTrue(colors[0].startswith("#"))
+        self.assertTrue(colors[1].startswith("#"))
+        self.assertEqual(colors[2], briefing_style.CHART_NEUTRAL)
+
+    def test_portrait_clip_circular_with_matched_background(self):
+        styles = briefing_style.portrait_clip_styles(
+            "hypatia",
+            size=96,
+            ring_background=briefing_style.SOTU_BEAR_BG,
+        )
+        self.assertIn("border-radius:50%", styles["ring"])
+        self.assertIn("overflow:hidden", styles["ring"])
+        self.assertIn(briefing_style.SOTU_BEAR_BG, styles["ring"])
+        self.assertIn("width:102px;height:102px", styles["img"])
+        self.assertIn("margin:-3px", styles["img"])
+
+    def test_chart_charge_colors_sign_semantics(self):
+        colors = briefing_style.chart_charge_colors([12.0, -8.0, 0.02, 5.0])
+        self.assertEqual(colors[0], briefing_style.CHART_GAIN)
+        self.assertEqual(colors[1], briefing_style.CHART_LOSS)
+        self.assertEqual(colors[2], briefing_style.CHART_NEUTRAL)
+        self.assertIn(colors[3], briefing_style.CHART_GAIN_VARIANTS)
+
     def test_css_variables_present(self):
         css = briefing_style.executive_briefing_css()
         self.assertIn("--bg-canvas: #121212", css)
@@ -34,14 +66,35 @@ class BriefingStyleTests(unittest.TestCase):
         self.assertEqual(briefing_style.CHART_LEGEND_FONT_SIZE, 14)
         self.assertEqual(briefing_style.CHART_CANVAS_DARK, briefing_style.BG_CANVAS)
 
-        bull = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['hypatia']} ⭐⭐⭐⭐")
-        self.assertTrue(bull[0].startswith("rgba("))
-        self.assertIn(str(briefing_style.SOTU_BG_ALPHA), bull[0])
-        self.assertIn("110,231,183", bull[0])  # light bull tint, not dark pill bg
-        sage = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['davinci']} ⭐⭐⭐")
-        self.assertEqual(sage[1], briefing_style.BRAND_SAGE)
-        bear = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['aurelius']} ⭐")
-        self.assertTrue(bear[0].startswith("rgba("))
+        bull = briefing_style.sotu_quote_style(f"{PANELIST_ROLES['hypatia']} (⭐⭐⭐⭐ Bullish)")
+        self.assertEqual(bull[0], briefing_style.SOTU_BULL_BG)
+        self.assertEqual(bull[1], briefing_style.BULL_TEXT)
+        self.assertIn("box-shadow", bull[2])
+        self.assertIn("110,231,183", bull[2])
+
+        three_bull = briefing_style.sotu_quote_style(f"{PANELIST_ROLES['davinci']} (⭐⭐⭐ Bullish)")
+        self.assertEqual(three_bull[0], briefing_style.SOTU_BULL_BG)
+        self.assertEqual(three_bull[1], briefing_style.BULL_TEXT)
+
+        neutral = briefing_style.sotu_quote_style(f"{PANELIST_ROLES['suntzu']} (⭐⭐ Neutral)")
+        self.assertEqual(neutral[0], briefing_style.SOTU_NEUTRAL_BG)
+        self.assertEqual(neutral[1], briefing_style.SOTU_NEUTRAL_TEXT)
+        self.assertIn("147,197,253", neutral[2])
+
+        bear = briefing_style.sotu_quote_style(f"{PANELIST_ROLES['aurelius']} (⭐ Bearish)")
+        self.assertEqual(bear[0], briefing_style.SOTU_BEAR_BG)
+        self.assertEqual(bear[1], briefing_style.BEAR_TEXT)
+        self.assertIn("252,165,165", bear[2])
+
+    def test_investor_qa_summary_uses_advisory_not_emoji(self):
+        html = briefing_style.format_investor_qa_summary([
+            {"agent_role": "Post Mortem QA Auditor", "is_compliant": True},
+            {"agent_role": "Prompt Engineer QA", "is_compliant": False},
+        ])
+        self.assertIn("ADVISORY", html)
+        self.assertIn("PASS", html)
+        self.assertNotIn("&#10060;", html)
+        self.assertNotIn("&#9989;", html)
 
     def test_briefing_html_includes_inline_dark_theme(self):
         html = reporting.generate_html_briefing(

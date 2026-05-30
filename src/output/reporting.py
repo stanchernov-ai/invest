@@ -9,14 +9,16 @@ from jinja2 import Template
 import logging
 
 from src.output.briefing_enrichment import enrich_chairman_for_briefing_sync, _is_generic_synthesis
-from src.core.board_roster import PANELIST_AVATAR_URLS, PANELIST_ROLES
+from src.core.board_roster import PANELIST_AVATAR_URLS, PANELIST_ROLES, resolve_panelist_key, shorten_panelist_references
 from src.output.briefing_style import (
     executive_briefing_css,
     executive_briefing_inline_styles,
     qa_dashboard_css,
     qa_summary_box_html,
-    sotu_quote_colors,
+    portrait_clip_styles,
+    sotu_quote_style,
     verdict_pill_styles,
+    DEBATE_AVATAR_SIZE,
     SOTU_AVATAR_COLUMN_WIDTH,
     BG_CANVAS,
     BG_CONTAINER,
@@ -43,6 +45,35 @@ from src.output.briefing_style import (
     CHART_OUTLABEL_MIN_SIZE,
     CHART_OUTLABEL_MAX_SIZE,
     CHART_OUTLABEL_WEIGHT,
+    chart_magnitude_colors,
+    chart_charge_colors,
+    CHART_LINE_PORTFOLIO,
+    CHART_LINE_BENCHMARK,
+    CHART_LINE_NASDAQ,
+    CHART_GAIN,
+    CHART_LOSS,
+    CHART_NEUTRAL,
+    BAR_CHART_WIDTH,
+    BAR_CHART_HEIGHT,
+    BAR_DATALABEL_ANCHOR,
+    BAR_DATALABEL_ALIGN,
+    BAR_DATALABEL_COLOR,
+    BAR_DATALABEL_SIZE,
+    BAR_DATALABEL_OFFSET,
+    BAR_TICK_FORMAT,
+    BAR_CHART_LAYOUT_PADDING,
+    BAR_Y_SCALE_GRACE,
+    ACTION_PLAN_AVATAR_SIZE,
+    BRIEFING_PAIR_CHART_WIDTH,
+    LINE_CHART_WIDTH,
+    LINE_CHART_HEIGHT,
+    PIE_OUTLABEL_COLOR,
+    PIE_OUTLABEL_MIN_SIZE,
+    PIE_OUTLABEL_MAX_SIZE,
+    PIE_OUTLABEL_STRETCH,
+    BAR_MIN_BAR_LENGTH,
+    PIE_CHART_WIDTH,
+    PIE_CHART_HEIGHT,
 )
 
 logger = logging.getLogger(__name__)
@@ -116,7 +147,7 @@ def audit_chart_health(chart_urls):
     re-downloading the same chart URLs."""
     labels = {
         "line_chart_url": "Performance vs. Benchmark — indexed (line)",
-        "bar_chart_url": "Personal Return by Asset (bar)",
+        "bar_chart_url": "Unrealized Gain by Asset (bar)",
         "pie_chart_url": "Unrealized Gains (pie)",
         "account_pie_url": "12M Return by Account (pie)",
     }
@@ -312,12 +343,7 @@ CHART_LABEL_COLOR = CHART_DATALABEL_ON_DARK
 CHART_AXIS_COLOR = CHART_AXIS_ON_DARK
 CHART_GRID_COLOR = CHART_GRID_ON_DARK
 CHART_LABEL_ON_SLICE = CHART_DATALABEL_ON_LIGHT
-PIE_CHART_WIDTH = 600
-PIE_CHART_HEIGHT = 420
 LINE_CHART_MAX_POINTS = 12
-BAR_DATALABEL_FORMATTER = (
-    "function(value){return value==null?'':(Math.round(value*10)/10)+'%';}"
-)
 
 
 def _format_history_axis_labels(date_keys: list[str]) -> list[str]:
@@ -387,27 +413,27 @@ def _light_chart_scales(*, y_title: str, y_begin_at_zero: bool = False) -> dict:
     }
 
 
-def _outlabeled_pie_options(*, dark: bool = True) -> dict:
+def _outlabeled_pie_options(slice_colors: list[str]) -> dict:
     """QuickChart outlabeledPie — legend must be boolean false, not {display: false}."""
-    label_color = CHART_DATALABEL_ON_DARK if dark else CHART_DATALABEL_ON_LIGHT
     return {
         "plugins": {
             "legend": False,
             "datalabels": {"display": False},
             "outlabels": {
                 "text": "%l %p",
-                "color": label_color,
-                "stretch": 35,
+                "color": PIE_OUTLABEL_COLOR,
+                "backgroundColor": slice_colors,
+                "stretch": PIE_OUTLABEL_STRETCH,
                 "font": {
                     "resizable": True,
-                    "minSize": CHART_OUTLABEL_MIN_SIZE,
-                    "maxSize": CHART_OUTLABEL_MAX_SIZE,
+                    "minSize": PIE_OUTLABEL_MIN_SIZE,
+                    "maxSize": PIE_OUTLABEL_MAX_SIZE,
                     "weight": str(CHART_OUTLABEL_WEIGHT),
                 },
             },
         },
         "legend": {"display": False},
-        "layout": {"padding": {"top": 8, "bottom": 8, "left": 8, "right": 8}},
+        "layout": {"padding": {"top": 16, "bottom": 16, "left": 40, "right": 40}},
     }
 
 
@@ -418,7 +444,7 @@ def _render_outlabeled_pie_chart(labels, data, colors):
             "labels": labels,
             "datasets": [{"backgroundColor": colors, "data": data}],
         },
-        "options": _outlabeled_pie_options(),
+        "options": _outlabeled_pie_options(colors),
     }
     return get_quickchart_short_url(
         chart_config,
@@ -428,12 +454,13 @@ def _render_outlabeled_pie_chart(labels, data, colors):
     )
 
 
-def colors_for_metric(values: list[float], *, theme: str = "light") -> list[str]:
-    """Gradual colors across the slice set — min→max spread shows disparity.
+def pie_chart_colors(values: list[float]) -> list[str]:
+    """Slice/bar hues from return magnitude — darker green = larger gain."""
+    return chart_magnitude_colors(values)
 
-    Green ramp for gains, red ramp for losses. Use theme='dark' for bar charts
-    on {CHART_CANVAS_DARK}; default 'light' for white-canvas pies.
-    """
+
+def colors_for_metric(values: list[float], *, theme: str = "light") -> list[str]:
+    """Legacy gradual ramp — prefer ``chart_charge_colors`` for briefing charts."""
     if not values:
         return []
     if theme == "dark":
@@ -473,14 +500,14 @@ def colors_for_metric(values: list[float], *, theme: str = "light") -> list[str]
 
 
 def get_color_for_return(ret: float, *, vmin: float | None = None, vmax: float | None = None) -> str:
-    """Single return → color. With vmin/vmax, uses the same gradual scale as charts."""
+    """Single return → charge color (green / blue / red)."""
     try:
         val = float(ret)
     except (TypeError, ValueError):
         val = 0.0
     if vmin is not None and vmax is not None:
-        return colors_for_metric([vmin, vmax, val])[2]
-    return colors_for_metric([val])[0]
+        return chart_magnitude_colors([vmin, vmax, val])[2]
+    return chart_magnitude_colors([val])[0]
 
 
 def build_portfolio_pie_chart(sorted_ledger):
@@ -496,15 +523,15 @@ def build_portfolio_pie_chart(sorted_ledger):
     if not data:
         return ""
 
-    colors = colors_for_metric(returns, theme="dark")
+    colors = pie_chart_colors(returns)
 
     return _render_outlabeled_pie_chart(labels, data, colors)
 
 _ACCOUNT_PIE_LABELS = {
     "eTrade Taxable": "eTrade",
-    "eTrade Roth IRA": "eTrade Roth",
-    "Fidelity 401K": "Fidelity 401K",
-    "Fidelity Roth 401K": "Fidelity Roth 401K",
+    "eTrade Roth IRA": "Roth IRA",
+    "Fidelity 401K": "Fid 401K",
+    "Fidelity Roth 401K": "R401K",
 }
 
 
@@ -527,9 +554,37 @@ def build_account_allocation_pie(account_holdings, account_returns):
     if not data:
         return ""
 
-    colors = colors_for_metric(twelves, theme="dark")
+    colors = pie_chart_colors(twelves)
 
     return _render_outlabeled_pie_chart(labels, data, colors)
+
+def _bar_chart_scales() -> dict:
+    scales = _dark_chart_scales(y_title="Unrealized Gain (%)", y_begin_at_zero=True)
+    scales["y"]["grace"] = BAR_Y_SCALE_GRACE
+    return scales
+
+
+def _attach_narrative_portraits(narrative: dict) -> dict:
+    """Champion / dissenter bust avatars for Action Plan rows."""
+    narrative = dict(narrative)
+    for role in ("champion", "dissenter"):
+        name = (narrative.get(role) or "").strip()
+        if not name or name.upper() in {"NONE", "N/A"}:
+            continue
+        panelist_key = resolve_panelist_key(name)
+        if not panelist_key:
+            continue
+        portrait = portrait_clip_styles(
+            panelist_key,
+            size=ACTION_PLAN_AVATAR_SIZE,
+            ring_background=BG_SURFACE,
+        )
+        narrative[f"{role}_avatar_url"] = PANELIST_AVATAR_URLS[panelist_key]
+        narrative[f"{role}_avatar_ring_style"] = portrait["ring"]
+        narrative[f"{role}_avatar_cell_style"] = portrait["cell"]
+        narrative[f"{role}_avatar_img_style"] = portrait["img"]
+    return narrative
+
 
 def build_returns_bar_chart(sorted_ledger):
     labels = []
@@ -545,31 +600,47 @@ def build_returns_bar_chart(sorted_ledger):
     if not data:
         return ""
 
-    colors = colors_for_metric(returns, theme="dark")
+    colors = chart_magnitude_colors(returns)
 
     chart_config = {
         "type": "bar",
         "data": {
             "labels": labels,
-            "datasets": [{"label": "", "data": data, "backgroundColor": colors}]
+            "datasets": [{
+                "label": "",
+                "data": data,
+                "backgroundColor": colors,
+                "borderColor": colors,
+                "borderWidth": 1,
+                "borderRadius": 4,
+                "minBarLength": BAR_MIN_BAR_LENGTH,
+            }],
         },
         "options": {
+            "layout": {"padding": BAR_CHART_LAYOUT_PADDING},
             "plugins": {
                 "legend": False,
+                "tickFormat": BAR_TICK_FORMAT,
                 "datalabels": {
                     "display": True,
-                    "align": "end",
-                    "anchor": "end",
-                    "color": CHART_DATALABEL_ON_DARK,
-                    "font": {"weight": CHART_DATALABEL_WEIGHT, "size": CHART_DATALABEL_SIZE},
-                    "formatter": BAR_DATALABEL_FORMATTER,
+                    "align": BAR_DATALABEL_ALIGN,
+                    "anchor": BAR_DATALABEL_ANCHOR,
+                    "offset": BAR_DATALABEL_OFFSET,
+                    "clip": False,
+                    "color": BAR_DATALABEL_COLOR,
+                    "font": {"weight": CHART_DATALABEL_WEIGHT, "size": BAR_DATALABEL_SIZE},
                 },
             },
-            "scales": _dark_chart_scales(y_title="Return (%)", y_begin_at_zero=True),
+            "scales": _bar_chart_scales(),
             "legend": {"display": False},
         },
     }
-    return get_quickchart_short_url(chart_config, background_color=CHART_CANVAS_DARK)
+    return get_quickchart_short_url(
+        chart_config,
+        width=BAR_CHART_WIDTH,
+        height=BAR_CHART_HEIGHT,
+        background_color=CHART_CANVAS_DARK,
+    )
 
 def _downsample(labels, series_list, max_points=90):
     """Evenly subsample parallel label + series lists, always keeping the last point."""
@@ -712,7 +783,7 @@ def _sanitize_position_for_briefing(pos: dict) -> dict:
         dissenter_quote = "N/A"
     narrative["dissenter"] = dissenter
     narrative["dissenter_quote"] = dissenter_quote
-    out["narrative"] = narrative
+    out["narrative"] = _attach_narrative_portraits(narrative)
     return out
 
 
@@ -726,7 +797,7 @@ def _alpha_pick_displayable(alpha_pick: dict) -> bool:
     return bool(quote) and quote.upper() not in {"N/A", "NONE"}
 
 
-from src.core.boardroom_brawl import is_boardroom_brawl_complete, split_debate_paragraphs
+from src.core.boardroom_brawl import build_debate_display_blocks, is_boardroom_brawl_complete
 
 
 def _debate_has_content(brawl_text: str) -> bool:
@@ -823,28 +894,34 @@ def build_benchmark_line_chart(history_data):
         {
             "label": "Portfolio (TWR)",
             "data": port_data,
-            "borderColor": "#60a5fa",
+            "borderColor": CHART_LINE_PORTFOLIO,
+            "backgroundColor": CHART_LINE_PORTFOLIO,
             "fill": False,
             "tension": 0.1,
             "spanGaps": True,
+            "borderWidth": 2,
         },
         {
             "label": "S&P 500",
             "data": spy_data,
-            "borderColor": "#d1d5db",
+            "borderColor": CHART_LINE_BENCHMARK,
+            "backgroundColor": CHART_LINE_BENCHMARK,
             "fill": False,
             "tension": 0.1,
             "spanGaps": True,
+            "borderWidth": 2,
         },
     ]
     if has_qqq:
         datasets.append({
             "label": "NASDAQ",
             "data": qqq_data,
-            "borderColor": "#34d399",
+            "borderColor": CHART_LINE_NASDAQ,
+            "backgroundColor": CHART_LINE_NASDAQ,
             "fill": False,
             "tension": 0.1,
             "spanGaps": True,
+            "borderWidth": 2,
         })
 
     chart_config = {
@@ -856,12 +933,6 @@ def build_benchmark_line_chart(history_data):
         "options": {
             "plugins": {
                 "datalabels": {"display": False},
-                "title": {
-                    "display": True,
-                    "text": "Indexed performance (start = 100)",
-                    "font": {"size": CHART_INNER_TITLE_SIZE, "weight": CHART_INNER_TITLE_WEIGHT},
-                    "color": CHART_INNER_TITLE_ON_DARK,
-                },
                 "legend": {
                     "position": "bottom",
                     "labels": {
@@ -870,11 +941,15 @@ def build_benchmark_line_chart(history_data):
                     },
                 },
             },
+            "layout": {"padding": {"top": 8, "bottom": 4, "left": 4, "right": 8}},
             "scales": _dark_chart_scales(y_title="Index"),
         },
     }
     return get_quickchart_short_url(
-        chart_config, width=640, height=340, background_color=CHART_CANVAS_DARK,
+        chart_config,
+        width=LINE_CHART_WIDTH,
+        height=LINE_CHART_HEIGHT,
+        background_color=CHART_CANVAS_DARK,
     )
 
 def build_briefing_charts(sorted_ledger, account_holdings, account_returns, history_data):
@@ -912,7 +987,7 @@ def inject_qa_summary_into_briefing(html: str, qa_summary_text: str) -> str:
     return html.replace("</body>", f"{box}\n    </body>", 1)
 
 
-def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None, account_returns=None, advanced_data=None, chart_urls=None, raw_verdicts=None, portfolio_symbols=None):
+def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None, account_returns=None, advanced_data=None, chart_urls=None, raw_verdicts=None, portfolio_symbols=None, raw_board_messages=None):
 
     if raw_verdicts:
         chairman_data = enrich_chairman_for_briefing_sync(
@@ -937,10 +1012,20 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     sotu_quotes = cos_data.get('state_of_the_union_quotes', [])
     for quote in sotu_quotes:
         base_name = quote.get('board_member', '').split(' (')[0].strip()
+        panelist_key = resolve_panelist_key(base_name) or ""
         quote['avatar_url'] = avatar_map.get(base_name, "https://ui-avatars.com/api/?name=AI&background=333&color=fff&rounded=true&size=128")
-        sotu_bg, sotu_border = sotu_quote_colors(quote.get('board_member', ''))
+        sotu_bg, sotu_border, sotu_glow = sotu_quote_style(quote.get('board_member', ''))
         quote['sotu_bg'] = sotu_bg
         quote['sotu_border'] = sotu_border
+        quote['sotu_glow'] = sotu_glow
+        portrait = portrait_clip_styles(panelist_key, ring_background=sotu_bg)
+        quote['avatar_ring_style'] = portrait["ring"]
+        quote['avatar_cell_style'] = portrait["cell"]
+        quote['avatar_img_style'] = portrait["img"]
+        if quote.get("quote"):
+            quote["quote"] = shorten_panelist_references(
+                _sanitize_briefing_text(quote["quote"])
+            )
 
     briefing_css = executive_briefing_css()
     email_styles = executive_briefing_inline_styles()
@@ -955,6 +1040,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     <!DOCTYPE html>
     <html>
     <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
         <style>
             {{ briefing_css }}
         </style>
@@ -963,7 +1050,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{{ bg_canvas }}" style="background-color:{{ bg_canvas }};">
             <tr>
                 <td align="center" style="{{ email_styles.canvas_cell }}">
-                    <table role="presentation" width="800" cellpadding="0" cellspacing="0" border="0" bgcolor="{{ bg_container }}" style="{{ email_styles.container_table }}">
+                    <table role="presentation" width="800" cellpadding="0" cellspacing="0" border="0" bgcolor="{{ bg_container }}" class="container" style="{{ email_styles.container_table }}">
                         <tr>
                             <td style="{{ email_styles.container_td }}">
             <h1 style="{{ email_styles.h1 }}">Invest AI: Executive Briefing{% if briefing_date %} &mdash; {{ briefing_date }}{% endif %}</h1>
@@ -981,15 +1068,15 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                     <td valign="top" width="{{ '50%' if bar_chart_url else '100%' }}" style="padding: 0 {{ '10px' if bar_chart_url else '0' }} 0 0;">
                         <div style="{{ email_styles.chart_title }}">Performance vs. Benchmark (indexed)</div>
                         <div style="{{ email_styles.chart_container }}">
-                            <img class="chart-img" src="{{ line_chart_url }}" alt="Benchmark Performance Line Chart" style="{{ email_styles.chart_img }}">
+                            <img class="chart-img" src="{{ line_chart_url }}" alt="Benchmark Performance Line Chart" style="{{ email_styles.chart_img_pair }}">
                         </div>
                     </td>
                     {% endif %}
                     {% if bar_chart_url %}
                     <td valign="top" width="{{ '50%' if line_chart_url else '100%' }}" style="padding: 0 0 0 {{ '10px' if line_chart_url else '0' }};">
-                        <div style="{{ email_styles.chart_title }}">Personal Return by Asset</div>
+                        <div style="{{ email_styles.chart_title }}">Unrealized Gain by Asset</div>
                         <div style="{{ email_styles.chart_container }}">
-                            <img class="chart-img" src="{{ bar_chart_url }}" alt="Portfolio Returns Bar Chart" style="{{ email_styles.chart_img }}">
+                            <img class="chart-img" src="{{ bar_chart_url }}" alt="Portfolio Returns Bar Chart" style="{{ email_styles.chart_img_pair }}">
                         </div>
                     </td>
                     {% endif %}
@@ -1004,7 +1091,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                     <td valign="top" width="{{ '50%' if account_pie_url else '100%' }}" style="padding: 0 {{ '10px' if account_pie_url else '0' }} 0 0;">
                         <div style="{{ email_styles.chart_title }}">Unrealized Gains</div>
                         <div style="{{ email_styles.chart_container }}">
-                            <img class="chart-img" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart" style="{{ email_styles.chart_img }}">
+                            <img class="chart-img" src="{{ pie_chart_url }}" alt="Unrealized Gains Pie Chart" style="{{ email_styles.chart_img_pair }}">
                         </div>
                     </td>
                     {% endif %}
@@ -1012,7 +1099,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                     <td valign="top" width="{{ '50%' if pie_chart_url else '100%' }}" style="padding: 0 0 0 {{ '10px' if pie_chart_url else '0' }};">
                         <div style="{{ email_styles.chart_title }}">12M Return by Account</div>
                         <div style="{{ email_styles.chart_container }}">
-                            <img class="chart-img" src="{{ account_pie_url }}" alt="1 Yr Return Pie Chart" style="{{ email_styles.chart_img }}">
+                            <img class="chart-img" src="{{ account_pie_url }}" alt="1 Yr Return Pie Chart" style="{{ email_styles.chart_img_pair }}">
                         </div>
                     </td>
                     {% endif %}
@@ -1020,33 +1107,14 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             </table>
             {% endif %}
 
-            {% if sotu_quotes %}
-            <h2 style="{{ email_styles.h2 }}">The State of the Union</h2>
-            <p style="{{ email_styles.muted_p }}">Each panelist&rsquo;s Round 1 portfolio-level view &mdash; concentration, regime fit, and mandate &mdash; not per-ticker rebuttals.</p>
-            {% for quote in sotu_quotes %}
-                <table width="100%" cellpadding="0" cellspacing="0" style="margin: 10px 0; border-left: 4px solid {{ quote.sotu_border }}; background-color: {{ quote.sotu_bg }}; border-radius: 6px;">
-                    <tr>
-                        <td width="{{ sotu_avatar_col_width }}" valign="top" style="{{ email_styles.sotu_avatar_cell }}">
-                            <div style="{{ email_styles.sotu_avatar_ring }}">
-                                <img src="{{ quote.avatar_url }}" style="{{ email_styles.sotu_avatar_img }}" alt="{{ quote.board_member }} avatar">
-                            </div>
-                        </td>
-                        <td valign="middle" style="{{ email_styles.sotu_quote }}">
-                            <strong style="{{ email_styles.strong }}">{{ quote.board_member }}:</strong> "{{ quote.quote }}"
-                        </td>
-                    </tr>
-                </table>
-            {% endfor %}
-            {% endif %}
-
             {% if show_alpha_pick %}
-            <h2 style="{{ email_styles.h2 }}">🎯 The Alpha Pick</h2>
+            <h2 style="{{ email_styles.h2 }}">The Alpha Pick</h2>
             <div style="{{ email_styles.metric_box }}">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
                     <tr>
                         {% if alpha_pick.image %}
                         <td valign="top" width="63" style="padding-right: 15px;">
-                            <img src="{{ alpha_pick.image }}" alt="{{ alpha_pick.symbol }} logo" style="width: 48px; height: 48px; border-radius: 6px; display: block; max-width: 48px; background-color: {{ bg_surface }};">
+                            <img src="{{ alpha_pick.image }}" alt="{{ alpha_pick.symbol }} logo" style="{{ email_styles.ticker_logo_md }}">
                         </td>
                         {% endif %}
                         <td valign="top">
@@ -1056,7 +1124,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 </table>
                 
                 {% if red_team_case %}
-                <h3 style="{{ email_styles.h3 }} {{ email_styles.bear_heading }}; margin-top: 20px; margin-bottom: 10px; border-bottom: none;">⚠️ The Bear Case Rebuttal</h3>
+                <h3 style="{{ email_styles.h3 }} {{ email_styles.bear_heading }}; margin-top: 20px; margin-bottom: 10px; border-bottom: none;">The Bear Case Rebuttal</h3>
                 <div style="{{ email_styles.red_team_box }}">
                     {{ red_team_case }}
                 </div>
@@ -1068,7 +1136,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
 
             {% if hedge_action %}
             <div style="{{ email_styles.hedge_box }}">
-                <strong style="{{ email_styles.strong }}">🛡️ Risk Management Mandate:</strong> {{ hedge_action }}
+                <strong style="{{ email_styles.strong }}">Risk Management Mandate:</strong> {{ hedge_action }}
             </div>
             {% endif %}
 
@@ -1081,7 +1149,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                                 <tr>
                                     {% if pos.image %}
                                     <td valign="middle" style="padding-right: 12px;">
-                                        <img src="{{ pos.image }}" alt="{{ pos.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; display: block; max-width: 28px; background-color: {{ bg_surface }};">
+                                        <img src="{{ pos.image }}" alt="{{ pos.symbol }} logo" style="{{ email_styles.ticker_logo_sm }}">
                                     </td>
                                     {% endif %}
                                     <td valign="middle">
@@ -1091,23 +1159,131 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                             </table>
                             <p style="{{ email_styles.p }}"><strong style="{{ email_styles.strong }}">Strategic Context:</strong> {{ pos.strategic_context or pos.synthesis }}</p>
                             {% if pos.narrative and pos.narrative.champion_quote %}
-                                <p style="{{ email_styles.p }}"><span style="{{ email_styles.champion }}">The Champion ({{ pos.narrative.champion }}):</span> "{{ pos.narrative.champion_quote }}"</p>
-                                <p style="{{ email_styles.p }}"><span style="{{ email_styles.dissenter }}">The Dissent ({{ pos.narrative.dissenter or 'None' }}):</span> "{{ pos.narrative.dissenter_quote or 'N/A' }}"</p>
+                                <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:10px;">
+                                    <tr>
+                                        {% if pos.narrative.champion_avatar_url %}
+                                        <td valign="top" style="padding-right:10px;width:{{ action_plan_avatar_size }}px;">
+                                            <div style="{{ pos.narrative.champion_avatar_ring_style }}">
+                                                <table cellpadding="0" cellspacing="0" role="presentation" style="{{ pos.narrative.champion_avatar_cell_style }}">
+                                                    <tr><td style="{{ pos.narrative.champion_avatar_cell_style }}">
+                                                        <img src="{{ pos.narrative.champion_avatar_url }}" style="{{ pos.narrative.champion_avatar_img_style }}" alt="{{ pos.narrative.champion }} avatar">
+                                                    </td></tr>
+                                                </table>
+                                            </div>
+                                        </td>
+                                        {% endif %}
+                                        <td valign="top">
+                                            <p style="{{ email_styles.p }};margin-top:0;"><span style="{{ email_styles.champion }}">The Champion ({{ pos.narrative.champion }}):</span> "{{ pos.narrative.champion_quote }}"</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                                <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                                    <tr>
+                                        {% if pos.narrative.dissenter_avatar_url %}
+                                        <td valign="top" style="padding-right:10px;width:{{ action_plan_avatar_size }}px;">
+                                            <div style="{{ pos.narrative.dissenter_avatar_ring_style }}">
+                                                <table cellpadding="0" cellspacing="0" role="presentation" style="{{ pos.narrative.dissenter_avatar_cell_style }}">
+                                                    <tr><td style="{{ pos.narrative.dissenter_avatar_cell_style }}">
+                                                        <img src="{{ pos.narrative.dissenter_avatar_url }}" style="{{ pos.narrative.dissenter_avatar_img_style }}" alt="{{ pos.narrative.dissenter }} avatar">
+                                                    </td></tr>
+                                                </table>
+                                            </div>
+                                        </td>
+                                        {% endif %}
+                                        <td valign="top">
+                                            <p style="{{ email_styles.p }};margin-top:0;"><span style="{{ email_styles.dissenter }}">The Dissent ({{ pos.narrative.dissenter or 'None' }}):</span> "{{ pos.narrative.dissenter_quote or 'N/A' }}"</p>
+                                        </td>
+                                    </tr>
+                                </table>
                             {% endif %}
                         </div>
                     {% endfor %}
                 {% endif %}
             {% endfor %}
 
+            {% if sotu_quotes %}
+            <h2 style="{{ email_styles.h2 }}">The State of the Union</h2>
+            <p style="{{ email_styles.muted_p }}">Each panelist&rsquo;s Round 1 portfolio-level view &mdash; concentration, regime fit, and mandate &mdash; not per-ticker rebuttals.</p>
+            {% for quote in sotu_quotes %}
+                <table width="100%" cellpadding="0" cellspacing="0" class="sotu-row" style="margin: 12px 0; border-left: 4px solid {{ quote.sotu_border }}; background-color: {{ quote.sotu_bg }}; border-radius: 8px; {{ quote.sotu_glow }}">
+                    <tr>
+                        <td width="{{ sotu_avatar_col_width }}" valign="top" class="sotu-avatar-col" style="{{ email_styles.sotu_avatar_cell }}">
+                            <div style="{{ quote.avatar_ring_style }}">
+                                <table cellpadding="0" cellspacing="0" role="presentation" style="{{ quote.avatar_cell_style }}">
+                                    <tr><td style="{{ quote.avatar_cell_style }}">
+                                        <img src="{{ quote.avatar_url }}" style="{{ quote.avatar_img_style }}" alt="{{ quote.board_member }} avatar">
+                                    </td></tr>
+                                </table>
+                            </div>
+                        </td>
+                        <td valign="middle" class="sotu-quote-col" style="{{ email_styles.sotu_quote }}">
+                            <strong style="{{ email_styles.strong }}">{{ quote.board_member }}:</strong> "{{ quote.quote }}"
+                        </td>
+                    </tr>
+                </table>
+            {% endfor %}
+            {% endif %}
+
             {% if show_debate %}
             <h2 style="{{ email_styles.h2 }}">The Debate</h2>
-            {% for paragraph in debate_paragraphs %}
-                <p style="{{ email_styles.p }}">{{ paragraph }}</p>
+            {% for block in debate_bubbles %}
+                {% if block.kind == 'turn' %}
+                <table width="100%" cellpadding="0" cellspacing="0" class="debate-turn" style="margin: 14px 0;">
+                    <tr>
+                        <td align="{{ block.align }}" style="padding:0 4px;">
+                            <table cellpadding="0" cellspacing="0" width="92%" align="{{ block.align }}" role="presentation">
+                                <tr>
+                                    {% if block.align == 'left' %}
+                                    <td valign="top" style="padding-right:10px;width:{{ debate_avatar_size }}px;">
+                                        <div style="{{ block.avatar_ring_style }}">
+                                            <table cellpadding="0" cellspacing="0" role="presentation" style="{{ block.avatar_cell_style }}">
+                                                <tr><td style="{{ block.avatar_cell_style }}">
+                                                    <img src="{{ block.avatar_url }}" style="{{ block.avatar_img_style }}" alt="{{ block.speaker }} avatar">
+                                                </td></tr>
+                                            </table>
+                                        </div>
+                                    </td>
+                                    <td valign="top" style="{{ email_styles.debate_bubble }}">
+                                        <p style="{{ email_styles.debate_speaker }}">{{ block.speaker }}{% if block.turn_heading %} &middot; {{ block.turn_heading }}{% endif %}</p>
+                                        <p style="{{ email_styles.debate_text }}">{{ block.text }}</p>
+                                    </td>
+                                    {% else %}
+                                    <td valign="top" style="{{ email_styles.debate_bubble }}">
+                                        <p style="{{ email_styles.debate_speaker }}">{{ block.speaker }}{% if block.turn_heading %} &middot; {{ block.turn_heading }}{% endif %}</p>
+                                        <p style="{{ email_styles.debate_text }}">{{ block.text }}</p>
+                                    </td>
+                                    <td valign="top" style="padding-left:10px;width:{{ debate_avatar_size }}px;">
+                                        <div style="{{ block.avatar_ring_style }}">
+                                            <table cellpadding="0" cellspacing="0" role="presentation" style="{{ block.avatar_cell_style }}">
+                                                <tr><td style="{{ block.avatar_cell_style }}">
+                                                    <img src="{{ block.avatar_url }}" style="{{ block.avatar_img_style }}" alt="{{ block.speaker }} avatar">
+                                                </td></tr>
+                                            </table>
+                                        </div>
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+                {% else %}
+                <table width="100%" cellpadding="0" cellspacing="0" class="debate-bubble" style="margin: 12px 0;">
+                    <tr>
+                        <td style="{{ email_styles.debate_bubble }}">
+                            {% if block.label %}
+                            <p style="{{ email_styles.debate_round_label }}">{{ block.label }}</p>
+                            {% endif %}
+                            <p style="margin:0;color:{{ text_primary }};line-height:1.55;">{{ block.html }}</p>
+                        </td>
+                    </tr>
+                </table>
+                {% endif %}
             {% endfor %}
             {% endif %}
             
             {% if unicorn_protocol_items %}
-            <h2 style="{{ email_styles.h2 }}">🦄 Unicorn Protocol</h2>
+            <h2 style="{{ email_styles.h2 }}">Unicorn Protocol</h2>
             <p style="{{ email_styles.muted_p }}">Unanimous board verdict — full context with Red Team rebuttal.</p>
             {% for item in unicorn_protocol_items %}
                 <div style="{{ email_styles.section_divider }}">
@@ -1115,7 +1291,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                         <tr>
                             {% if item.image %}
                             <td valign="middle" style="padding-right: 12px;">
-                                <img src="{{ item.image }}" alt="{{ item.symbol }} logo" style="width: 28px; height: 28px; border-radius: 4px; display: block; max-width: 28px; background-color: {{ bg_surface }};">
+                                <img src="{{ item.image }}" alt="{{ item.symbol }} logo" style="{{ email_styles.ticker_logo_sm }}">
                             </td>
                             {% endif %}
                             <td valign="middle">
@@ -1160,8 +1336,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             
             {% if qa_summary_text %}
             <div style="{{ email_styles.qa_box }}">
-                <strong style="{{ email_styles.strong }}">Automated QA Audit</strong>
-                <span style="color: {{ text_primary }};">&mdash; see the QA Audit Dashboard for details on any &#10060;.</span><br><br>
+                <div style="{{ email_styles.qa_box_title }}">Internal QA Ledger</div>
                 {{ qa_summary_text }}
             </div>
             {% else %}
@@ -1209,7 +1384,23 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     red_team_case = _sanitize_briefing_text(red_team_data.get('bear_case_narrative', ''))
     chairman_remarks = _sanitize_briefing_text(chairman_data.get('chairman_closing_remarks', ''))
     show_debate = _debate_has_content(brawl_text)
-    debate_paragraphs = split_debate_paragraphs(brawl_text)
+    debate_bubbles = build_debate_display_blocks(
+        brawl_text, raw_board_messages=raw_board_messages,
+    )
+    for block in debate_bubbles:
+        if block.get("kind") != "turn":
+            continue
+        block["text"] = _sanitize_briefing_text(block.get("text", ""))
+        portrait = portrait_clip_styles(
+            block.get("panelist_key"),
+            size=DEBATE_AVATAR_SIZE,
+            ring_background=BG_CONTAINER,
+        )
+        block["avatar_ring_style"] = portrait["ring"]
+        block["avatar_cell_style"] = portrait["cell"]
+        block["avatar_img_style"] = portrait["img"]
+    if any(b.get("kind") == "turn" for b in debate_bubbles):
+        show_debate = True
     
     hedge_action = chairman_data.get('capital_allocation_narrative', '') if 'hedge' in chairman_data.get('capital_allocation_narrative', '').lower() else ''
     hedge_action = _sanitize_briefing_text(hedge_action)
@@ -1239,7 +1430,9 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         sotu_quotes=sotu_quotes,
         sotu_avatar_col_width=SOTU_AVATAR_COLUMN_WIDTH,
         brawl_text=brawl_text,
-        debate_paragraphs=debate_paragraphs,
+        debate_bubbles=debate_bubbles,
+        debate_avatar_size=DEBATE_AVATAR_SIZE,
+        action_plan_avatar_size=ACTION_PLAN_AVATAR_SIZE,
         unicorn_protocol_items=unicorn_protocol_items,
         grouped_actions=grouped_actions,
         alpha_pick=alpha_pick,

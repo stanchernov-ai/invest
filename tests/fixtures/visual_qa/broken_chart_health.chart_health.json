@@ -1,6 +1,6 @@
 [
   {"name": "Performance vs. Benchmark (line)", "ok": false, "detail": "HTTP 404 when fetching chart.", "url": "https://quickchart.io/chart/render/missing"},
-  {"name": "Personal Return by Asset (bar)", "ok": true, "detail": "OK (HTTP 200, image/png).", "url": "https://quickchart.io/chart/render/bar"},
+  {"name": "Unrealized Gain by Asset (bar)", "ok": true, "detail": "OK (HTTP 200, image/png).", "url": "https://quickchart.io/chart/render/bar"},
   {"name": "Unrealized Gains (pie)", "ok": true, "detail": "OK (HTTP 200, image/png).", "url": "https://quickchart.io/chart/render/pie"},
   {"name": "12M Return by Account (pie)", "ok": true, "detail": "OK (HTTP 200, image/png).", "url": "https://quickchart.io/chart/render/acct"}
 ]
