@@ -37,7 +37,11 @@ class BriefingEnrichmentTests(unittest.TestCase):
         enriched = briefing_enrichment.enrich_position_from_round2(
             asml, raw_verdicts, sanitized_synthesis=sanitized,
         )
-        self.assertIn("liquidation limit", enriched["synthesis"].lower())
+        if "[SYSTEM OVERRIDE" in asml["synthesis"]:
+            self.assertIn("liquidation limit", enriched["synthesis"].lower())
+        else:
+            self.assertNotIn("vote engine", enriched["synthesis"].lower())
+            self.assertNotIn("buy_side", enriched["synthesis"].lower())
         self.assertGreater(len(enriched["synthesis"]), 60)
         champion = enriched["narrative"]["champion"]
         self.assertIn(

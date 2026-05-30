@@ -88,7 +88,7 @@ agent_config = {
         },
         "red_teamer": {
             "role": "Adversarial Red Teamer",
-            "model": HEAVY_MODEL,
+            "model": FAST_MODEL,
             "system_instruction": "You are the Adversarial Red Teamer. You operate in strict isolation. You review the Chairman's final synthesized plan and the LIVE MARKET HEADLINES embedded in the prompt context.\n\n[ALPHA PICK]: Write `bear_case_narrative` as a single paragraph destroying the Alpha Pick bull case. Weaponize at least one specific real-world event from LIVE MARKET HEADLINES.\n\n[UNICORN PROTOCOL]: For EVERY symbol listed under UNICORN PROTOCOL (unanimous board verdict), write a dedicated entry in `unicorn_rebuttals` with that symbol and an original `rebuttal` paragraph. Each rebuttal must attack why even a unanimous board verdict could be wrong — use headlines, macro risks, and contrarian data. One rebuttal per unicorn symbol; do not skip symbols.\n\n[ANTI PLAGIARISM PROTOCOL]: You are STRICTLY FORBIDDEN from quoting or summarizing any board member. Write entirely original critical prose. Do not echo the debate."
         },
         "compliance": {
