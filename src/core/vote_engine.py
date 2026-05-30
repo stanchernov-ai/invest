@@ -7,7 +7,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-from src.core.guardrails import BUY_VERDICTS, _normalize_verdict
+from src.core.guardrails import (
+    BUY_VERDICTS,
+    MAX_DAILY_BUYS,
+    _is_hedge_symbol,
+    _normalize_verdict,
+    _prepend_override,
+)
 
 MAJORITY_THRESHOLD = 3
 PANEL_SIZE = 5
@@ -97,15 +103,9 @@ class SymbolVoteSummary:
                 or self.bucket_counts.get("reduce", 0) >= MAJORITY_THRESHOLD)
 
     def needs_chairman_judgment(self) -> bool:
-        """True when vote math alone cannot pick a final verdict."""
+        """True when vote math alone cannot pick a final verdict (ties / insufficient votes)."""
         if self.panel_count < MAJORITY_THRESHOLD:
             return True
-        if self.has_actionable_majority() and not self.is_actionable_unanimous():
-            # Majority buy/reduce but not 5/5 — chairman weighs conviction / funding.
-            if self.bucket_counts.get("buy", 0) >= MAJORITY_THRESHOLD and not self.is_unanimous("buy"):
-                return True
-            if self.bucket_counts.get("reduce", 0) >= MAJORITY_THRESHOLD and not self.is_unanimous("reduce"):
-                return True
         mb = self.majority_bucket()
         if mb is None:
             return True
@@ -170,15 +170,22 @@ def detect_sell_candidates(summaries: dict[str, SymbolVoteSummary]) -> list[str]
     ]
 
 
-def can_bypass_chairman(summaries: dict[str, SymbolVoteSummary]) -> bool:
-    """Skip chairman Pro when every symbol is vote-deterministic and all actionable
-    Buy/Reduce mandates are unanimous (5/5). Hold/Pass consensus alone does not block."""
+def can_determine_allocation(summaries: dict[str, SymbolVoteSummary]) -> bool:
+    """Skip chairman Pro when every symbol has a clear board majority (Phase B).
+
+    3/5 majority buys/reduces are resolved in Python via ``mandate_verdict``,
+    ``apply_max_three_buys``, and guardrails — not by chairman LLM judgment."""
     if not summaries:
         return False
     for summary in summaries.values():
         if summary.needs_chairman_judgment():
             return False
     return True
+
+
+def can_bypass_chairman(summaries: dict[str, SymbolVoteSummary]) -> bool:
+    """Alias for ``can_determine_allocation`` (Phase B expanded bypass)."""
+    return can_determine_allocation(summaries)
 
 
 def mandate_verdict(summary: SymbolVoteSummary) -> str:
@@ -252,10 +259,11 @@ def format_vote_digest(
             f"hold={counts.get('hold', 0)} pass={counts.get('pass', 0)} "
             f"majority={mb or 'none'} → mandate={mandate}{uni}"
         )
-    bypass = can_bypass_chairman(summaries)
+    deterministic = can_determine_allocation(summaries)
     lines.append("")
     lines.append(
-        f"BYPASS CHAIRMAN ARBITRATION: {'YES — skeleton applied in Python' if bypass else 'NO — judgment required'}"
+        f"BYPASS CHAIRMAN ARBITRATION: "
+        f"{'YES — vote_engine allocation in Python' if deterministic else 'NO — judgment required'}"
     )
     return "\n".join(lines)
 
@@ -269,10 +277,43 @@ def _default_narrative(champion: str = "Board") -> dict:
     }
 
 
+def _pick_alpha_pick_from_chairman(
+    chairman: dict,
+    summaries: dict[str, SymbolVoteSummary],
+) -> dict:
+    """Alpha pick from executed Buy rows only (post max-3 cap)."""
+    candidates: list[tuple[int, str]] = []
+    for section in ("portfolio_positions", "watchlist_positions"):
+        for pos in chairman.get(section) or []:
+            sym = (pos.get("symbol") or "").strip()
+            if not sym or _is_hedge_symbol(sym):
+                continue
+            if _normalize_verdict(pos.get("final_verdict", "")) not in BUY_VERDICTS:
+                continue
+            summary = summaries.get(sym)
+            if summary and summary.bucket_counts.get("buy", 0) < MAJORITY_THRESHOLD:
+                continue
+            conviction = int(pos.get("aggregate_conviction_score") or 0)
+            candidates.append((conviction, sym))
+    candidates.sort(key=lambda x: (-x[0], x[1]))
+    if not candidates:
+        sym = next(iter(summaries.keys()), "N/A")
+        return {"symbol": sym, "champion_quote": "No executed majority Buy for alpha pick."}
+    sym = candidates[0][1]
+    summary = summaries[sym]
+    members, _ = _supporting_for_mandate(summary, mandate_verdict(summary))
+    champion = members[0] if members else "Board"
+    return {
+        "symbol": sym,
+        "champion_quote": f"{champion} led the board's conviction on {sym} for near-term alpha.",
+    }
+
+
 def _pick_alpha_pick(
     summaries: dict[str, SymbolVoteSummary],
     raw_verdicts: dict[str, dict] | None,
 ) -> dict:
+    """Legacy helper — prefer ``_pick_alpha_pick_from_chairman`` after max-3 cap."""
     candidates: list[tuple[int, str]] = []
     for sym, summary in summaries.items():
         if summary.bucket_counts.get("buy", 0) < MAJORITY_THRESHOLD:
@@ -292,14 +333,63 @@ def _pick_alpha_pick(
     }
 
 
-def build_chairman_skeleton(
+def apply_max_three_buys(
+    chairman: dict,
+    summaries: dict[str, SymbolVoteSummary] | None = None,
+    *,
+    max_buys: int = MAX_DAILY_BUYS,
+) -> dict:
+    """Keep top ``max_buys`` equity Buy mandates by board conviction; demote the rest."""
+    ranked: list[tuple[int, str, dict]] = []
+    for section_key in ("portfolio_positions", "watchlist_positions"):
+        for pos in chairman.get(section_key) or []:
+            sym = (pos.get("symbol") or "").strip()
+            if not sym or _is_hedge_symbol(sym):
+                continue
+            if _normalize_verdict(pos.get("final_verdict", "")) not in BUY_VERDICTS:
+                continue
+            conviction = int(pos.get("aggregate_conviction_score") or 0)
+            if summaries and sym in summaries:
+                _, conviction = _supporting_for_mandate(summaries[sym], "Buy")
+                pos["aggregate_conviction_score"] = conviction
+            ranked.append((conviction, section_key, pos))
+
+    ranked.sort(key=lambda item: (-item[0], item[2].get("symbol", "")))
+    kept_symbols = {item[2]["symbol"] for item in ranked[:max_buys]}
+
+    for conviction, section_key, pos in ranked[max_buys:]:
+        demote_to = "Hold" if section_key == "portfolio_positions" else "Pass"
+        pos["final_verdict"] = demote_to
+        _prepend_override(
+            pos,
+            f"[VOTE ENGINE] Surplus majority buy demoted (max {max_buys} equity buys; "
+            f"conviction {conviction}). Assigned {demote_to}.",
+        )
+
+    audit = chairman.get("capital_flow_audit")
+    if not audit:
+        chairman["capital_flow_audit"] = audit = {"liquidated_tickers": [], "target_tickers": []}
+    targets = [sym for sym in (audit.get("target_tickers") or []) if sym in kept_symbols or _is_hedge_symbol(sym)]
+    for sym in kept_symbols:
+        if sym not in targets:
+            targets.append(sym)
+    if not any(_is_hedge_symbol(t) for t in targets):
+        targets.insert(0, "TLT")
+    audit["target_tickers"] = targets
+    return chairman
+
+
+def build_chairman_allocation(
     raw_verdicts: dict[str, dict] | None,
     all_symbols: list[str],
     *,
     portfolio_symbols: set[str],
     watchlist_symbols: set[str],
 ) -> dict:
-    """Minimal ChairmanMasterSynthesis from vote_engine when bypass applies."""
+    """ChairmanMasterSynthesis from vote_engine — board majority days (Phase B).
+
+    Per-symbol mandates from ``mandate_verdict``, max-3 equity buys by conviction,
+    alpha pick from executed buys only. Chairman Pro is not invoked."""
     summaries = build_vote_summaries(raw_verdicts, all_symbols, portfolio_symbols=portfolio_symbols)
     portfolio_positions: list[dict] = []
     watchlist_positions: list[dict] = []
@@ -327,16 +417,15 @@ def build_chairman_skeleton(
         if _normalize_verdict(final) in BUY_VERDICTS and sym not in target_tickers:
             target_tickers.append(sym)
 
-    digest = format_vote_digest(summaries, portfolio_symbols=portfolio_symbols)
-    return {
-        "chain_of_thought_scratchpad": (
-            "PYTHON VOTE ENGINE BYPASS: All symbols have deterministic mandates; "
-            "actionable Buy/Reduce items are unanimous 5/5 where applicable.\n\n"
-            f"{digest}"
+    chairman: dict = {
+        "chain_of_thought_scratchpad": "",
+        "macro_view": (
+            "Board-majority allocation day — verdicts follow Round 2 panel votes "
+            "without chairman tie-break."
         ),
-        "macro_view": "Mechanical allocation day — panel votes aligned without chairman tie-break.",
         "capital_allocation_narrative": (
             "Verdicts derived deterministically from Round 2 structured votes. "
+            "Surplus majority buys demoted by conviction when over the max-3 cap. "
             "Mandatory TLT hedge included in target_tickers."
         ),
         "capital_flow_audit": {
@@ -348,9 +437,36 @@ def build_chairman_skeleton(
         },
         "portfolio_positions": portfolio_positions,
         "watchlist_positions": watchlist_positions,
-        "alpha_pick": _pick_alpha_pick(summaries, raw_verdicts),
+        "alpha_pick": {"symbol": "N/A", "champion_quote": "Pending max-3 cap."},
         "upcoming_events": [],
     }
+
+    chairman = apply_max_three_buys(chairman, summaries)
+    chairman["alpha_pick"] = _pick_alpha_pick_from_chairman(chairman, summaries)
+
+    digest = format_vote_digest(summaries, portfolio_symbols=portfolio_symbols)
+    chairman["chain_of_thought_scratchpad"] = (
+        "PYTHON VOTE ENGINE ALLOCATION (Phase B): Board majorities resolved in Python; "
+        "chairman executes panel mandates.\n\n"
+        f"{digest}"
+    )
+    return chairman
+
+
+def build_chairman_skeleton(
+    raw_verdicts: dict[str, dict] | None,
+    all_symbols: list[str],
+    *,
+    portfolio_symbols: set[str],
+    watchlist_symbols: set[str],
+) -> dict:
+    """Backward-compatible alias for ``build_chairman_allocation``."""
+    return build_chairman_allocation(
+        raw_verdicts,
+        all_symbols,
+        portfolio_symbols=portfolio_symbols,
+        watchlist_symbols=watchlist_symbols,
+    )
 
 
 def apply_conviction_scores(chairman: dict, raw_verdicts: dict[str, dict] | None) -> dict:

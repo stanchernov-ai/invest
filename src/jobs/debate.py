@@ -63,6 +63,8 @@ async def run_debate(run_id: str) -> dict:
         unicorn_trades = []
         is_approved_flag = False
         compliance_failure_detail = None
+        allocation_source = "llm"
+        chairman_bypassed = False
 
         async for output in app.astream(initial_state):
             for key, value in output.items():
@@ -91,6 +93,8 @@ async def run_debate(run_id: str) -> dict:
                         raw_verdicts = value["raw_verdicts"]
                 if key == "compliance":
                     is_approved_flag = value.get("is_approved", False)
+                    allocation_source = value.get("allocation_source", "llm")
+                    chairman_bypassed = value.get("chairman_bypassed", False)
                     if is_approved_flag:
                         c_data = value.get("chairman_data", {})
                         red_team_data = value.get("red_team_data", {})
@@ -133,7 +137,11 @@ async def run_debate(run_id: str) -> dict:
             return {"run_id": run_id, "status": "failed", "is_approved": False}
 
         raw_log_combined = "".join(raw_log_lines)
-        telemetry = {"AGENT_ACTIVITY": agent_activity.snapshot()}
+        telemetry = {
+            "AGENT_ACTIVITY": agent_activity.snapshot(),
+            "allocation_source": allocation_source,
+            "chairman_bypassed": chairman_bypassed,
+        }
 
         checkpoint = {
             "run_id": run_id,
@@ -146,6 +154,8 @@ async def run_debate(run_id: str) -> dict:
             "raw_log_combined": raw_log_combined,
             "unicorn_trades": unicorn_trades,
             "telemetry": telemetry,
+            "allocation_source": allocation_source,
+            "chairman_bypassed": chairman_bypassed,
         }
         storage_client.save_checkpoint(run_id, "debate", checkpoint)
         storage_client.save_report(f"api_telemetry_{run_id}_debate.json", json.dumps(telemetry, indent=4))

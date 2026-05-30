@@ -16,9 +16,9 @@ from src.core.guardrails import apply_chairman_guardrails
 from src.core.state_of_union import build_state_of_union_quotes
 from src.core.vote_engine import (
     apply_conviction_scores,
-    build_chairman_skeleton,
+    build_chairman_allocation,
     build_vote_summaries,
-    can_bypass_chairman,
+    can_determine_allocation,
     detect_sell_candidates,
     detect_unicorn_trades,
     format_vote_digest,
@@ -43,6 +43,7 @@ class StateMachineOrchestrator:
         self.red_team_json = "{}"
         self.compliance_attempts: list[dict] = []
         self.chairman_bypassed: bool = False
+        self.allocation_source: str = "llm"
 
     def _portfolio_symbols(self) -> set[str]:
         return set((self.state.portfolio_holdings or {}).keys())
@@ -250,10 +251,13 @@ class StateMachineOrchestrator:
         portfolio_symbols = self._portfolio_symbols()
         watchlist_symbols = self._watchlist_symbols()
 
-        if not self.state.qa_feedback and can_bypass_chairman(summaries):
-            logger.info("Chairman Pro bypass — deterministic vote mandates (actionable unanimous / no tie-break).")
+        if can_determine_allocation(summaries):
+            logger.info(
+                "Chairman Pro bypass — vote_engine allocation (board majority resolved in Python)."
+            )
             self.chairman_bypassed = True
-            res = build_chairman_skeleton(
+            self.allocation_source = "vote_engine"
+            res = build_chairman_allocation(
                 self.raw_verdicts,
                 self.state.all_symbols,
                 portfolio_symbols=portfolio_symbols,
@@ -264,6 +268,7 @@ class StateMachineOrchestrator:
             return
 
         self.chairman_bypassed = False
+        self.allocation_source = "llm"
         history = "\n\n".join([m["content"] for m in self.state.messages])
         munger_warning = ""
         if self.state.munger_overrides:
@@ -419,6 +424,8 @@ class AppWrapper:
             "is_approved": final_state.is_approved,
             "chairman_data": chair_data,
             "red_team_data": red_data,
+            "chairman_bypassed": orchestrator.chairman_bypassed,
+            "allocation_source": orchestrator.allocation_source,
         }
         if not final_state.is_approved:
             compliance_payload["failure_detail"] = orchestrator.build_compliance_failure_detail()

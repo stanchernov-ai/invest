@@ -21,6 +21,7 @@ from src.core.vote_engine import board_majority_buy_counts
 PANEL_MAJORITY_THRESHOLD = 3  # 3 of 5 panelists
 
 _SYSTEM_MAX_BUY_OVERRIDE = "[SYSTEM OVERRIDE: Maximum"
+_VOTE_ENGINE_DEMOTION = "[VOTE ENGINE]"
 _FALSE_MAX_BUY_PATTERNS = re.compile(
     r"(maximum\s+3\s+buys?|max(?:imum)?\s+3\s+buys?|maximum\s+three\s+buys?)",
     re.IGNORECASE,
@@ -144,6 +145,8 @@ def fill_majority_buys_within_cap(chairman: dict, raw_verdicts: dict[str, dict] 
             if _normalize_verdict(pos.get("final_verdict", "")) in BUY_VERDICTS:
                 continue
             if _has_system_max_buy_override(pos.get("synthesis", "")):
+                continue
+            if _VOTE_ENGINE_DEMOTION in (pos.get("synthesis") or ""):
                 continue
             candidates.append((
                 int(pos.get("aggregate_conviction_score") or 0),
