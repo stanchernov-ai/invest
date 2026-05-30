@@ -58,29 +58,9 @@ def _verdict_bucket(verdict: str) -> str:
     return "hold"
 
 
-_ROUND2_HEADER_RE = re.compile(
-    r"\*\*\[ROUND 2 REBUTTAL\]\s+(.+?)\*\*:",
-    re.IGNORECASE,
-)
-
-
 def _extract_round2_text(messages: list[dict], agent_key: str) -> str:
-    """Return only this panelist's Round 2 block (not cumulative debate history)."""
-    marker = PANELIST_MARKERS.get(agent_key, "")
-    if not marker:
-        return ""
-    header = f"**[ROUND 2 REBUTTAL] {marker}**:"
-    for msg in reversed(messages or []):
-        content = msg.get("content") or ""
-        if header not in content:
-            continue
-        start = content.index(header)
-        section = content[start:]
-        next_match = _ROUND2_HEADER_RE.search(section, len(header))
-        if next_match:
-            section = section[: next_match.start()]
-        return section
-    return ""
+    from src.core.rebuttal import extract_panelist_round2_block
+    return extract_panelist_round2_block(messages, agent_key)
 
 
 def _unanimous_ticker_stats(matrix: dict) -> dict:
@@ -112,7 +92,7 @@ def _scan_forbidden_phrases(agent_key: str, text: str) -> list[str]:
 
 def audit_debate_persona(raw_messages: list[dict], all_symbols: list[str]) -> tuple[list[str], dict]:
     """Return (violation strings, stats dict) for the debate transcript."""
-    from src.core.rebuttal import extract_round_overview, is_verbatim_r1_copy
+    from src.core.rebuttal import extract_panelist_round2_block, extract_round_overview, is_verbatim_r1_copy
     from src.qa_pipeline import parse_board_matrix
 
     violations: list[str] = []

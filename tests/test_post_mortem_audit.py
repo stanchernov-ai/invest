@@ -4,7 +4,9 @@ import unittest
 
 from src.core.compliance_audit import audit_chairman_compliance
 from src.qa.post_mortem_audit import (
+    audit_debate_prose_vs_raw_verdicts,
     audit_post_mortem_deterministic,
+    audit_scratchpad_digest_consistency,
     format_post_mortem_digest,
     merge_post_mortem_reports,
 )
@@ -98,6 +100,52 @@ class TestPostMortemAudit(unittest.TestCase):
     def test_merge_pass_without_llm(self):
         merged = merge_post_mortem_reports([], None)
         self.assertTrue(merged["is_compliant"])
+
+    def test_scratchpad_digest_must_match_raw_verdicts(self):
+        raw = _raw_verdicts_amzn_buy_votes(3)
+        chairman = _chairman_amzn_buy()
+        chairman["chain_of_thought_scratchpad"] = (
+            "PYTHON VOTE ENGINE ALLOCATION\n\n"
+            "DETERMINISTIC VOTE DIGEST (Round 2 JSON — authoritative; do not re-count from prose):\n"
+            "  AMZN: buy_side=2/5 sell_side=0/5 pass=3/5 → mandate=Pass\n"
+        )
+        violations = audit_scratchpad_digest_consistency(
+            chairman, raw, all_symbols=["AMZN"], portfolio_symbols=set()
+        )
+        self.assertTrue(any("SCRATCHPAD DIGEST MISMATCH" in v and "AMZN" in v for v in violations))
+
+    def test_debate_prose_drift_detected(self):
+        raw = _raw_verdicts_amzn_buy_votes(3)
+        messages = [{
+            "content": (
+                "**[ROUND 2 REBUTTAL] Warren Buffett**:\n"
+                "* **AMZN**: Pass (2/10).\n"
+                "**[ROUND 2 REBUTTAL] Peter Lynch**:\n"
+                "* **AMZN**: Buy (8/10).\n"
+            )
+        }]
+        # buffett Pass in prose but Buy in raw for first agent — fix raw to create drift
+        raw["buffett"]["watchlist_verdicts"][0]["verdict"] = "Buy"
+        violations = audit_debate_prose_vs_raw_verdicts(
+            messages, raw, all_symbols=["AMZN"]
+        )
+        self.assertTrue(any("VOTE JSON/PROSE DRIFT" in v and "Warren Buffett" in v for v in violations))
+
+    def test_cumulative_debate_messages_align_with_json(self):
+        import json
+        from pathlib import Path
+
+        debate_path = Path(".cache/state/debate.json")
+        if not debate_path.exists():
+            self.skipTest("cached debate.json not available")
+        debate = json.loads(debate_path.read_text(encoding="utf-8"))
+        prep = json.loads(Path(".cache/state/prepare.json").read_text(encoding="utf-8"))
+        violations = audit_debate_prose_vs_raw_verdicts(
+            debate.get("raw_board_messages") or [],
+            debate.get("raw_verdicts") or {},
+            all_symbols=prep.get("all_symbols") or [],
+        )
+        self.assertEqual(violations, [], violations[:3] if violations else None)
 
 
 if __name__ == "__main__":

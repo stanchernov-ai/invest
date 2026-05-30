@@ -15,10 +15,61 @@ _REBUTTAL_SUMMARY_RE = re.compile(
     r"\*\s*\*\*Rebuttal Summary\*\*\s*:\s*(.+?)(?=\n\*|\Z)",
     re.IGNORECASE | re.DOTALL,
 )
+_ROUND2_HEADER_RE = re.compile(
+    r"\*\*\[ROUND 2 REBUTTAL\]\s+(.+?)\*\*:",
+    re.IGNORECASE,
+)
+_TICKER_VERDICT_LINE_RE = re.compile(
+    r"^\*\s*\*\*([^*]+)\*\*\s*:\s*(.+)$",
+)
 
 
 def _marker_for(agent_key: str) -> str:
     return agent_config["board_members"][agent_key]["role"]
+
+
+def extract_panelist_round2_block(messages: list[dict], agent_key: str) -> str:
+    """Return only this panelist's Round 2 block (handles cumulative debate messages)."""
+    marker = _marker_for(agent_key)
+    header = f"**[ROUND 2 REBUTTAL] {marker}**:"
+    for msg in reversed(messages or []):
+        content = msg.get("content") or ""
+        if header not in content:
+            continue
+        start = content.index(header)
+        section = content[start:]
+        next_match = _ROUND2_HEADER_RE.search(section, len(header))
+        if next_match:
+            section = section[: next_match.start()]
+        return section
+    return ""
+
+
+def parse_ticker_verdict_from_line(line: str) -> tuple[str, str] | None:
+    """Parse `* **NVDA**: Strong Sell (7/10).` → (symbol, verdict)."""
+    match = _TICKER_VERDICT_LINE_RE.match((line or "").strip())
+    if not match:
+        return None
+    ticker = match.group(1).strip()
+    rest = match.group(2)
+    # Verdict is before optional (score) or first sentence — ignore rationale prose.
+    verdict_part = rest.split("(")[0].split(".")[0].strip()
+    lower = verdict_part.lower()
+    if "strong sell" in lower:
+        return ticker, "Strong Sell"
+    if "strong buy" in lower:
+        return ticker, "Strong Buy"
+    if re.search(r"\btrim\b", lower):
+        return ticker, "Trim"
+    if re.search(r"\bsell\b", lower):
+        return ticker, "Sell"
+    if re.search(r"\bbuy\b", lower):
+        return ticker, "Buy"
+    if re.search(r"\bpass\b", lower):
+        return ticker, "Pass"
+    if re.search(r"\bhold\b", lower):
+        return ticker, "Hold"
+    return None
 
 
 def extract_round_overview(messages: list[dict], agent_key: str, round_num: str) -> str:

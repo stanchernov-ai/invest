@@ -63,34 +63,23 @@ def build_board_matrix(
 
 
 def parse_board_matrix(raw_messages, all_tickers):
-    matrix = {ticker: {"buffett": "", "lynch": "", "livermore": "", "huang": "", "simons": ""} for ticker in all_tickers}
-    agent_names = {
-        "buffett": "Warren Buffett",
-        "lynch": "Peter Lynch",
-        "livermore": "Jesse Livermore",
-        "huang": "Jensen Huang",
-        "simons": "Jim Simons",
-    }
-    for msg in raw_messages:
-        content = msg.get("content", "")
-        agent = None
-        for key, name in agent_names.items():
-            # Match both legacy `**Warren Buffett**` and debate headers `**[ROUND N] Warren Buffett**`.
-            if name in content and (f"**{name}**" in content or f"] {name}**" in content):
-                agent = key
-                break
-        if not agent:
-            continue
-        for line in content.split("\n"):
-            if line.startswith("* **"):
-                parts = line.split("**: ")
-                if len(parts) > 1:
-                    ticker = parts[0].replace("* **", "").strip()
-                    verdict_full = parts[1].split(" ")[0].replace("*", "")
-                    if "Strong" in parts[1]:
-                        verdict_full = "Strong Buy"
-                    if ticker in matrix:
-                        matrix[ticker][agent] = verdict_full
+    """Parse Round 2 per-panelist blocks only (not cumulative R1+R2 history)."""
+    from src.core.rebuttal import extract_panelist_round2_block, parse_ticker_verdict_from_line
+    from src.core.vote_engine import AGENT_KEYS
+
+    matrix = {ticker: {k: "" for k in AGENT_KEYS} for ticker in all_tickers}
+    for msg in raw_messages or []:
+        for agent_key in AGENT_KEYS:
+            block = extract_panelist_round2_block([msg], agent_key)
+            if not block:
+                continue
+            for line in block.split("\n"):
+                parsed = parse_ticker_verdict_from_line(line)
+                if not parsed:
+                    continue
+                ticker, verdict = parsed
+                if ticker in matrix:
+                    matrix[ticker][agent_key] = verdict
     return matrix
 
 
@@ -134,6 +123,7 @@ async def run_post_flight_qa(
         raw_verdicts=raw_verdicts,
         all_symbols=all_symbols or [],
         portfolio_symbols=portfolio_symbols,
+        raw_board_messages=raw_board_messages,
     )
     architect_task = _run_system_architect_qa(base_prompt)
     persona_task = run_prompt_engineer_qa(
@@ -191,6 +181,7 @@ async def run_post_mortem_qa(
     raw_verdicts: dict | None = None,
     all_symbols: list[str] | None = None,
     portfolio_symbols: set[str] | None = None,
+    raw_board_messages: list[dict] | None = None,
 ) -> dict:
     """Post Mortem audit: deterministic vote alignment + procedural LLM pass."""
     from src.qa.post_mortem_audit import (
@@ -210,6 +201,7 @@ async def run_post_mortem_qa(
         raw_verdicts,
         all_symbols=all_symbols or [],
         portfolio_symbols=portfolio_symbols,
+        raw_board_messages=raw_board_messages,
     )
     if not violations:
         merged = merge_post_mortem_reports([], None)
