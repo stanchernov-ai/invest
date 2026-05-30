@@ -298,5 +298,83 @@ class BriefingHtmlTests(unittest.TestCase):
         self.assertNotIn("12.00 percent", html)
 
 
+class DeliverPerformanceTests(unittest.TestCase):
+    def test_build_briefing_charts_returns_all_urls_in_parallel(self):
+        call_count = {"n": 0}
+
+        def fake_short_url(*_args, **_kwargs):
+            call_count["n"] += 1
+            return f"https://example.com/chart{call_count['n']}.png"
+
+        ledger = [("AAPL", {"Total": 50_000, "Personal_Return_Pct": 5.0})]
+        holdings = {"eTrade Taxable": {"AAPL": {"value": 50_000}}}
+        history = {
+            "20250101": {"portfolio_index": 100.0, "spy": 500, "qqq": 400},
+            "20250201": {"portfolio_index": 101.0, "spy": 505, "qqq": 402},
+        }
+        with patch.object(reporting, "get_quickchart_short_url", side_effect=fake_short_url):
+            urls = reporting.build_briefing_charts(ledger, holdings, {"returns": {}}, history)
+        self.assertEqual(
+            set(urls.keys()),
+            {"pie_chart_url", "account_pie_url", "bar_chart_url", "line_chart_url"},
+        )
+        self.assertEqual(call_count["n"], 4)
+
+    def test_audit_chart_health_probes_all_charts(self):
+        probed = []
+
+        def fake_probe(url):
+            probed.append(url)
+            return bool(url), "OK"
+
+        with patch.object(reporting, "_probe_image_url", side_effect=fake_probe):
+            health = reporting.audit_chart_health({
+                "pie_chart_url": "https://example.com/pie",
+                "bar_chart_url": "https://example.com/bar",
+                "line_chart_url": "https://example.com/line",
+                "account_pie_url": "https://example.com/acct",
+            })
+        self.assertEqual(len(health), 4)
+        self.assertEqual(len(probed), 4)
+
+    def test_inject_qa_summary_replaces_anchor(self):
+        base = "<html><body><footer></footer><!-- QA_SUMMARY_ANCHOR --></body></html>"
+        summary = "<strong>Post Mortem QA</strong> &#9989;"
+        out = reporting.inject_qa_summary_into_briefing(base, summary)
+        self.assertNotIn(reporting.QA_SUMMARY_ANCHOR, out)
+        self.assertIn("Automated QA Audit", out)
+        self.assertIn("Post Mortem QA", out)
+
+    def test_inject_qa_summary_matches_direct_render(self):
+        kwargs = dict(
+            total_val=150_000,
+            qqq_trend=5.0,
+            portfolio_3m_trend=3.0,
+            mandate="CAGR of 12.00 percent projected balance at age 65 is $1,000,000.00",
+            chairman_data={
+                "portfolio_positions": [],
+                "watchlist_positions": [],
+                "alpha_pick": {"symbol": "NONE", "champion_quote": "N/A"},
+                "upcoming_events": [],
+            },
+            cos_data={"state_of_the_union_quotes": [], "boardroom_brawl": "x" * 100},
+            matrix_md="",
+            unicorn_trades=[],
+            sorted_ledger=[],
+            chart_urls={},
+        )
+        summary = "<strong>Graphics Designer</strong> &#10060;"
+        direct = reporting.generate_html_briefing(**kwargs, qa_summary_text=summary)
+        injected = reporting.inject_qa_summary_into_briefing(
+            reporting.generate_html_briefing(**kwargs, qa_summary_text=""),
+            summary,
+        )
+        self.assertIn("Automated QA Audit", direct)
+        self.assertIn("Graphics Designer", direct)
+        self.assertIn("Automated QA Audit", injected)
+        self.assertIn("Graphics Designer", injected)
+        self.assertNotIn(reporting.QA_SUMMARY_ANCHOR, injected)
+
+
 if __name__ == "__main__":
     unittest.main()

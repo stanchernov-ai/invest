@@ -125,8 +125,8 @@ async def run_deliver(run_id: str) -> dict:
         if broken_charts:
             logger.warning(f"Broken/missing briefing charts detected: {', '.join(broken_charts)}")
 
-        # Generate the briefing HTML first so Graphics QA reviews the exact Azure/email artifact.
-        briefing_for_visual_qa = reporting.generate_html_briefing(
+        # Render briefing once (QA summary injected after integrity audit).
+        briefing_html = reporting.generate_html_briefing(
             total_val=total_portfolio_value, qqq_trend=live_qqq_trend,
             portfolio_3m_trend=portfolio_3m_trend, mandate=live_mandate,
             chairman_data=c_data, cos_data=cos_data, matrix_md=matrix_md, unicorn_trades=unicorn_trades,
@@ -136,7 +136,7 @@ async def run_deliver(run_id: str) -> dict:
             raw_verdicts=raw_verdicts or None,
             portfolio_symbols=portfolio_symbols,
         )
-        graphics_report = await qa_pipeline.run_graphics_designer_qa(briefing_for_visual_qa, chart_health)
+        graphics_report = await qa_pipeline.run_graphics_designer_qa(briefing_html, chart_health)
         qa_reports.append(graphics_report)
 
         from src.qa.scorecard import build_qa_scorecard, persist_scorecard
@@ -150,7 +150,7 @@ async def run_deliver(run_id: str) -> dict:
         )
         integrity_report = await qa_pipeline.run_qa_integrity_audit(
             qa_reports, raw_log_combined, json.dumps(c_data), interim_qa_dashboard_html,
-            executive_briefing_html=briefing_for_visual_qa,
+            executive_briefing_html=briefing_html,
         )
         qa_reports.append(integrity_report)
 
@@ -161,16 +161,7 @@ async def run_deliver(run_id: str) -> dict:
 
         storage_client.save_report(f"qa_reports_{run_id}.json", json.dumps(qa_reports, indent=2, default=str))
 
-        html_payload = reporting.generate_html_briefing(
-            total_val=total_portfolio_value, qqq_trend=live_qqq_trend,
-            portfolio_3m_trend=portfolio_3m_trend, mandate=live_mandate,
-            chairman_data=c_data, cos_data=cos_data, matrix_md=matrix_md, unicorn_trades=unicorn_trades,
-            sorted_ledger=sorted_ledger, red_team_data=red_team_data, history_data=history_data,
-            qa_summary_text=final_qa_summary_text, account_holdings=account_holdings, account_returns=account_returns,
-            advanced_data=advanced_data, chart_urls=chart_urls,
-            raw_verdicts=raw_verdicts or None,
-            portfolio_symbols=portfolio_symbols,
-        )
+        html_payload = reporting.inject_qa_summary_into_briefing(briefing_html, final_qa_summary_text)
         qa_dashboard_html = reporting.generate_qa_dashboard_html(
             qa_reports, run_id, review_url=review_url
         )
