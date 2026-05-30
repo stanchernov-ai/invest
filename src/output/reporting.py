@@ -155,13 +155,15 @@ def build_unicorn_protocol_items(unicorn_trades, chairman_data, advanced_data=No
         unicorn_symbols.add(sym)
         pos = pos_by_symbol.get(sym, {})
         narrative = pos.get("narrative") or {}
+        sanitized = _sanitize_position_for_briefing(pos)
+        sanitized_narrative = sanitized.get("narrative") or {}
         items.append({
             "symbol": sym,
             "verdict": panel_verdict,
-            "synthesis": pos.get("synthesis", ""),
-            "champion": narrative.get("champion", ""),
-            "champion_quote": narrative.get("champion_quote", ""),
-            "red_team_rebuttal": rebuttal_map.get(sym, ""),
+            "synthesis": sanitized.get("synthesis", ""),
+            "champion": sanitized_narrative.get("champion", narrative.get("champion", "")),
+            "champion_quote": sanitized_narrative.get("champion_quote", ""),
+            "red_team_rebuttal": _sanitize_briefing_text(rebuttal_map.get(sym, "")),
             "image": advanced_data.get(sym, {}).get("image", ""),
         })
 
@@ -481,13 +483,111 @@ def _rebase_index_series(values):
     return [round(v / first * 100, 2) if v is not None else None for v in values]
 
 
+_BRIEFING_JARGON_RULES: list[tuple[str, str]] = [
+    (
+        r"\[SYSTEM OVERRIDE:\s*10%\s*Liquidation Cap Reached\.\s*Hold enforced\.\]",
+        "Position held to respect the portfolio's daily liquidation limit.",
+    ),
+    (
+        r"\[SYSTEM OVERRIDE:\s*10%\s*Liquidation Cap Reached\.\s*Action canceled\.\]",
+        "Action canceled after reaching the daily liquidation limit.",
+    ),
+    (
+        r"\[SYSTEM OVERRIDE:\s*Sell mathematically capped at[^\]]+\]",
+        "Sell size was capped by the daily liquidation limit; the verdict was adjusted accordingly.",
+    ),
+    (
+        r"\[SYSTEM OVERRIDE:\s*Trim mathematically capped at[^\]]+\]",
+        "Trim size was capped by the daily liquidation limit; the verdict was adjusted accordingly.",
+    ),
+    (
+        r"\[SYSTEM OVERRIDE:\s*Maximum\s+\d+\s+Buys limit[^\]]+\]",
+        "Held to stay within the three-buy daily limit after ranking board conviction.",
+    ),
+    (
+        r"\[SYSTEM OVERRIDE:\s*Wash-Sale Rule[^\]]+\]",
+        "Sell deferred due to wash-sale rules on a recent purchase.",
+    ),
+    (
+        r"\[SYSTEM OVERRIDE:\s*Board majority Buy[^\]]+\]",
+        "",
+    ),
+    (
+        r"\[VOTE ENGINE\]\s*Surplus majority buy demoted[^.]+\.\s*Assigned\s+\w+\.",
+        "Held to respect the three-buy daily limit after ranking board conviction.",
+    ),
+    (
+        r"\[VOTE ENGINE\]\s*Deterministic mandate from Round 2 panel votes\s*"
+        r"\(buy_side=\d/5,\s*sell_side=\d/5\)\.?",
+        "The board reached a consensus mandate from today's panel vote.",
+    ),
+    (r"\[VOTE ENGINE\][^\n\.]*\.?", ""),
+    (r"\[SYSTEM OVERRIDE:[^\]]+\]", ""),
+    (
+        r"(?i)\bVote-engine mandate from unanimous\s*/\s*deterministic Round 2 panel votes\.?",
+        "",
+    ),
+    (r"(?i)\bbuy_side=\d/5,\s*sell_side=\d/5\b", ""),
+    (r"(?i)\bas per the qa amendment protocol\b[,:\s]*", ""),
+    (r"(?i)\bqa amendment protocol\b[,:\s]*", ""),
+    (r"(?i)\btarget_tickers\b", "target allocations"),
+    (r"(?i)\bmax-3 cap\b", "three-buy daily limit"),
+    (r"(?i)\bdeterministically from Round 2 structured votes\b", "from today's board vote"),
+]
+
+_DEFAULT_SYNTHESIS = (
+    "The investment committee finalized this position after today's board deliberation."
+)
+
+_BOILERPLATE_CHAMPION_RE = re.compile(
+    r"(?i)^(vote[- ]engine mandate|deterministic mandate|pending max-3|no executed majority).*$"
+)
+
+
 def _sanitize_briefing_text(text: str) -> str:
     """Strip internal protocol jargon before rendering investor-facing copy."""
     if not text:
         return text
-    cleaned = re.sub(r"(?i)\bas per the qa amendment protocol\b[,:\s]*", "", text)
-    cleaned = re.sub(r"(?i)\bqa amendment protocol\b[,:\s]*", "", cleaned)
+    cleaned = text
+    for _ in range(3):
+        prev = cleaned
+        for pattern, repl in _BRIEFING_JARGON_RULES:
+            cleaned = re.sub(pattern, repl, cleaned)
+        if cleaned == prev:
+            break
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    cleaned = re.sub(r"(?:\.\s*){2,}", ". ", cleaned)
     return cleaned.strip()
+
+
+def _is_boilerplate_champion_quote(text: str) -> bool:
+    if not text:
+        return True
+    return bool(_BOILERPLATE_CHAMPION_RE.match(text.strip()))
+
+
+def _sanitize_position_for_briefing(pos: dict) -> dict:
+    """Return a shallow copy with investor-facing synthesis and narrative."""
+    sym = (pos.get("symbol") or "").strip()
+    out = dict(pos)
+    synthesis = _sanitize_briefing_text(pos.get("synthesis", ""))
+    out["synthesis"] = synthesis if len(synthesis) >= 12 else _DEFAULT_SYNTHESIS
+
+    narrative = dict(pos.get("narrative") or {})
+    champion = (narrative.get("champion") or "Board").strip()
+    champion_quote = _sanitize_briefing_text(narrative.get("champion_quote", ""))
+    if _is_boilerplate_champion_quote(champion_quote):
+        champion_quote = ""
+    if not champion_quote and champion.upper() not in {"NONE", "BOARD", ""}:
+        champion_quote = f"{champion} supported the committee's recommendation for {sym}."
+    narrative["champion_quote"] = champion_quote
+
+    dissenter_quote = _sanitize_briefing_text(narrative.get("dissenter_quote", ""))
+    if dissenter_quote.upper() in {"N/A", "NONE"}:
+        dissenter_quote = ""
+    narrative["dissenter_quote"] = dissenter_quote
+    out["narrative"] = narrative
+    return out
 
 
 def _alpha_pick_displayable(alpha_pick: dict) -> bool:
@@ -820,9 +920,9 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                                 </tr>
                             </table>
                             <p><strong>Strategic Context:</strong> {{ pos.synthesis }}</p>
-                            {% if pos.narrative %}
+                            {% if pos.narrative and pos.narrative.champion_quote %}
                                 <p><span class="champion">The Champion ({{ pos.narrative.champion }}):</span> "{{ pos.narrative.champion_quote }}"</p>
-                                {% if pos.narrative.dissenter and pos.narrative.dissenter|upper != 'NONE' and pos.narrative.dissenter_quote|upper != 'N/A' %}
+                                {% if pos.narrative.dissenter and pos.narrative.dissenter|upper != 'NONE' and pos.narrative.dissenter_quote %}
                                 <p><span class="dissenter">The Dissent ({{ pos.narrative.dissenter }}):</span> "{{ pos.narrative.dissenter_quote }}"</p>
                                 {% endif %}
                             {% endif %}
@@ -997,8 +1097,9 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             continue
         verdict = pos.get('final_verdict', 'Pass').upper()
         if verdict in grouped_actions:
-            pos['image'] = advanced_data.get(sym, {}).get('image', '')
-            grouped_actions[verdict].append(pos)
+            sanitized = _sanitize_position_for_briefing(pos)
+            sanitized['image'] = advanced_data.get(sym, {}).get('image', '')
+            grouped_actions[verdict].append(sanitized)
             
     for cat in grouped_actions:
         grouped_actions[cat].sort(key=lambda x: x.get('aggregate_conviction_score', 0), reverse=True)

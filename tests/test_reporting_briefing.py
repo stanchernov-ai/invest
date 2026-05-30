@@ -52,6 +52,73 @@ class BriefingCopyTests(unittest.TestCase):
         self.assertNotIn("QA Amendment", cleaned)
         self.assertIn("no alpha pick", cleaned.lower())
 
+    def test_sanitize_vote_engine_and_system_override_jargon(self):
+        raw = (
+            "[SYSTEM OVERRIDE: 10% Liquidation Cap Reached. Hold enforced.] "
+            "[VOTE ENGINE] Deterministic mandate from Round 2 panel votes "
+            "(buy_side=0/5, sell_side=5/5)."
+        )
+        cleaned = reporting._sanitize_briefing_text(raw)
+        self.assertNotIn("VOTE ENGINE", cleaned)
+        self.assertNotIn("SYSTEM OVERRIDE", cleaned)
+        self.assertNotIn("buy_side", cleaned)
+        self.assertIn("liquidation limit", cleaned.lower())
+
+    def test_sanitize_position_replaces_boilerplate_champion(self):
+        pos = reporting._sanitize_position_for_briefing({
+            "symbol": "NVDA",
+            "final_verdict": "Buy",
+            "synthesis": "[VOTE ENGINE] Deterministic mandate from Round 2 panel votes (buy_side=3/5, sell_side=2/5).",
+            "narrative": {
+                "champion": "Peter Lynch",
+                "champion_quote": "Vote-engine mandate from unanimous / deterministic Round 2 panel votes.",
+                "dissenter": "None",
+                "dissenter_quote": "N/A",
+            },
+        })
+        self.assertNotIn("VOTE ENGINE", pos["synthesis"])
+        self.assertIn("Peter Lynch", pos["narrative"]["champion_quote"])
+        self.assertNotIn("Vote-engine", pos["narrative"]["champion_quote"])
+
+    def test_briefing_html_hides_internal_jargon(self):
+        html = reporting.generate_html_briefing(
+            total_val=150_000,
+            qqq_trend=5.0,
+            portfolio_3m_trend=3.0,
+            mandate="CAGR of 12.00 percent projected balance at age 65 is $1,000,000.00",
+            chairman_data={
+                "portfolio_positions": [
+                    {
+                        "symbol": "TSM",
+                        "final_verdict": "Hold",
+                        "synthesis": (
+                            "[SYSTEM OVERRIDE: 10% Liquidation Cap Reached. Hold enforced.] "
+                            "[VOTE ENGINE] Deterministic mandate from Round 2 panel votes "
+                            "(buy_side=0/5, sell_side=5/5)."
+                        ),
+                        "narrative": {
+                            "champion": "Warren Buffett",
+                            "champion_quote": "Vote-engine mandate from unanimous / deterministic Round 2 panel votes.",
+                            "dissenter": "None",
+                            "dissenter_quote": "N/A",
+                        },
+                    }
+                ],
+                "watchlist_positions": [],
+                "alpha_pick": {"symbol": "NONE", "champion_quote": "N/A"},
+                "upcoming_events": [],
+            },
+            cos_data={"state_of_the_union_quotes": [], "boardroom_brawl": "x" * 100},
+            matrix_md="",
+            unicorn_trades=[],
+            sorted_ledger=[],
+            chart_urls={},
+        )
+        self.assertNotIn("VOTE ENGINE", html)
+        self.assertNotIn("SYSTEM OVERRIDE", html)
+        self.assertNotIn("buy_side", html)
+        self.assertIn("liquidation limit", html.lower())
+
     def test_alpha_pick_hidden_for_none_symbol(self):
         self.assertFalse(reporting._alpha_pick_displayable({"symbol": "NONE", "champion_quote": "wait"}))
 
