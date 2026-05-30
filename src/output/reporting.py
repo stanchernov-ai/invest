@@ -7,6 +7,8 @@ from datetime import datetime
 from jinja2 import Template
 import logging
 
+from src.output.briefing_enrichment import enrich_chairman_for_briefing, _is_generic_synthesis
+
 logger = logging.getLogger(__name__)
 
 def get_quickchart_short_url(chart_config, width=600, height=300, background_color="white"):
@@ -571,14 +573,22 @@ def _sanitize_position_for_briefing(pos: dict) -> dict:
     sym = (pos.get("symbol") or "").strip()
     out = dict(pos)
     synthesis = _sanitize_briefing_text(pos.get("synthesis", ""))
-    out["synthesis"] = synthesis if len(synthesis) >= 12 else _DEFAULT_SYNTHESIS
+    if len(synthesis) < 12 or _is_generic_synthesis(synthesis):
+        synthesis = _DEFAULT_SYNTHESIS
+    out["synthesis"] = synthesis
 
     narrative = dict(pos.get("narrative") or {})
     champion = (narrative.get("champion") or "Board").strip()
     champion_quote = _sanitize_briefing_text(narrative.get("champion_quote", ""))
     if _is_boilerplate_champion_quote(champion_quote):
         champion_quote = ""
-    if not champion_quote and champion.upper() not in {"NONE", "BOARD", ""}:
+    if champion_quote and champion_quote.strip() == synthesis.strip():
+        champion_quote = ""
+    if (
+        not champion_quote
+        and _is_generic_synthesis(synthesis)
+        and champion.upper() not in {"NONE", "BOARD", ""}
+    ):
         champion_quote = f"{champion} supported the committee's recommendation for {sym}."
     narrative["champion_quote"] = champion_quote
 
@@ -755,7 +765,12 @@ def build_briefing_charts(sorted_ledger, account_holdings, account_returns, hist
     }
 
 
-def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None, account_returns=None, advanced_data=None, chart_urls=None):
+def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None, account_returns=None, advanced_data=None, chart_urls=None, raw_verdicts=None):
+
+    if raw_verdicts:
+        chairman_data = enrich_chairman_for_briefing(
+            chairman_data, raw_verdicts, sanitize_fn=_sanitize_briefing_text,
+        )
 
     if chart_urls is None:
         chart_urls = build_briefing_charts(sorted_ledger, account_holdings, account_returns, history_data)

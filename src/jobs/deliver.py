@@ -124,6 +124,7 @@ async def run_deliver(run_id: str) -> dict:
             sorted_ledger=sorted_ledger, red_team_data=red_team_data, history_data=history_data,
             qa_summary_text="", account_holdings=account_holdings, account_returns=account_returns,
             advanced_data=advanced_data, chart_urls=chart_urls,
+            raw_verdicts=raw_verdicts or None,
         )
         graphics_report = await qa_pipeline.run_graphics_designer_qa(briefing_for_visual_qa, chart_health)
         qa_reports.append(graphics_report)
@@ -156,7 +157,8 @@ async def run_deliver(run_id: str) -> dict:
             chairman_data=c_data, cos_data=cos_data, matrix_md=matrix_md, unicorn_trades=unicorn_trades,
             sorted_ledger=sorted_ledger, red_team_data=red_team_data, history_data=history_data,
             qa_summary_text=final_qa_summary_text, account_holdings=account_holdings, account_returns=account_returns,
-            advanced_data=advanced_data, chart_urls=chart_urls
+            advanced_data=advanced_data, chart_urls=chart_urls,
+            raw_verdicts=raw_verdicts or None,
         )
         qa_dashboard_html = reporting.generate_qa_dashboard_html(
             qa_reports, run_id, review_url=review_url

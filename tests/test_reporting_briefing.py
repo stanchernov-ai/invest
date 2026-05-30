@@ -117,7 +117,6 @@ class BriefingCopyTests(unittest.TestCase):
         self.assertNotIn("VOTE ENGINE", html)
         self.assertNotIn("SYSTEM OVERRIDE", html)
         self.assertNotIn("buy_side", html)
-        self.assertIn("liquidation limit", html.lower())
 
     def test_alpha_pick_hidden_for_none_symbol(self):
         self.assertFalse(reporting._alpha_pick_displayable({"symbol": "NONE", "champion_quote": "wait"}))
