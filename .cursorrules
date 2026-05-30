@@ -84,8 +84,10 @@ Cursor adopts these personas via `.cursor/rules/*.mdc` files. The Supervisor orc
 ## 4. Execution Triggers
 * **During active coding:** Refactoring is advisory on save.
 * **Before commit:** QA Validation and Refactoring are blocking via git hooks.
-* **Before push:** Supervisor generates pre push summary.
-* **After pipeline run completes:** API Optimization, Data Insight, and Supervisor run advisory analysis.
+* **Before push:** Supervisor generates pre push summary (not yet automated — manual or future hook).
+* **After pipeline run completes (Azure):** At end of **deliver**, the pipeline writes `boardroom-state/post_job_oversight_{run_id}.json` — deterministic equivalents of API Optimization, Data Insight, and Supervisor (verdict, findings, human_actions). Standing QA digest persists as `qa_digest_{run_id}.json` at 7 AM.
+* **After pipeline run completes (local):** Run `tools/fetch_azure_reports.py --run-id RUN_ID --post-job` (or `scripts/wait_for_run.py --run-id RUN_ID --post-job`) to pull artifacts and mirror oversight into `.cursor/agent_state/ecosystem_state.json` → `api_audit`, `data_insights`, `supervisor_summaries`, `qa_scorecards`. Inspect with `tools/ecosystem_state.py show --last 5`.
+* **Cursor `.mdc` personas** remain available for ad-hoc deep dives; they do not auto-spawn. Production oversight is the Azure blob + local sync path above.
 
 ## 5. Sub Agent Invocation Pattern
 1. Supervisor declares phase and scope.

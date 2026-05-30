@@ -13,8 +13,16 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 RUN_ID_RE = re.compile(r"^\d{8}_\d{6}$")
 
 
-def _run_id_present(bucket: list, run_id: str) -> bool:
-    return any(isinstance(e, dict) and e.get("run_id") == run_id for e in bucket)
+def _entry_present(bucket: list, run_id: str, *, phase: str | None = None, agent: str | None = None) -> bool:
+    for e in bucket:
+        if not isinstance(e, dict) or e.get("run_id") != run_id:
+            continue
+        if phase and e.get("phase") != phase:
+            continue
+        if agent and e.get("agent") != agent:
+            continue
+        return True
+    return False
 
 
 def sync_ecosystem_from_cache(
@@ -23,7 +31,7 @@ def sync_ecosystem_from_cache(
     *,
     phase: str = "post_job",
 ) -> dict[str, bool]:
-    """Idempotently append qa_scorecards, data_insights, qa_human_reviews for run_id."""
+    """Idempotently append oversight + scorecards + retrospective + human review."""
     if not RUN_ID_RE.match(run_id):
         raise ValueError(f"Invalid run_id: {run_id!r}")
 
@@ -32,16 +40,24 @@ def sync_ecosystem_from_cache(
         cache = REPO_ROOT / cache
 
     from tools.ecosystem_state import append_entry, load_state
+    from src.qa.post_job_audit import append_oversight_to_ecosystem, load_oversight_from_cache
 
     state = load_state()
     synced: dict[str, bool] = {
+        "post_job_oversight": False,
         "qa_scorecards": False,
-        "data_insights": False,
+        "data_insights_retrospective": False,
         "qa_human_reviews": False,
     }
 
+    oversight = load_oversight_from_cache(cache, run_id)
+    if oversight:
+        result = append_oversight_to_ecosystem(oversight)
+        if any(result.values()):
+            synced["post_job_oversight"] = True
+
     telemetry_path = cache / "state" / f"api_telemetry_{run_id}.json"
-    if telemetry_path.exists() and not _run_id_present(state.get("qa_scorecards", []), run_id):
+    if telemetry_path.exists() and not _entry_present(state.get("qa_scorecards", []), run_id):
         telemetry = json.loads(telemetry_path.read_text(encoding="utf-8"))
         scorecard = telemetry.get("QA_SCORECARD")
         if scorecard:
@@ -56,7 +72,9 @@ def sync_ecosystem_from_cache(
             synced["qa_scorecards"] = True
 
     retro_path = cache / "state" / f"retrospective_{run_id}.json"
-    if retro_path.exists() and not _run_id_present(state.get("data_insights", []), run_id):
+    if retro_path.exists() and not _entry_present(
+        state.get("data_insights", []), run_id, phase="post_deliver_retrospective",
+    ):
         marker = json.loads(retro_path.read_text(encoding="utf-8"))
         candidates = marker.get("candidates") or marker.get("candidate_actions") or []
         flags = marker.get("flags") or marker.get("backlog_flags") or []
@@ -75,10 +93,10 @@ def sync_ecosystem_from_cache(
             ],
             "evidence_ref": f"retrospective_{run_id}.json",
         })
-        synced["data_insights"] = True
+        synced["data_insights_retrospective"] = True
 
     review_path = cache / "state" / f"qa_human_review_{run_id}.json"
-    if review_path.exists() and not _run_id_present(state.get("qa_human_reviews", []), run_id):
+    if review_path.exists() and not _entry_present(state.get("qa_human_reviews", []), run_id):
         review = json.loads(review_path.read_text(encoding="utf-8"))
         append_entry("qa_human_reviews", {
             "phase": phase,

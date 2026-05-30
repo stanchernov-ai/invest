@@ -181,6 +181,21 @@ async def run_deliver(run_id: str) -> dict:
         merged_telemetry["QA_SCORECARD"] = qa_scorecard
         storage_client.save_report(f"api_telemetry_{run_id}.json", json.dumps(merged_telemetry, indent=4))
 
+        # Post-job oversight blobs (API Optimization / Data Insight / Supervisor).
+        try:
+            from src.qa.post_job_audit import execute_post_job_oversight
+
+            run_status = storage_client.load_run_status_for_run(run_id) or {}
+            oversight = execute_post_job_oversight(
+                run_id, merged_telemetry, qa_reports, run_status=run_status,
+            )
+            logger.info(
+                "[DELIVER] Post-job oversight saved — verdict=%s.",
+                oversight.get("metrics", {}).get("verdict"),
+            )
+        except Exception as oversight_exc:
+            logger.error("[DELIVER] Post-job oversight failed (non-blocking): %s", oversight_exc)
+
         finished = now_local()
         storage_client.mark_phase(run_id, "deliver", "success",
                                   started_at=started.isoformat(),

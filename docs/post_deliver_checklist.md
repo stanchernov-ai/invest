@@ -40,6 +40,7 @@ Confirm under `.cache/`:
 | `state/qa_human_review_*.json` | Your confirmations (if submitted) |
 | `state/debate.json` | Chairman output + **`raw_verdicts`** (Round 2 vote SSOT) |
 | `state/board_verdicts.json` | Pass cooldown writes (after compliant deliver) |
+| `state/post_job_oversight_*.json` | API Optimization + Data Insight + Supervisor (Azure deliver step) |
 | `state/api_telemetry_*.json` | Scorecard + agent activity |
 | `reports/retrospective_*.md` | Auto-generated candidate action items (after deliver) |
 | `state/retrospective_*.json` | Idempotency marker (skip if already processed) |
@@ -145,7 +146,7 @@ Or wait for completion and sync in one step:
 .venv\Scripts\python.exe scripts\wait_for_run.py --run-id RUN_ID --post-job
 ```
 
-This writes to `.cursor/agent_state/ecosystem_state.json`:
+This writes to `.cursor/agent_state/ecosystem_state.json` (mirrors Azure `post_job_oversight_{run_id}.json`):
 
 | Bucket | Agent | What it captures |
 |--------|-------|------------------|

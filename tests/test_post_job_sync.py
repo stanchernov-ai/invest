@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from src.qa.post_job_audit import build_post_job_oversight
 from src.qa.post_mortem_audit import merge_post_mortem_reports
 from tools.post_job_sync import run_post_job_sync
 
@@ -51,6 +52,10 @@ class TestPostJobSync(unittest.TestCase):
                 from tools import ecosystem_state
 
                 ecosystem_state.EXAMPLE_PATH = cache / "missing_example.json"
+                bundle = build_post_job_oversight(run_id, telemetry, qa_reports)
+                (cache / "state" / f"post_job_oversight_{run_id}.json").write_text(
+                    json.dumps(bundle), encoding="utf-8"
+                )
                 result = run_post_job_sync(run_id, cache)
                 self.assertEqual(result["qa_critical_count"], 1)
                 state = ecosystem_state.load_state()
