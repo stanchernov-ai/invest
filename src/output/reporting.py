@@ -9,6 +9,7 @@ from jinja2 import Template
 import logging
 
 from src.output.briefing_enrichment import enrich_chairman_for_briefing_sync, _is_generic_synthesis
+from src.core.board_roster import PANELIST_AVATAR_URLS, PANELIST_ROLES
 from src.output.briefing_style import (
     executive_briefing_css,
     qa_dashboard_css,
@@ -917,13 +918,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     if red_team_data is None:
         red_team_data = {}
 
-    avatar_map = {
-        "Warren Buffett": "https://stboardroomprod.blob.core.windows.net/assets/buffett.jpg",
-        "Peter Lynch": "https://stboardroomprod.blob.core.windows.net/assets/lynch.jpg",
-        "Jesse Livermore": "https://stboardroomprod.blob.core.windows.net/assets/livermore.jpg",
-        "Jensen Huang": "https://stboardroomprod.blob.core.windows.net/assets/huang.jpg",
-        "Jim Simons": "https://stboardroomprod.blob.core.windows.net/assets/simons.jpg"
-    }
+    avatar_map = {role: PANELIST_AVATAR_URLS[key] for key, role in PANELIST_ROLES.items()}
 
     sotu_quotes = cos_data.get('state_of_the_union_quotes', [])
     for quote in sotu_quotes:

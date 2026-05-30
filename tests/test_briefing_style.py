@@ -1,6 +1,7 @@
 """Tests for Invest AI briefing visual style SSOT."""
 import unittest
 
+from src.core.board_roster import PANELIST_ROLES
 from src.output import briefing_style, reporting
 
 
@@ -24,12 +25,12 @@ class BriefingStyleTests(unittest.TestCase):
         self.assertEqual(briefing_style.CHART_LEGEND_FONT_SIZE, 14)
         self.assertEqual(briefing_style.CHART_CANVAS_DARK, briefing_style.BG_CANVAS)
 
-        bull = briefing_style.sotu_quote_colors("Warren Buffett ⭐⭐⭐⭐")
+        bull = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['franklin']} ⭐⭐⭐⭐")
         self.assertTrue(bull[0].startswith("rgba("))
         self.assertIn(str(briefing_style.SOTU_BG_ALPHA), bull[0])
-        sage = briefing_style.sotu_quote_colors("Peter Lynch ⭐⭐⭐")
+        sage = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['darwin']} ⭐⭐⭐")
         self.assertEqual(sage[1], briefing_style.BRAND_SAGE)
-        bear = briefing_style.sotu_quote_colors("Jim Simons ⭐")
+        bear = briefing_style.sotu_quote_colors(f"{PANELIST_ROLES['pythagoras']} ⭐")
         self.assertTrue(bear[0].startswith("rgba("))
 
     def test_briefing_html_includes_dark_theme(self):

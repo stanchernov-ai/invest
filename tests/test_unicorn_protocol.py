@@ -1,6 +1,7 @@
 import re
 import unittest
 
+from src.core.board_roster import PANELIST_AVATAR_URLS, PANELIST_ROLES
 from src.output.reporting import build_unicorn_protocol_items, generate_html_briefing
 from src.qa.visual_audit import audit_briefing_html
 
@@ -10,7 +11,7 @@ CHAIRMAN = {
         "final_verdict": "Hold",
         "synthesis": "Unanimous hold on quality compounder.",
         "narrative": {
-            "champion": "Warren Buffett",
+            "champion": PANELIST_ROLES["franklin"],
             "champion_quote": "Moat intact.",
             "dissenter": "None",
             "dissenter_quote": "N/A",
@@ -20,9 +21,9 @@ CHAIRMAN = {
         "final_verdict": "Buy",
         "synthesis": "Add on AI strength.",
         "narrative": {
-            "champion": "Jensen Huang",
+            "champion": PANELIST_ROLES["tesla"],
             "champion_quote": "Platform moat widening.",
-            "dissenter": "Warren Buffett",
+            "dissenter": PANELIST_ROLES["franklin"],
             "dissenter_quote": "Rich multiples.",
         },
     }],
@@ -42,9 +43,9 @@ RED_TEAM = {
 
 COS = {
     "state_of_the_union_quotes": [{
-        "board_member": "Warren Buffett (⭐⭐⭐ Bullish)",
+        "board_member": f"{PANELIST_ROLES['franklin']} (⭐⭐⭐ Bullish)",
         "quote": "Quality compounders remain attractive.",
-        "avatar_url": "https://example.com/buffett.jpg",
+        "avatar_url": PANELIST_AVATAR_URLS["franklin"],
     }],
     "boardroom_brawl": "The board debated.\n\nRound two heated up.\n\nChairman decided.",
 }

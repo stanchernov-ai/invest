@@ -5,7 +5,7 @@ import re
 
 from src.core.agents import agent_config
 
-PANELIST_KEYS = ("buffett", "lynch", "livermore", "huang", "simons")
+from src.core.board_roster import PANELIST_KEYS
 
 _OVERVIEW_RE = re.compile(
     r"\*\s*\*\*Portfolio Overview\*\*\s*:\s*(.+?)(?=\n\*|\Z)",

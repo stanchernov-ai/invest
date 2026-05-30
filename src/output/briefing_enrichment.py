@@ -10,6 +10,7 @@ from google.genai import types
 
 from src.core.agents import FAST_MODEL, FLASH_TOKEN_LIMIT, call_gemini_async, client
 from src.core.schemas import ActionPlanStrategicContexts
+from src.core.board_roster import normalize_panelist_key, resolve_panelist_key
 from src.core.vote_engine import (
     AGENT_DISPLAY,
     BUY_VERDICTS,
@@ -21,6 +22,14 @@ from src.core.vote_engine import (
 logger = logging.getLogger(__name__)
 
 _DISPLAY_TO_AGENT = {name: key for key, name in AGENT_DISPLAY.items()}
+for legacy_name, key in (
+    ("Warren Buffett", "franklin"),
+    ("Peter Lynch", "darwin"),
+    ("Jesse Livermore", "suntzu"),
+    ("Jensen Huang", "tesla"),
+    ("Jim Simons", "pythagoras"),
+):
+    _DISPLAY_TO_AGENT.setdefault(legacy_name, key)
 
 _GENERIC_SYNTHESIS_MARKERS = (
     "consensus mandate from today's panel vote",
@@ -47,6 +56,9 @@ def _iter_symbol_rows(raw_verdicts: dict[str, dict] | None):
         return
     for agent_key, agent_data in raw_verdicts.items():
         if not agent_data:
+            continue
+        agent_key = normalize_panelist_key(agent_key)
+        if agent_key not in AGENT_DISPLAY:
             continue
         for bucket in ("portfolio_verdicts", "watchlist_verdicts"):
             section = "portfolio" if bucket == "portfolio_verdicts" else "watchlist"

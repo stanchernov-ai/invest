@@ -25,14 +25,10 @@ logger = logging.getLogger(__name__)
 MAJORITY_THRESHOLD = 3
 PANEL_SIZE = 5
 
-AGENT_KEYS = ("buffett", "lynch", "livermore", "huang", "simons")
-AGENT_DISPLAY = {
-    "buffett": "Warren Buffett",
-    "lynch": "Peter Lynch",
-    "livermore": "Jesse Livermore",
-    "huang": "Jensen Huang",
-    "simons": "Jim Simons",
-}
+from src.core.board_roster import PANELIST_KEYS, PANELIST_ROLES, normalize_panelist_key
+
+AGENT_KEYS = PANELIST_KEYS
+AGENT_DISPLAY = PANELIST_ROLES
 
 Bucket = Literal["buy", "reduce", "hold", "pass"]
 
@@ -68,6 +64,9 @@ def _iter_panel_verdicts(raw_verdicts: dict[str, dict] | None):
         return
     for agent_key, agent_data in raw_verdicts.items():
         if not agent_data:
+            continue
+        agent_key = normalize_panelist_key(agent_key)
+        if agent_key not in AGENT_DISPLAY:
             continue
         for bucket in ("portfolio_verdicts", "watchlist_verdicts"):
             section = "portfolio" if bucket == "portfolio_verdicts" else "watchlist"

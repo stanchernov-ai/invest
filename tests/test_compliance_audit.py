@@ -1,6 +1,7 @@
 """Tests for deterministic compliance audit (in-loop chairman gate)."""
 import unittest
 
+from src.core.board_roster import PANELIST_KEYS, PANELIST_ROLES
 from src.core.compliance_audit import (
     audit_chairman_compliance,
     audit_chairman_vote_alignment,
@@ -76,7 +77,7 @@ class TestComplianceAudit(unittest.TestCase):
     def test_format_debate_extracts_rounds(self):
         messages = [
             {"content": "noise"},
-            {"content": "**[ROUND 2 REBUTTAL] Warren Buffett**:\nBuy META (8/10)"},
+            {"content": f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['franklin']}**:\nBuy META (8/10)"},
         ]
         text = format_debate_for_compliance(messages)
         self.assertIn("ROUND 2", text)
@@ -84,19 +85,19 @@ class TestComplianceAudit(unittest.TestCase):
 
     def test_fails_plurality_buy_without_majority(self):
         raw = {
-            "lynch": {
+            "darwin": {
                 "portfolio_verdicts": [],
                 "watchlist_verdicts": [
                     {"symbol": "AMZN", "verdict": "Buy", "conviction_score": 8, "analysis": "growth"},
                 ],
             },
-            "livermore": {
+            "suntzu": {
                 "portfolio_verdicts": [],
                 "watchlist_verdicts": [
                     {"symbol": "AMZN", "verdict": "Buy", "conviction_score": 7, "analysis": "tape"},
                 ],
             },
-            "buffett": {
+            "franklin": {
                 "portfolio_verdicts": [],
                 "watchlist_verdicts": [
                     {"symbol": "AMZN", "verdict": "Pass", "conviction_score": 5, "analysis": "val"},
@@ -128,7 +129,7 @@ class TestComplianceAudit(unittest.TestCase):
 
     def test_surplus_majority_buy_demotion_not_a_violation(self):
         raw = {}
-        for i, agent in enumerate(("buffett", "lynch", "livermore", "huang", "simons")):
+        for i, agent in enumerate(PANELIST_KEYS):
             raw[agent] = {
                 "portfolio_verdicts": [],
                 "watchlist_verdicts": [

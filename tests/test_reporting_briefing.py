@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 
+from src.core.board_roster import PANELIST_ROLES
 from src.output import reporting
 
 
@@ -70,14 +71,14 @@ class BriefingCopyTests(unittest.TestCase):
             "final_verdict": "Buy",
             "synthesis": "[VOTE ENGINE] Deterministic mandate from Round 2 panel votes (buy_side=3/5, sell_side=2/5).",
             "narrative": {
-                "champion": "Peter Lynch",
+                "champion": PANELIST_ROLES["darwin"],
                 "champion_quote": "Vote-engine mandate from unanimous / deterministic Round 2 panel votes.",
                 "dissenter": "None",
                 "dissenter_quote": "N/A",
             },
         })
         self.assertNotIn("VOTE ENGINE", pos["synthesis"])
-        self.assertIn("Peter Lynch", pos["narrative"]["champion"])
+        self.assertIn(PANELIST_ROLES["darwin"], pos["narrative"]["champion"])
         self.assertNotIn("Vote-engine", pos["narrative"]["champion_quote"])
 
     def test_briefing_html_hides_internal_jargon(self):
@@ -97,7 +98,7 @@ class BriefingCopyTests(unittest.TestCase):
                             "(buy_side=0/5, sell_side=5/5)."
                         ),
                         "narrative": {
-                            "champion": "Warren Buffett",
+                            "champion": PANELIST_ROLES["franklin"],
                             "champion_quote": "Vote-engine mandate from unanimous / deterministic Round 2 panel votes.",
                             "dissenter": "None",
                             "dissenter_quote": "N/A",
@@ -125,7 +126,7 @@ class BriefingCopyTests(unittest.TestCase):
         self.assertFalse(reporting._debate_has_content("Short."))
 
     def test_debate_hidden_for_truncated_mid_sentence(self):
-        truncated = "Buffett initiated by dismissing the entire portfolio as"
+        truncated = "Franklin initiated by dismissing the entire portfolio as"
         self.assertFalse(reporting._debate_has_content(truncated))
 
 
@@ -244,7 +245,7 @@ class BriefingHtmlTests(unittest.TestCase):
                         "final_verdict": "Sell",
                         "synthesis": "Unanimous sell mandate.",
                         "narrative": {
-                            "champion": "Jim Simons",
+                            "champion": PANELIST_ROLES["pythagoras"],
                             "champion_quote": "Mathematically suboptimal.",
                             "dissenter": "None",
                             "dissenter_quote": "N/A",
@@ -284,7 +285,7 @@ class BriefingHtmlTests(unittest.TestCase):
                         "symbol": "NVDA",
                         "final_verdict": "Buy",
                         "synthesis": "Strong momentum.",
-                        "narrative": {"champion": "Buffett", "champion_quote": "Buy.", "dissenter": "NONE", "dissenter_quote": "N/A"},
+                        "narrative": {"champion": "Franklin", "champion_quote": "Buy.", "dissenter": "NONE", "dissenter_quote": "N/A"},
                     }
                 ],
                 "watchlist_positions": [],
@@ -293,7 +294,7 @@ class BriefingHtmlTests(unittest.TestCase):
             },
             cos_data={
                 "state_of_the_union_quotes": [
-                    {"board_member": "Warren Buffett", "quote": "Markets remain rational long term."},
+                    {"board_member": PANELIST_ROLES["franklin"], "quote": "Markets remain rational long term."},
                 ],
                 "boardroom_brawl": "x" * 100,
             },

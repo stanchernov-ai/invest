@@ -7,17 +7,13 @@ from __future__ import annotations
 
 import re
 
-PANELIST_MARKERS: dict[str, str] = {
-    "buffett": "Warren Buffett",
-    "lynch": "Peter Lynch",
-    "livermore": "Jesse Livermore",
-    "huang": "Jensen Huang",
-    "simons": "Jim Simons",
-}
+from src.core.board_roster import PANELIST_ROLES
+
+PANELIST_MARKERS = PANELIST_ROLES
 
 # Round-2 text must not lean on another agent's core vocabulary (case-insensitive).
 FORBIDDEN_PHRASES: dict[str, tuple[str, ...]] = {
-    "livermore": (
+    "suntzu": (
         "p/e",
         "pe ratio",
         "price-to-earnings",
@@ -27,7 +23,7 @@ FORBIDDEN_PHRASES: dict[str, tuple[str, ...]] = {
         "free cash flow",
         "return on equity",
     ),
-    "buffett": (
+    "franklin": (
         "3m trend",
         "relative strength",
         "the tape",
@@ -35,7 +31,7 @@ FORBIDDEN_PHRASES: dict[str, tuple[str, ...]] = {
         "breakout",
         "rising scale",
     ),
-    "simons": (
+    "pythagoras": (
         "economic moat",
         "margin of safety",
         "story stock",

@@ -84,10 +84,14 @@ def parse_board_matrix(raw_messages, all_tickers):
 
 
 def generate_matrix_markdown(matrix):
-    md = "| Ticker | Buffett | Lynch | Livermore | Huang | Simons |\n|---|---|---|---|---|---|\n"
+    from src.core.vote_engine import AGENT_DISPLAY, AGENT_KEYS
+
+    headers = " | ".join(AGENT_DISPLAY[k] for k in AGENT_KEYS)
+    md = f"| Ticker | {headers} |\n|{'---|' * (len(AGENT_KEYS) + 1)}\n"
     for ticker, votes in matrix.items():
         if any(v != "" for v in votes.values()):
-            md += f"| **{ticker}** | {votes['buffett']} | {votes['lynch']} | {votes['livermore']} | {votes['huang']} | {votes['simons']} |\n"
+            row = " | ".join(votes[k] for k in AGENT_KEYS)
+            md += f"| **{ticker}** | {row} |\n"
     return md
 
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 
 from src.core.agents import agent_config
-from src.core.state_of_union import PANELIST_KEYS
+from src.core.board_roster import PANELIST_KEYS, PANELIST_ROLES
 
 _OVERVIEW_MARKERS = ("**Portfolio Overview**", "**Rebuttal Summary**")
 _ROUND1 = re.compile(r"\*\*\[ROUND 1\]", re.I)

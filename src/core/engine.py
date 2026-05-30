@@ -30,6 +30,7 @@ from src.core.vote_engine import (
     format_vote_digest,
 )
 from src.core.agents import call_gemini_async, agent_config, FAST_MODEL, FLASH_TOKEN_LIMIT
+from src.core.board_roster import CONCENTRATION_AUDIT_KEYS, PANELIST_KEYS
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +196,7 @@ class StateMachineOrchestrator:
         self.oracle_reason = result["reason"]
 
     async def execute_parallel_board(self) -> None:
-        agents = ["buffett", "lynch", "livermore", "huang", "simons"]
+        agents = list(PANELIST_KEYS)
         tasks = [self._run_agent(a, "Provide initial asset analysis.", schema=PanelistPortfolioVerdict) for a in agents]
         results = await asyncio.gather(*tasks)
         
@@ -217,7 +218,7 @@ class StateMachineOrchestrator:
             self.state.messages.append({"role": "assistant", "content": msg})
 
     async def execute_rebuttal_round(self) -> None:
-        agents = ["buffett", "lynch", "livermore", "huang", "simons"]
+        agents = list(PANELIST_KEYS)
         tasks = [
             self._run_agent(
                 a,
@@ -281,8 +282,8 @@ class StateMachineOrchestrator:
                 "Your previous boardroom_brawl was truncated or incomplete. "
                 "Return ONLY valid JSON with a complete boardroom_brawl field: exactly 3 full "
                 "paragraphs (blank line between each), 3-4 sentences per paragraph, ending with "
-                "proper punctuation. Name Warren Buffett, Peter Lynch, Jesse Livermore, Jensen Huang, "
-                "and Jim Simons where relevant.\n\n"
+                "proper punctuation. Name Benjamin Franklin, Charles Darwin, Sun Tzu, Nikola Tesla, "
+                "and Pythagoras where relevant.\n\n"
                 f"{debate_digest}"
             )
             retry_res = await self._run_agent(
@@ -305,7 +306,7 @@ class StateMachineOrchestrator:
         self.state.chief_of_staff_json = json.dumps(cos_res) if cos_res else "{}"
 
     async def execute_munger_audit(self) -> None:
-        roster = ["buffett", "huang", "lynch"]
+        roster = list(CONCENTRATION_AUDIT_KEYS)
         prompt = f"Concentration warning for: {self.state.heavy_tickers}. Validate structural health."
         tasks = [self._run_agent(a, prompt, schema=PanelistPortfolioVerdict) for a in roster]
         results = await asyncio.gather(*tasks)

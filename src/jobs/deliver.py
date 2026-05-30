@@ -221,7 +221,7 @@ async def run_deliver(run_id: str) -> dict:
             sym for sym in (prep.get("all_symbols") or [])
             if sym not in portfolio_syms
         ]
-        # Watchlist Pass cooldown — only after compliance-approved debate (Markopolos gate).
+        # Watchlist Pass cooldown — only after compliance-approved debate (compliance gate).
         verdict_memory.persist_chairman_watchlist_passes(
             c_data,
             run_id,

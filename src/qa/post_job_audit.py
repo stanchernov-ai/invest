@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 RUN_ID_RE = re.compile(r"^\d{8}_\d{6}$")
 
 EXPECTED_ACTIVE_KEYS = frozenset({
-    "buffett", "lynch", "livermore", "huang", "simons", "clerk", "red_teamer",
+    "franklin", "darwin", "suntzu", "tesla", "pythagoras", "clerk", "red_teamer",
     "post_mortem_qa", "system_architect", "prompt_engineer", "graphics_designer_qa",
     "qa_integrity_auditor",
 })

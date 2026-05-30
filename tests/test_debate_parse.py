@@ -1,6 +1,7 @@
 """Tests for Round 2 debate log parsing helpers."""
 import unittest
 
+from src.core.board_roster import PANELIST_ROLES
 from src.core.rebuttal import parse_ticker_verdict_from_line
 from src.qa_pipeline import parse_board_matrix
 
@@ -17,19 +18,21 @@ class TestDebateParse(unittest.TestCase):
         self.assertEqual(parsed, ("AMD", "Pass"))
 
     def test_cumulative_round2_matrix_uses_latest_panelist_block(self):
+        franklin = PANELIST_ROLES["franklin"]
+        darwin = PANELIST_ROLES["darwin"]
         cumulative = {
             "content": (
-                "**[ROUND 1] Warren Buffett**:\n"
+                f"**[ROUND 1] {franklin}**:\n"
                 "* **ANET**: Strong Buy (8/10).\n\n"
-                "**[ROUND 2 REBUTTAL] Warren Buffett**:\n"
+                f"**[ROUND 2 REBUTTAL] {franklin}**:\n"
                 "* **ANET**: Strong Sell (7/10).\n\n"
-                "**[ROUND 2 REBUTTAL] Peter Lynch**:\n"
+                f"**[ROUND 2 REBUTTAL] {darwin}**:\n"
                 "* **ANET**: Sell (6/10).\n"
             )
         }
         matrix = parse_board_matrix([cumulative], ["ANET"])
-        self.assertEqual(matrix["ANET"]["buffett"], "Strong Sell")
-        self.assertEqual(matrix["ANET"]["lynch"], "Sell")
+        self.assertEqual(matrix["ANET"]["franklin"], "Strong Sell")
+        self.assertEqual(matrix["ANET"]["darwin"], "Sell")
 
 
 if __name__ == "__main__":

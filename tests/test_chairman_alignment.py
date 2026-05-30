@@ -1,6 +1,7 @@
 """Tests for chairman ↔ board majority coherence (P0.2 / run 20260529_134042)."""
 import unittest
 
+from src.core.board_roster import PANELIST_KEYS
 from src.core.vote_engine import board_majority_buy_counts
 from src.core.chairman_alignment import (
     apply_board_and_cap_coherence,
@@ -29,9 +30,9 @@ def _pos(symbol, verdict, conviction=10, synthesis="Rationale."):
 
 def _round2_raw_verdicts(amzn_votes: int = 3) -> dict:
     """Three panelists Buy AMZN; others Pass — majority Buy on AMZN."""
-    buy_agents = ("lynch", "livermore", "huang")[:amzn_votes]
+    buy_agents = ("darwin", "suntzu", "tesla")[:amzn_votes]
     raw = {}
-    for agent in ("buffett", "lynch", "livermore", "huang", "simons"):
+    for agent in PANELIST_KEYS:
         verdict = "Buy" if agent in buy_agents else "Pass"
         raw[agent] = {
             "portfolio_verdicts": [],

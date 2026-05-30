@@ -3,6 +3,7 @@ import os
 import unittest
 from unittest.mock import AsyncMock, patch
 
+from src.core.board_roster import resolve_panelist_key
 from src.output import briefing_enrichment, reporting
 
 
@@ -38,7 +39,12 @@ class BriefingEnrichmentTests(unittest.TestCase):
         if "[SYSTEM OVERRIDE" in asml["synthesis"]:
             self.assertIn("liquidation limit", (enriched.get("override_context") or "").lower())
         champion = enriched["narrative"]["champion"]
-        self.assertIn(champion, asml.get("supporting_members") or [])
+        champion_key = resolve_panelist_key(champion) or champion
+        supporter_keys = {
+            resolve_panelist_key(name) or name
+            for name in (asml.get("supporting_members") or [])
+        }
+        self.assertIn(champion_key, supporter_keys)
 
     def test_action_plan_html_shows_three_layers(self):
         if not os.path.exists(FIXTURE_DEBATE):

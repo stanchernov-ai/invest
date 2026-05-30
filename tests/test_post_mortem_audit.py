@@ -2,6 +2,7 @@
 import json
 import unittest
 
+from src.core.board_roster import PANELIST_KEYS, PANELIST_ROLES
 from src.core.compliance_audit import audit_chairman_compliance
 from src.qa.post_mortem_audit import (
     audit_debate_prose_vs_raw_verdicts,
@@ -13,7 +14,7 @@ from src.qa.post_mortem_audit import (
 
 
 def _raw_verdicts_amzn_buy_votes(buy_count: int) -> dict:
-    agents = ["buffett", "lynch", "livermore", "huang", "simons"]
+    agents = list(PANELIST_KEYS)
     buy_agents = agents[:buy_count]
     raw = {}
     for agent in agents:
@@ -118,18 +119,18 @@ class TestPostMortemAudit(unittest.TestCase):
         raw = _raw_verdicts_amzn_buy_votes(3)
         messages = [{
             "content": (
-                "**[ROUND 2 REBUTTAL] Warren Buffett**:\n"
+                f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['franklin']}**:\n"
                 "* **AMZN**: Pass (2/10).\n"
-                "**[ROUND 2 REBUTTAL] Peter Lynch**:\n"
+                f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['darwin']}**:\n"
                 "* **AMZN**: Buy (8/10).\n"
             )
         }]
-        # buffett Pass in prose but Buy in raw for first agent — fix raw to create drift
-        raw["buffett"]["watchlist_verdicts"][0]["verdict"] = "Buy"
+        # franklin Pass in prose but Buy in raw for first agent — fix raw to create drift
+        raw["franklin"]["watchlist_verdicts"][0]["verdict"] = "Buy"
         violations = audit_debate_prose_vs_raw_verdicts(
             messages, raw, all_symbols=["AMZN"]
         )
-        self.assertTrue(any("VOTE JSON/PROSE DRIFT" in v and "Warren Buffett" in v for v in violations))
+        self.assertTrue(any("VOTE JSON/PROSE DRIFT" in v and PANELIST_ROLES["franklin"] in v for v in violations))
 
     def test_cumulative_debate_messages_align_with_json(self):
         import json

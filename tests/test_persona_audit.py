@@ -1,6 +1,7 @@
 """Tests for deterministic persona audit (Prompt Engineer QA pre-check)."""
 import unittest
 
+from src.core.board_roster import PANELIST_ROLES
 from src.qa.persona_audit import (
     audit_debate_persona,
     format_persona_digest,
@@ -18,25 +19,25 @@ class TestPersonaAudit(unittest.TestCase):
         from src.qa_pipeline import parse_board_matrix
 
         messages = [
-            _round2_msg("Warren Buffett", "* **META**: Buy (8/10)."),
-            _round2_msg("Peter Lynch", "* **META**: Hold (6/10)."),
+            _round2_msg(PANELIST_ROLES["franklin"], "* **META**: Buy (8/10)."),
+            _round2_msg(PANELIST_ROLES["darwin"], "* **META**: Hold (6/10)."),
         ]
         matrix = parse_board_matrix(messages, ["META"])
-        self.assertEqual(matrix["META"]["buffett"], "Buy")
-        self.assertEqual(matrix["META"]["lynch"], "Hold")
+        self.assertEqual(matrix["META"]["franklin"], "Buy")
+        self.assertEqual(matrix["META"]["darwin"], "Hold")
 
-    def test_livermore_forbidden_pe_ratio(self):
+    def test_suntzu_forbidden_pe_ratio(self):
         messages = [
-            _round2_msg("Jesse Livermore", "* **NVDA**: Buy. The P/E ratio supports momentum."),
+            _round2_msg(PANELIST_ROLES["suntzu"], "* **NVDA**: Buy. The P/E ratio supports momentum."),
         ]
         violations, _ = audit_debate_persona(messages, ["NVDA"])
-        self.assertTrue(any("PERSONA DRIFT" in v and "Livermore" in v for v in violations))
+        self.assertTrue(any("PERSONA DRIFT" in v and "Sun Tzu" in v for v in violations))
 
     def test_unanimous_collapse_detected(self):
         symbols = ["A", "B", "C", "D"]
         messages = []
         for sym in symbols:
-            for agent in ("Warren Buffett", "Peter Lynch", "Jesse Livermore", "Jensen Huang", "Jim Simons"):
+            for agent in PANELIST_ROLES.values():
                 messages.append(_round2_msg(agent, f"* **{sym}**: Buy (8/10)."))
         violations, stats = audit_debate_persona(messages, symbols)
         self.assertGreaterEqual(stats["unanimous_rate"], 0.6)
@@ -44,9 +45,9 @@ class TestPersonaAudit(unittest.TestCase):
 
     def test_clean_debate_passes_deterministic(self):
         messages = [
-            _round2_msg("Warren Buffett", "* **META**: Hold. Cash flow adequate but no margin of safety."),
-            _round2_msg("Jesse Livermore", "* **META**: Trim. Tape weakening vs QQQ."),
-            _round2_msg("Jim Simons", "* **META**: Hold. Beta elevated; edge unclear."),
+            _round2_msg(PANELIST_ROLES["franklin"], "* **META**: Hold. Cash flow adequate but no margin of safety."),
+            _round2_msg(PANELIST_ROLES["suntzu"], "* **META**: Trim. Tape weakening vs QQQ."),
+            _round2_msg(PANELIST_ROLES["pythagoras"], "* **META**: Hold. Beta elevated; edge unclear."),
         ]
         violations, _ = audit_debate_persona(messages, ["META"])
         self.assertEqual(violations, [])
@@ -72,22 +73,23 @@ class TestPersonaAudit(unittest.TestCase):
 
     def test_verbatim_r1_copy_detected_in_persona_audit(self):
         shared = "The portfolio is too concentrated in mega-cap tech without margin of safety."
+        franklin = PANELIST_ROLES["franklin"]
         messages = [
             {
                 "content": (
-                    f"**[ROUND 1] Warren Buffett**:\n* **Portfolio Overview**: {shared}\n"
+                    f"**[ROUND 1] {franklin}**:\n* **Portfolio Overview**: {shared}\n"
                     "* **NVDA**: Hold (5/10).\n"
                 )
             },
             {
                 "content": (
-                    f"**[ROUND 2 REBUTTAL] Warren Buffett**:\n* **Rebuttal Summary**: {shared}\n"
+                    f"**[ROUND 2 REBUTTAL] {franklin}**:\n* **Rebuttal Summary**: {shared}\n"
                     "* **NVDA**: Hold (5/10).\n"
                 )
             },
         ]
         violations, stats = audit_debate_persona(messages, ["NVDA"])
-        self.assertIn("buffett", stats["verbatim_r1_copies"])
+        self.assertIn("franklin", stats["verbatim_r1_copies"])
         self.assertTrue(any("VERBATIM R1 COPY" in v for v in violations))
 
     def test_format_digest_includes_stats(self):
@@ -99,13 +101,13 @@ class TestPersonaAudit(unittest.TestCase):
         """Prod debate checkpoints append R2 blocks; scan only the agent's section."""
         cumulative = {
             "content": (
-                "**[ROUND 2 REBUTTAL] Peter Lynch**:\n"
+                f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['darwin']}**:\n"
                 "* **Rebuttal Summary**: The portfolio's problem isn't high P/E ratios.\n"
                 "* **NET**: Pass (2/10). This is a story stock with no earnings.\n\n"
-                "**[ROUND 2 REBUTTAL] Jesse Livermore**:\n"
+                f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['suntzu']}**:\n"
                 "* **Rebuttal Summary**: The tape is the only truth.\n"
                 "* **NVDA**: Strong Sell (10/10). Lagging the QQQ.\n\n"
-                "**[ROUND 2 REBUTTAL] Jim Simons**:\n"
+                f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['pythagoras']}**:\n"
                 "* **Rebuttal Summary**: Alpha decay requires reallocation.\n"
                 "* **NVDA**: Strong Buy (10/10). PEG 0.29 supports the edge.\n"
             )

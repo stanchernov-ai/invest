@@ -1,6 +1,7 @@
 """Tests for deterministic vote_engine (Phase A–C mandate voting)."""
 import unittest
 
+from src.core.board_roster import PANELIST_KEYS
 from src.core.compliance_audit import audit_chairman_compliance, audit_chairman_vote_alignment
 from src.core.vote_engine import (
     apply_max_three_buys,
@@ -20,7 +21,7 @@ from src.core.vote_engine import (
 
 
 def _raw_portfolio_symbol(symbol: str, verdicts: list[tuple[str, int]]) -> dict:
-    agents = ("buffett", "lynch", "livermore", "huang", "simons")
+    agents = PANELIST_KEYS
     raw = {a: {"portfolio_verdicts": [], "watchlist_verdicts": []} for a in agents}
     for agent, (verdict, conviction) in zip(agents, verdicts):
         raw[agent]["portfolio_verdicts"] = [
@@ -30,7 +31,7 @@ def _raw_portfolio_symbol(symbol: str, verdicts: list[tuple[str, int]]) -> dict:
 
 
 def _raw_watchlist_symbol(symbol: str, verdicts: list[tuple[str, int]]) -> dict:
-    agents = ("buffett", "lynch", "livermore", "huang", "simons")
+    agents = PANELIST_KEYS
     raw = {a: {"portfolio_verdicts": [], "watchlist_verdicts": []} for a in agents}
     for agent, (verdict, conviction) in zip(agents, verdicts):
         raw[agent]["watchlist_verdicts"] = [
@@ -215,7 +216,7 @@ class TestVoteEnginePhaseC(unittest.TestCase):
     def test_build_matrix_from_json(self):
         raw = _majority_buy_raw("META")
         matrix = build_matrix_from_raw_verdicts(raw, ["META"])
-        self.assertEqual(matrix["META"]["buffett"], "Buy")
+        self.assertEqual(matrix["META"]["franklin"], "Buy")
 
     def test_apply_max_three_buys_standalone(self):
         chairman = {
