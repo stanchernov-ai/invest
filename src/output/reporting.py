@@ -539,7 +539,10 @@ def _sanitize_position_for_briefing(pos: dict) -> dict:
     context = _sanitize_briefing_text(
         pos.get("strategic_context") or pos.get("synthesis", "")
     )
-    if len(context) < 12 or _is_generic_synthesis(context):
+    if pos.get("strategic_context"):
+        if len(context.strip()) < 12:
+            context = _DEFAULT_SYNTHESIS
+    elif len(context) < 12 or _is_generic_synthesis(context):
         context = _DEFAULT_SYNTHESIS
     out["strategic_context"] = context
     out["synthesis"] = context
