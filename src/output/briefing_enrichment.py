@@ -27,8 +27,7 @@ _GENERIC_SYNTHESIS_MARKERS = (
     "investment committee finalized this position",
     "vote-engine mandate",
     "deterministic mandate from round 2",
-    "vote engine",
-    "buy_side=",
+    "[vote engine]",
 )
 
 _STRATEGIC_CONTEXT_SYSTEM = """You are the board secretary drafting Strategic Context lines for an executive Action Plan.
