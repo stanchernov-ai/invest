@@ -323,11 +323,13 @@ class DeliverPerformanceTests(unittest.TestCase):
     def test_audit_chart_health_probes_all_charts(self):
         probed = []
 
-        def fake_probe(url):
+        def fake_fetch(url):
             probed.append(url)
-            return bool(url), "OK"
+            if url:
+                return True, "OK", b"\x89PNG", "image/png"
+            return False, "empty", None, None
 
-        with patch.object(reporting, "_probe_image_url", side_effect=fake_probe):
+        with patch.object(reporting, "_fetch_image_url", side_effect=fake_fetch):
             health = reporting.audit_chart_health({
                 "pie_chart_url": "https://example.com/pie",
                 "bar_chart_url": "https://example.com/bar",
@@ -336,6 +338,21 @@ class DeliverPerformanceTests(unittest.TestCase):
             })
         self.assertEqual(len(health), 4)
         self.assertEqual(len(probed), 4)
+        self.assertTrue(all(row.get("bytes") for row in health if row.get("url")))
+
+    def test_chart_health_image_cache_maps_urls(self):
+        health = [
+            {
+                "name": "Line",
+                "ok": True,
+                "url": "https://example.com/line",
+                "bytes": b"line-bytes",
+                "mime_type": "image/png",
+            }
+        ]
+        cache = reporting.chart_health_image_cache(health)
+        self.assertIn("https://example.com/line", cache)
+        self.assertEqual(cache["https://example.com/line"]["bytes"], b"line-bytes")
 
     def test_inject_qa_summary_replaces_anchor(self):
         base = "<html><body><footer></footer><!-- QA_SUMMARY_ANCHOR --></body></html>"

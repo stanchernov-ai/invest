@@ -27,6 +27,23 @@ class TestBriefingVisualAssets(unittest.TestCase):
         self.assertEqual(assets[0]["mime_type"], "image/png")
         mock_get.assert_called_once()
 
+    @patch("src.output.reporting.requests.get")
+    def test_fetch_reuses_prefetched_chart_bytes(self, mock_get):
+        chart_url = "https://example.com/chart-a.png"
+        html = f'<html><body><img src="{chart_url}" alt="Performance vs. Benchmark"></body></html>'
+        prefetched = {
+            chart_url: {
+                "name": "Performance vs. Benchmark — indexed (line)",
+                "url": chart_url,
+                "bytes": b"\x89PNG cached",
+                "mime_type": "image/png",
+            }
+        }
+        assets = fetch_briefing_visual_assets(html, prefetched_by_url=prefetched)
+        self.assertEqual(len(assets), 1)
+        self.assertEqual(assets[0]["bytes"], b"\x89PNG cached")
+        mock_get.assert_not_called()
+
 
 class TestChartHealthFormat(unittest.TestCase):
     def test_format_marks_broken(self):

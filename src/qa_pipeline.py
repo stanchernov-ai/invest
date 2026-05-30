@@ -375,7 +375,10 @@ async def run_graphics_designer_qa(
         logger.warning("Graphics QA: deterministic chart-health failed; skipping visual LLM review.")
         return deterministic
 
-    visual_assets = reporting.fetch_briefing_visual_assets(final_briefing_html)
+    visual_assets = reporting.fetch_briefing_visual_assets(
+        final_briefing_html,
+        prefetched_by_url=reporting.chart_health_image_cache(chart_health),
+    )
     health_text = reporting.format_chart_health(chart_health)
     html_excerpt = (final_briefing_html or "")[:GRAPHICS_BRIEFING_HTML_CHAR_LIMIT]
 

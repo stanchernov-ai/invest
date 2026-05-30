@@ -48,27 +48,37 @@ def get_quickchart_short_url(chart_config, width=600, height=300, background_col
     return f"https://quickchart.io/chart?w={width}&h={height}&bkg={bkg}&c={encoded_config}"
 
 
+def _fetch_image_url(url):
+    """Download an image URL; used by chart health probes and briefing asset fetch."""
+    if not url:
+        return False, "No chart generated (empty URL).", None, None
+    try:
+        resp = requests.get(url, timeout=12)
+        status = resp.status_code
+        ctype = (resp.headers.get("content-type") or "").split(";")[0].strip().lower()
+        body = resp.content
+        if status != 200:
+            return False, f"HTTP {status} when fetching chart.", None, None
+        if "image" not in ctype and "svg" not in ctype:
+            return False, f"Non-image content-type returned: {ctype or 'unknown'}.", None, None
+        mime = ctype if ctype.startswith("image/") else "image/png"
+        return True, f"OK (HTTP 200, {ctype}).", body, mime
+    except Exception as e:
+        return False, f"Request failed: {e}", None, None
+
+
 def _probe_image_url(url):
     """Best-effort HTTP check that a chart URL actually serves an image."""
-    if not url:
-        return False, "No chart generated (empty URL)."
-    try:
-        resp = requests.get(url, timeout=12, stream=True)
-        status = resp.status_code
-        ctype = resp.headers.get("content-type", "")
-        resp.close()
-        if status != 200:
-            return False, f"HTTP {status} when fetching chart."
-        if "image" not in ctype and "svg" not in ctype:
-            return False, f"Non-image content-type returned: {ctype or 'unknown'}."
-        return True, f"OK (HTTP 200, {ctype})."
-    except Exception as e:
-        return False, f"Request failed: {e}"
+    ok, detail, _, _ = _fetch_image_url(url)
+    return ok, detail
 
 
 def audit_chart_health(chart_urls):
     """Deterministically verify each briefing chart renders. Ground truth for the
-    Graphics Designer QA agent, which cannot 'see' rendered images itself."""
+    Graphics Designer QA agent, which cannot 'see' rendered images itself.
+
+    Successful probes retain image bytes so Graphics QA can reuse them without
+    re-downloading the same chart URLs."""
     labels = {
         "line_chart_url": "Performance vs. Benchmark — indexed (line)",
         "bar_chart_url": "Personal Return by Asset (bar)",
@@ -80,11 +90,32 @@ def audit_chart_health(chart_urls):
     def _probe_one(item):
         key, name = item
         url = urls.get(key, "")
-        ok, detail = _probe_image_url(url)
-        return {"name": name, "ok": ok, "detail": detail, "url": url}
+        ok, detail, body, mime = _fetch_image_url(url)
+        entry = {"name": name, "ok": ok, "detail": detail, "url": url}
+        if ok and body:
+            entry["bytes"] = body
+            entry["mime_type"] = mime
+        return entry
 
     with ThreadPoolExecutor(max_workers=_CHART_PARALLEL_WORKERS) as pool:
         return list(pool.map(_probe_one, labels.items()))
+
+
+def chart_health_image_cache(chart_health: list[dict]) -> dict[str, dict]:
+    """Map chart URL -> prefetched asset payload from audit_chart_health probes."""
+    cache: dict[str, dict] = {}
+    for row in chart_health or []:
+        url = (row.get("url") or "").strip()
+        body = row.get("bytes")
+        if not row.get("ok") or not url or not body:
+            continue
+        cache[url] = {
+            "name": row.get("name") or "chart",
+            "url": url,
+            "bytes": body,
+            "mime_type": row.get("mime_type") or "image/png",
+        }
+    return cache
 
 
 def format_chart_health(health):
@@ -97,16 +128,23 @@ def format_chart_health(health):
     return "\n".join(lines)
 
 
-def fetch_briefing_visual_assets(html: str, max_images: int = 10) -> list[dict]:
+def fetch_briefing_visual_assets(
+    html: str,
+    max_images: int = 10,
+    *,
+    prefetched_by_url: dict[str, dict] | None = None,
+) -> list[dict]:
     """Download chart/avatar images embedded in the final briefing HTML.
 
     These bytes are what the Graphics Designer agent reviews — the same images
-    a recipient's email client loads from the saved Azure artifact."""
+    a recipient's email client loads from the saved Azure artifact. Chart URLs
+    probed during audit_chart_health can be passed via prefetched_by_url."""
     from bs4 import BeautifulSoup
 
     if not html:
         return []
 
+    prefetched_by_url = prefetched_by_url or {}
     assets = []
     soup = BeautifulSoup(html, "html.parser")
     for idx, img in enumerate(soup.find_all("img")):
@@ -115,6 +153,15 @@ def fetch_briefing_visual_assets(html: str, max_images: int = 10) -> list[dict]:
         src = (img.get("src") or "").strip()
         alt = (img.get("alt") or f"briefing_image_{idx + 1}").strip()
         if not src or src.startswith("data:"):
+            continue
+        cached = prefetched_by_url.get(src)
+        if cached:
+            assets.append({
+                "name": alt or cached.get("name") or f"briefing_image_{idx + 1}",
+                "url": src,
+                "bytes": cached["bytes"],
+                "mime_type": cached.get("mime_type") or "image/png",
+            })
             continue
         try:
             resp = requests.get(src, timeout=15, stream=True)
