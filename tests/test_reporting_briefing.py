@@ -203,6 +203,45 @@ class ChartColorTests(unittest.TestCase):
 
 
 class BriefingHtmlTests(unittest.TestCase):
+    def test_action_plan_integrated_blocks_without_summary_table(self):
+        html = reporting.generate_html_briefing(
+            total_val=500_000,
+            qqq_trend=2.0,
+            portfolio_3m_trend=1.0,
+            mandate="CAGR of 12.00 percent projected balance at age 65 is $1,000,000.00",
+            chairman_data={
+                "portfolio_positions": [
+                    {
+                        "symbol": "TSM",
+                        "final_verdict": "Sell",
+                        "synthesis": "Unanimous sell mandate.",
+                        "narrative": {
+                            "champion": "Jim Simons",
+                            "champion_quote": "Mathematically suboptimal.",
+                            "dissenter": "None",
+                            "dissenter_quote": "N/A",
+                        },
+                    }
+                ],
+                "watchlist_positions": [],
+                "alpha_pick": {"symbol": "NONE", "champion_quote": "N/A"},
+                "upcoming_events": [],
+            },
+            cos_data={"state_of_the_union_quotes": [], "boardroom_brawl": "x" * 100},
+            matrix_md="",
+            unicorn_trades=[],
+            sorted_ledger=[],
+            chart_urls={},
+        )
+        action_pos = html.find("The Action Plan")
+        after_action = html[action_pos:]
+        self.assertNotRegex(
+            after_action[:1500],
+            r"<th[^>]*>Symbol</th>\s*<th[^>]*>Action</th>",
+        )
+        self.assertIn("Strategic Context:", after_action)
+        self.assertIn("SELL : TSM", after_action)
+
     def test_section_order_and_footer(self):
         html = reporting.generate_html_briefing(
             total_val=150_000,
@@ -243,14 +282,12 @@ class BriefingHtmlTests(unittest.TestCase):
         )
         perf_pos = html.find("Performance vs. Benchmark")
         pie_pos = html.find("Unrealized Gains")
-        twr_pos = html.find("Time-Weighted Returns")
         sotu_pos = html.find("The State of the Union")
         action_pos = html.find("The Action Plan")
         self.assertLess(perf_pos, pie_pos)
-        self.assertLess(pie_pos, twr_pos)
-        self.assertLess(twr_pos, sotu_pos)
+        self.assertLess(pie_pos, sotu_pos)
         self.assertLess(sotu_pos, action_pos)
-        self.assertIn("Symbol", html)
+        self.assertNotIn("Time-Weighted Returns", html)
         self.assertIn("NVDA", html)
         self.assertIn("Invest AI Daily Briefing", html)
         self.assertNotIn("Generated autonomously", html)

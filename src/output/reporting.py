@@ -389,42 +389,6 @@ def build_account_allocation_pie(account_holdings, account_returns):
 
     return _render_outlabeled_pie_chart(labels, data, colors)
 
-def build_returns_rows(account_returns):
-    """Flatten the history-engine output into display rows (Total first)."""
-    if not account_returns or not account_returns.get("returns"):
-        return []
-    order = ["Total", "eTrade Taxable", "eTrade Roth IRA", "Fidelity 401K", "Fidelity Roth 401K"]
-    rets = account_returns["returns"]
-    names = [n for n in order if n in rets]
-    ytd_vals = [rets[n].get("ytd", 0.0) or 0.0 for n in names]
-    twelve_vals = [rets[n].get("12m", 0.0) or 0.0 for n in names]
-    ytd_colors = colors_for_metric(ytd_vals)
-    twelve_colors = colors_for_metric(twelve_vals)
-    rows = []
-    for name, ytd, twelve, yc, tc in zip(names, ytd_vals, twelve_vals, ytd_colors, twelve_colors):
-        rows.append({
-            "name": name,
-            "ytd": ytd,
-            "ytd_color": yc,
-            "twelve": twelve,
-            "twelve_color": tc,
-        })
-    return rows
-
-
-def build_action_summary_rows(grouped_actions, hedge_action: str = "") -> list[dict]:
-    """At-a-glance symbol + action rows for the Action Plan header."""
-    rows = []
-    for category in ["STRONG BUY", "BUY", "HOLD", "TRIM", "SELL", "STRONG SELL"]:
-        for pos in grouped_actions.get(category, []) or []:
-            sym = pos.get("symbol")
-            if sym:
-                rows.append({"symbol": sym, "action": category})
-    if hedge_action:
-        rows.append({"symbol": "Portfolio", "action": "HEDGE"})
-    return rows
-
-
 def build_returns_bar_chart(sorted_ledger):
     labels = []
     data = []
@@ -780,8 +744,6 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     account_pie_url = chart_urls.get("account_pie_url", "")
     bar_chart_url = chart_urls.get("bar_chart_url", "")
     line_chart_url = chart_urls.get("line_chart_url", "")
-    returns_rows = build_returns_rows(account_returns)
-    returns_updated = (account_returns or {}).get("updated", "")
     
     if red_team_data is None:
         red_team_data = {}
@@ -892,31 +854,6 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             </table>
             {% endif %}
 
-            {% if returns_rows %}
-            <h2>Time-Weighted Returns</h2>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: separate; border-spacing: 0; margin-bottom: 10px;">
-                <tr>
-                    <td valign="top">
-                        <table width="100%" style="border-collapse:collapse; background-color:#f8fafc; border:1px solid #e5e7eb; border-radius:6px;">
-                            <tr style="text-align:left; color:#6b7280; font-size:13px;">
-                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb;">Account</th>
-                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb; text-align:right;">YTD</th>
-                                <th style="padding:8px 10px; border-bottom:2px solid #e5e7eb; text-align:right;">12 Mo</th>
-                            </tr>
-                            {% for r in returns_rows %}
-                            <tr>
-                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6;{% if r.name == 'Total' %} font-weight:bold;{% endif %}">{{ r.name }}</td>
-                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6; text-align:right; font-weight:bold; color:{{ r.ytd_color }};">{{ '%+.2f'|format(r.ytd) }}%</td>
-                                <td style="padding:8px 10px; border-bottom:1px solid #eef2f6; text-align:right; font-weight:bold; color:{{ r.twelve_color }};">{{ '%+.2f'|format(r.twelve) }}%</td>
-                            </tr>
-                            {% endfor %}
-                        </table>
-                        <p style="font-size:11px; color:#9ca3af; margin:8px 0 0 0;">Time-weighted return (securities only); neutralizes deposits, withdrawals, and trades. Updated {{ returns_updated }}.</p>
-                    </td>
-                </tr>
-            </table>
-            {% endif %}
-
             {% if sotu_quotes %}
             <h2>The State of the Union</h2>
             {% for quote in sotu_quotes %}
@@ -974,23 +911,6 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
 
             <h2>The Action Plan</h2>
 
-            {% if action_summary %}
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin-bottom: 20px; background-color: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px;">
-                <tr style="text-align: left; color: #6b7280; font-size: 13px;">
-                    <th style="padding: 8px 12px; border-bottom: 2px solid #e5e7eb;">Symbol</th>
-                    <th style="padding: 8px 12px; border-bottom: 2px solid #e5e7eb;">Action</th>
-                </tr>
-                {% for row in action_summary %}
-                <tr>
-                    <td style="padding: 8px 12px; border-bottom: 1px solid #eef2f6; font-weight: bold;">{{ row.symbol }}</td>
-                    <td style="padding: 8px 12px; border-bottom: 1px solid #eef2f6;">
-                        <span class="verdict-pill" style="{{ pill_styles[row.action] if row.action in pill_styles else 'background-color:#fffbeb; color:#92400e;' }} margin-bottom: 0;">{{ row.action }}</span>
-                    </td>
-                </tr>
-                {% endfor %}
-            </table>
-            {% endif %}
-            
             {% if hedge_action %}
             <div class="hedge-box">
                 <strong>🛡️ Risk Management Mandate:</strong> {{ hedge_action }}
@@ -1133,7 +1053,6 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     
     hedge_action = chairman_data.get('capital_allocation_narrative', '') if 'hedge' in chairman_data.get('capital_allocation_narrative', '').lower() else ''
     hedge_action = _sanitize_briefing_text(hedge_action)
-    action_summary = build_action_summary_rows(grouped_actions, hedge_action)
 
     from src.config.settings import now_local
     briefing_date = now_local().strftime("%B %d, %Y")
@@ -1162,13 +1081,10 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         events=events,
         pie_chart_url=pie_chart_url,
         account_pie_url=account_pie_url,
-        returns_rows=returns_rows,
-        returns_updated=returns_updated,
         bar_chart_url=bar_chart_url,
         line_chart_url=line_chart_url,
         red_team_case=red_team_case,
         hedge_action=hedge_action,
-        action_summary=action_summary,
         chairman_remarks=chairman_remarks,
         qa_summary_text=qa_summary_text
     )
