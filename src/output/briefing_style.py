@@ -423,6 +423,26 @@ def executive_briefing_inline_styles() -> dict[str, str]:
             f"color:{BRAND_SAGE};font-size:0.72em;font-weight:600;letter-spacing:0.1em;"
             f"text-transform:uppercase;margin:0 0 10px 0;{font}"
         ),
+        "actions_summary_box": (
+            f"background-color:{BG_SURFACE};padding:16px 18px;border-radius:8px;"
+            f"border:1px solid {BORDER_SUBTLE};margin:24px 0 8px 0;{font}color:{TEXT_PRIMARY};"
+        ),
+        "actions_row_cell": (
+            f"padding:10px 0;border-bottom:1px solid {BORDER_SUBTLE};vertical-align:middle;{font}"
+        ),
+        "actions_pill": (
+            "display:inline-block;padding:4px 10px;border-radius:6px;font-weight:bold;"
+            "font-size:12px;white-space:nowrap;"
+        ),
+        "actions_symbol": f"color:{TEXT_HIGHLIGHT};font-weight:600;font-size:0.95em;{font}",
+        "actions_context": f"color:{TEXT_PRIMARY};font-size:0.88em;line-height:1.45;{font}",
+        "actions_unanimous_badge": (
+            f"color:{BRAND_SAGE};font-size:0.68em;font-weight:600;letter-spacing:0.06em;"
+            f"text-transform:uppercase;margin-left:6px;{font}"
+        ),
+        "actions_overflow_note": (
+            f"color:{TEXT_PRIMARY};font-size:0.85em;margin:10px 0 0 0;font-style:italic;{font}"
+        ),
     }
 
 

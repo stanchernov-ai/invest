@@ -258,6 +258,90 @@ _UNICORN_ACTIONABLE_VERDICTS = frozenset({
     "STRONG BUY", "BUY", "TRIM", "SELL", "STRONG SELL",
 })
 
+_TODAYS_ACTIONS_MAX = 12
+_TODAYS_ACTIONS_CONTEXT_MAX = 110
+_TODAYS_ACTIONS_CATEGORIES = ("STRONG SELL", "SELL", "TRIM", "STRONG BUY", "BUY")
+_TODAYS_ACTIONS_VERDICT_RANK = {
+    "STRONG SELL": 0,
+    "STRONG BUY": 1,
+    "SELL": 2,
+    "BUY": 3,
+    "TRIM": 4,
+}
+
+
+def _truncate_action_context(text: str, max_len: int = _TODAYS_ACTIONS_CONTEXT_MAX) -> str:
+    text = (text or "").strip()
+    if not text:
+        return ""
+    if len(text) <= max_len:
+        return text
+    cut = text[: max_len - 1].rsplit(" ", 1)[0]
+    return cut.rstrip(".,; ") + "…"
+
+
+def _action_summary_context(pos: dict) -> str:
+    """One-line rationale for Today's Actions — synthesis first, champion quote fallback."""
+    ctx = _sanitize_briefing_text(pos.get("strategic_context") or pos.get("synthesis", ""))
+    if ctx and ctx != _DEFAULT_SYNTHESIS and len(ctx.strip()) >= 12:
+        return _truncate_action_context(ctx)
+    narrative = pos.get("narrative") or {}
+    quote = _sanitize_briefing_text(narrative.get("champion_quote", ""))
+    if quote and not _is_boilerplate_champion_quote(quote):
+        return _truncate_action_context(quote)
+    return ""
+
+
+def build_todays_actions_summary(
+    grouped_actions: dict,
+    unicorn_protocol_items: list | None = None,
+    *,
+    max_items: int = _TODAYS_ACTIONS_MAX,
+) -> tuple[list[dict], int]:
+    """Compact scannable rows for the Today's Actions briefing section (AP-2)."""
+    rows: list[dict] = []
+    seen: set[str] = set()
+
+    def _add(symbol: str, verdict: str, context: str, *, image: str = "", unanimous: bool = False) -> None:
+        sym = (symbol or "").strip().upper()
+        v = (verdict or "").upper()
+        if not sym or v in {"HOLD", "PASS"} or sym in seen:
+            return
+        seen.add(sym)
+        rows.append({
+            "symbol": sym,
+            "verdict": v,
+            "context": _truncate_action_context(context),
+            "image": image or "",
+            "unanimous": unanimous,
+        })
+
+    for item in unicorn_protocol_items or []:
+        _add(
+            item.get("symbol", ""),
+            item.get("verdict", ""),
+            item.get("synthesis") or item.get("strategic_context", ""),
+            image=item.get("image", ""),
+            unanimous=True,
+        )
+
+    for category in _TODAYS_ACTIONS_CATEGORIES:
+        for pos in grouped_actions.get(category, []):
+            _add(
+                pos.get("symbol", ""),
+                category,
+                _action_summary_context(pos),
+                image=pos.get("image", ""),
+            )
+
+    rows.sort(key=lambda r: (
+        _TODAYS_ACTIONS_VERDICT_RANK.get(r["verdict"], 99),
+        0 if r.get("unanimous") else 1,
+        r["symbol"],
+    ))
+    overflow = max(0, len(rows) - max_items)
+    return rows[:max_items], overflow
+
 
 def build_unicorn_protocol_items(unicorn_trades, chairman_data, advanced_data=None, red_team_data=None):
     """Enrich unanimous panel trades with chairman narrative + Red Team rebuttals."""
@@ -1132,6 +1216,46 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             </table>
             {% endif %}
 
+            {% if todays_actions or hedge_action %}
+            <h2 style="{{ email_styles.h2 }}">Today&rsquo;s Actions</h2>
+            <p style="{{ email_styles.muted_p }}">Key board decisions at a glance &mdash; details in each section below.</p>
+            <div style="{{ email_styles.actions_summary_box }}">
+                {% if hedge_action %}
+                <div style="{{ email_styles.hedge_box }};margin-top:0;margin-bottom:14px;">
+                    <strong style="{{ email_styles.strong }}">Risk hedge:</strong> {{ hedge_action }}
+                </div>
+                {% endif %}
+                {% if todays_actions %}
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    {% for action in todays_actions %}
+                    <tr>
+                        <td style="{{ email_styles.actions_row_cell }};width:36px;padding-right:10px;">
+                            {% if action.image %}
+                            <img src="{{ action.image }}" alt="{{ action.symbol }} logo" style="{{ email_styles.ticker_logo_sm }}">
+                            {% endif %}
+                        </td>
+                        <td style="{{ email_styles.actions_row_cell }};width:130px;white-space:nowrap;">
+                            <span style="{{ pill_styles[action.verdict] if action.verdict in pill_styles else pill_styles['HOLD'] }} {{ email_styles.actions_pill }}">{{ action.verdict }}</span>
+                            <span style="{{ email_styles.actions_symbol }}">&nbsp;{{ action.symbol }}</span>
+                            {% if action.unanimous %}
+                            <span style="{{ email_styles.actions_unanimous_badge }}">Unanimous</span>
+                            {% endif %}
+                        </td>
+                        <td style="{{ email_styles.actions_row_cell }}">
+                            {% if action.context %}
+                            <span style="{{ email_styles.actions_context }}">{{ action.context }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% if todays_actions_overflow %}
+                <p style="{{ email_styles.actions_overflow_note }}">+ {{ todays_actions_overflow }} more decision(s) in the full action plan.</p>
+                {% endif %}
+                {% endif %}
+            </div>
+            {% endif %}
+
             {% if sotu_quotes %}
             <h2 style="{{ email_styles.h2 }}">The State of the Union</h2>
             <p style="{{ email_styles.muted_p }}">Each panelist&rsquo;s opening portfolio thesis in 1&ndash;2 sentences &mdash; concentration, regime, and mandate.</p>
@@ -1374,6 +1498,11 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     for cat in grouped_actions:
         grouped_actions[cat].sort(key=lambda x: x.get('aggregate_conviction_score', 0), reverse=True)
 
+    todays_actions, todays_actions_overflow = build_todays_actions_summary(
+        grouped_actions,
+        unicorn_protocol_items,
+    )
+
     alpha_pick = chairman_data.get('alpha_pick', {})
     if alpha_pick and 'symbol' in alpha_pick:
         alpha_pick['image'] = advanced_data.get(alpha_pick['symbol'], {}).get('image', '')
@@ -1441,6 +1570,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         action_plan_avatar_size=ACTION_PLAN_AVATAR_SIZE,
         unicorn_protocol_items=unicorn_protocol_items,
         grouped_actions=grouped_actions,
+        todays_actions=todays_actions,
+        todays_actions_overflow=todays_actions_overflow,
         alpha_pick=alpha_pick,
         show_alpha_pick=show_alpha_pick,
         show_debate=show_debate,

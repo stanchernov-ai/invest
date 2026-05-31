@@ -505,11 +505,13 @@ class BriefingHtmlTests(unittest.TestCase):
         )
         perf_pos = html.find("Performance vs. Benchmark")
         pie_pos = html.find("Unrealized Gains")
+        actions_pos = html.find("Today&rsquo;s Actions")
         sotu_pos = html.find("The State of the Union")
         debate_pos = html.find("The Debate")
         action_pos = html.find("The Action Plan")
         self.assertLess(perf_pos, pie_pos)
-        self.assertLess(pie_pos, sotu_pos)
+        self.assertLess(pie_pos, actions_pos)
+        self.assertLess(actions_pos, sotu_pos)
         self.assertLess(sotu_pos, debate_pos)
         self.assertLess(debate_pos, action_pos)
         self.assertNotIn("Time-Weighted Returns", html)
@@ -664,6 +666,115 @@ class DeliverPerformanceTests(unittest.TestCase):
         self.assertIn("Internal QA Ledger", injected)
         self.assertIn("Graphics Designer", injected)
         self.assertNotIn(reporting.QA_SUMMARY_ANCHOR, injected)
+
+
+class TodaysActionsTests(unittest.TestCase):
+    def _minimal_chairman(self, **overrides):
+        base = {
+            "portfolio_positions": [],
+            "watchlist_positions": [],
+            "alpha_pick": {"symbol": "NONE", "champion_quote": "N/A"},
+            "upcoming_events": [],
+        }
+        base.update(overrides)
+        return base
+
+    def test_build_summary_sorts_strong_actions_first_and_dedupes_unicorn(self):
+        grouped = {cat: [] for cat in ["STRONG BUY", "BUY", "HOLD", "TRIM", "SELL", "STRONG SELL"]}
+        grouped["BUY"].append({
+            "symbol": "VRT",
+            "final_verdict": "BUY",
+            "synthesis": "Committee executes BUY on infrastructure play.",
+        })
+        grouped["SELL"].append({
+            "symbol": "GOOGL",
+            "final_verdict": "SELL",
+            "synthesis": "Reallocate capital to higher-conviction names.",
+        })
+        grouped["TRIM"].append({
+            "symbol": "ASML",
+            "final_verdict": "TRIM",
+            "synthesis": "Duplicate row should be skipped.",
+        })
+        unicorn = [{
+            "symbol": "ASML",
+            "verdict": "TRIM",
+            "synthesis": "Unanimous reduce mandate after Round 2.",
+        }]
+        rows, overflow = reporting.build_todays_actions_summary(grouped, unicorn)
+        symbols = [r["symbol"] for r in rows]
+        self.assertEqual(symbols, ["GOOGL", "VRT", "ASML"])
+        self.assertEqual(len([r for r in rows if r["symbol"] == "ASML"]), 1)
+        self.assertTrue(rows[2]["unanimous"])
+        self.assertEqual(overflow, 0)
+
+    def test_build_summary_caps_overflow(self):
+        grouped = {cat: [] for cat in ["STRONG BUY", "BUY", "HOLD", "TRIM", "SELL", "STRONG SELL"]}
+        grouped["BUY"] = [
+            {"symbol": f"SYM{i}", "synthesis": f"Reason {i}."}
+            for i in range(15)
+        ]
+        rows, overflow = reporting.build_todays_actions_summary(grouped, max_items=5)
+        self.assertEqual(len(rows), 5)
+        self.assertEqual(overflow, 10)
+
+    def test_todays_actions_section_before_state_of_union(self):
+        html = reporting.generate_html_briefing(
+            total_val=150_000,
+            qqq_trend=5.0,
+            portfolio_3m_trend=3.0,
+            mandate="CAGR of 12.00 percent projected balance at age 65 is $1,000,000.00",
+            chairman_data=self._minimal_chairman(
+                portfolio_positions=[
+                    {
+                        "symbol": "MSFT",
+                        "final_verdict": "Strong Buy",
+                        "synthesis": "Round 2 split buy_side=4/5 on MSFT; committee executes STRONG BUY.",
+                        "narrative": {
+                            "champion": PANELIST_ROLES["davinci"],
+                            "champion_quote": "Growth at a reasonable price opportunity.",
+                            "dissenter": "None",
+                            "dissenter_quote": "N/A",
+                        },
+                    }
+                ],
+                capital_allocation_narrative="Mandatory TLT hedge included in target allocations.",
+            ),
+            cos_data={
+                "state_of_the_union_quotes": [
+                    {"board_member": "Hypatia (Value Anchor)", "quote": "Margin of safety first."}
+                ],
+                "boardroom_brawl": "",
+            },
+            matrix_md="",
+            unicorn_trades=[],
+            sorted_ledger=[],
+            chart_urls={},
+        )
+        self.assertIn("Today&rsquo;s Actions", html)
+        self.assertIn("STRONG BUY", html)
+        self.assertIn("MSFT", html)
+        self.assertIn("Risk hedge:", html)
+        actions_idx = html.index("Today&rsquo;s Actions")
+        sotu_idx = html.index("The State of the Union")
+        self.assertLess(actions_idx, sotu_idx)
+
+    def test_todays_actions_hidden_when_only_hold(self):
+        html = reporting.generate_html_briefing(
+            total_val=100_000,
+            qqq_trend=1.0,
+            portfolio_3m_trend=1.0,
+            mandate="Test mandate.",
+            chairman_data=self._minimal_chairman(
+                portfolio_positions=[{"symbol": "NVDA", "final_verdict": "Hold", "synthesis": "Hold."}],
+            ),
+            cos_data={"state_of_the_union_quotes": [], "boardroom_brawl": ""},
+            matrix_md="",
+            unicorn_trades=[],
+            sorted_ledger=[],
+            chart_urls={},
+        )
+        self.assertNotIn("Today&rsquo;s Actions", html)
 
 
 if __name__ == "__main__":
