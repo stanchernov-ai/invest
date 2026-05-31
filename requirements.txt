@@ -13,3 +13,6 @@ tzdata
 asyncpg
 PyJWT
 cryptography
+fastapi
+uvicorn
+python-multipart
