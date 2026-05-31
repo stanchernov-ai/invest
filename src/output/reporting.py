@@ -1663,7 +1663,17 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
 
     return rendered_html
 
-def generate_qa_dashboard_html(reports, timestamp, review_url: str = None):
+def generate_qa_dashboard_html(
+    reports,
+    timestamp,
+    review_url: str = None,
+    *,
+    candidates: list | None = None,
+    triage_url: str | None = None,
+):
+    from src.qa.candidate_triage import render_dashboard_candidates_html
+
+    candidates_html = render_dashboard_candidates_html(candidates, triage_url=triage_url)
     dashboard_css = qa_dashboard_css()
     html_template = """
     <!DOCTYPE html>
@@ -1736,6 +1746,8 @@ def generate_qa_dashboard_html(reports, timestamp, review_url: str = None):
             </div>
             {% endfor %}
             
+            {{ candidates_html | safe }}
+            
             <div class="footer">
                 Automated Post-Flight Quality Assurance Report.<br>
                 {% if review_url %}
@@ -1755,4 +1767,5 @@ def generate_qa_dashboard_html(reports, timestamp, review_url: str = None):
         timestamp=timestamp,
         review_url=review_url,
         dashboard_css=dashboard_css,
+        candidates_html=candidates_html,
     )

@@ -646,6 +646,28 @@ def qa_dashboard_css() -> str:
                 text-decoration: none;
                 font-weight: bold;
             }}
+            .candidate-preview {{
+                margin-top: 50px;
+                padding-top: 24px;
+                border-top: 2px solid var(--border-subtle);
+            }}
+            .candidate-intro {{
+                color: var(--text-primary);
+                font-size: 0.9em;
+                margin-bottom: 16px;
+            }}
+            .candidate-table td {{
+                font-size: 13px;
+            }}
+            .pending-badge {{
+                display: inline-block;
+                padding: 3px 8px;
+                border-radius: 4px;
+                background: var(--bg-surface);
+                color: var(--text-highlight);
+                font-size: 12px;
+                font-weight: bold;
+            }}
             """
 
 

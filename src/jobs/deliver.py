@@ -151,10 +151,11 @@ async def run_deliver(run_id: str) -> dict:
         from src.qa.human_review import build_review_url
 
         review_url = build_review_url(run_id)
+        triage_url = build_review_url(run_id, fragment="candidates")
 
         # QA-the-QA on Flash + hard timeout so it can't blow the ceiling.
         interim_qa_dashboard_html = reporting.generate_qa_dashboard_html(
-            qa_reports, run_id, review_url=review_url
+            qa_reports, run_id, review_url=review_url,
         )
         integrity_report = await qa_pipeline.run_qa_integrity_audit(
             qa_reports, raw_log_combined, json.dumps(c_data), interim_qa_dashboard_html,
@@ -168,13 +169,38 @@ async def run_deliver(run_id: str) -> dict:
 
         storage_client.save_report(f"qa_reports_{run_id}.json", json.dumps(qa_reports, indent=2, default=str))
 
+        # Retrospective before dashboard email so candidate actions appear in QA dashboard.
+        deliver_activity = agent_activity.snapshot()
+        qa_scorecard = build_qa_scorecard(run_id, qa_reports, deliver_activity)
+        retrospective_candidates: list = []
+        try:
+            from src.qa.retrospective import execute_retrospective
+
+            retro = execute_retrospective(
+                run_id,
+                qa_reports=qa_reports,
+                qa_scorecard=qa_scorecard,
+                write_local_insights=False,
+            )
+            retro_marker = storage_client.load_state_blob(f"retrospective_{run_id}.json")
+            if isinstance(retro_marker, dict):
+                retrospective_candidates = retro_marker.get("candidates") or []
+            logger.info(
+                "[DELIVER] Retrospective %s for %s (%s candidates).",
+                retro.get("status"), run_id, retro.get("candidate_count", 0),
+            )
+        except Exception as retro_exc:
+            logger.error("[DELIVER] Retrospective failed (non-blocking): %s", retro_exc)
+
         # GFX-6: investor email is briefing-only; QA lives on the separate dashboard email.
         investor_briefing_html = reporting.inject_qa_review_link_into_briefing(
             reporting.inject_qa_summary_into_briefing(briefing_html, ""),
             review_url,
         )
         qa_dashboard_html = reporting.generate_qa_dashboard_html(
-            qa_reports, run_id, review_url=review_url
+            qa_reports, run_id, review_url=review_url,
+            candidates=retrospective_candidates,
+            triage_url=triage_url,
         )
 
         storage_client.save_report(f"qa_dashboard_{run_id}.html", qa_dashboard_html)
@@ -236,8 +262,6 @@ async def run_deliver(run_id: str) -> dict:
             return {"run_id": run_id, "status": "failed"}
 
         # Merge telemetry from all three phases into the canonical run file.
-        deliver_activity = agent_activity.snapshot()
-        qa_scorecard = build_qa_scorecard(run_id, qa_reports, deliver_activity)
         persist_scorecard(qa_scorecard)
         merged_telemetry = _merge_telemetry(
             prep.get("telemetry"), debate.get("telemetry"), deliver_activity
@@ -294,22 +318,6 @@ async def run_deliver(run_id: str) -> dict:
             is_approved=bool(debate.get("is_approved")),
             watchlist_symbols=watchlist_symbols,
         )
-
-        # Post-deliver retrospective (idempotent per run_id; non-blocking).
-        try:
-            from src.qa.retrospective import execute_retrospective
-            retro = execute_retrospective(
-                run_id,
-                qa_reports=qa_reports,
-                qa_scorecard=qa_scorecard,
-                write_local_insights=False,
-            )
-            logger.info(
-                "[DELIVER] Retrospective %s for %s (%s candidates).",
-                retro.get("status"), run_id, retro.get("candidate_count", 0),
-            )
-        except Exception as retro_exc:
-            logger.error(f"[DELIVER] Retrospective failed (non-blocking): {retro_exc}")
 
         logger.info(f"[DELIVER] Completed for run {run_id} in {round((finished - started).total_seconds(), 1)}s.")
         return {"run_id": run_id, "status": "success"}

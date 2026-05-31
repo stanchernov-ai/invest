@@ -36,14 +36,17 @@ def validate_access_token(token: str | None) -> bool:
     return bool(token) and token.strip() == expected
 
 
-def build_review_url(run_id: str) -> str | None:
+def build_review_url(run_id: str, *, fragment: str | None = None) -> str | None:
     """Public review link for the QA dashboard email footer."""
     base = os.getenv("QA_REVIEW_BASE_URL", "").strip().rstrip("/")
     token = os.getenv("QA_REVIEW_TOKEN", "").strip()
     if not base or not token or not run_id:
         return None
     query = urlencode({"run_id": run_id, "token": token})
-    return f"{base}/api/qa-review?{query}"
+    url = f"{base}/api/qa-review?{query}"
+    if fragment:
+        url = f"{url}#{fragment}"
+    return url
 
 
 def _validate_run_id(run_id: str) -> bool:
@@ -173,8 +176,10 @@ def _summarize_reviews(reviews: list[dict]) -> str:
     return f"{confirmed} confirmed · {rejected} rejected · {skipped} notes-only/skipped"
 
 
-def render_review_page(context: dict, *, error: str = None, success: str = None) -> str:
+def render_review_page(context: dict, *, error: str = None, success: str = None, promoted_markdown: str = None) -> str:
     """HTML review form — mobile-friendly, email-safe styling."""
+    from src.qa.candidate_triage import render_triage_section_html
+
     run_id = context["run_id"]
     agents = context.get("agents") or []
     rows_html = []
@@ -215,6 +220,16 @@ def render_review_page(context: dict, *, error: str = None, success: str = None)
     if success:
         alert = f'<div class="alert success">{html.escape(success)}</div>'
 
+    promoted_block = ""
+    if promoted_markdown:
+        promoted_block = f"""
+  <div class="promoted-box">
+    <h3>Promoted items — paste into action_tracker.md</h3>
+    <pre>{html.escape(promoted_markdown.strip())}</pre>
+  </div>"""
+
+    triage_section = render_triage_section_html(context.get("triage") or {"run_id": run_id, "candidates": []})
+
     return f"""<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8">
@@ -237,6 +252,20 @@ def render_review_page(context: dict, *, error: str = None, success: str = None)
   .alert.error {{ background: #fee2e2; color: #991b1b; }}
   .alert.success {{ background: #dcfce7; color: #166534; }}
   .footer {{ text-align: center; font-size: 0.75rem; color: #9ca3af; margin-top: 24px; }}
+  .candidate-section {{ margin-top: 40px; padding-top: 24px; border-top: 2px solid #e5e7eb; }}
+  .candidate-section h2 {{ margin-top: 0; }}
+  .candidate-card {{ border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px; margin-bottom: 16px; background: #f9fafb; }}
+  .candidate-head {{ margin-bottom: 8px; font-size: 0.95rem; }}
+  .candidate-head .pri {{ background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-weight: bold; margin-right: 8px; }}
+  .candidate-head .sev {{ margin-right: 8px; font-weight: bold; }}
+  .candidate-head .sev-CRITICAL {{ color: #dc2626; }}
+  .candidate-head .sev-WARNING {{ color: #d97706; }}
+  .candidate-head .sev-HIGH {{ color: #dc2626; }}
+  .candidate-head .source {{ color: #6b7280; font-size: 0.85rem; }}
+  .candidate-card .desc {{ margin: 8px 0; line-height: 1.45; }}
+  .candidate-card .rec {{ margin: 0 0 12px; font-size: 0.9rem; color: #4b5563; }}
+  .promoted-box {{ margin-top: 24px; padding: 16px; background: #eff6ff; border-radius: 6px; border: 1px solid #bfdbfe; }}
+  .promoted-box pre {{ white-space: pre-wrap; font-size: 0.85rem; margin: 8px 0 0; }}
 </style>
 </head>
 <body>
@@ -247,9 +276,11 @@ def render_review_page(context: dict, *, error: str = None, success: str = None)
   <form method="POST">
     <input type="hidden" name="agent_count" value="{len(agents)}">
     {''.join(rows_html)}
-    <button type="submit">Save review</button>
+    {triage_section}
+    <button type="submit">Save review &amp; triage</button>
   </form>
-  <p class="footer">Invest AI Boardroom · human-confirmed QA scorecard</p>
+  {promoted_block}
+  <p class="footer">Invest AI Boardroom · human-confirmed QA scorecard + candidate triage</p>
 </div>
 </body></html>"""
 
@@ -291,17 +322,31 @@ def handle_review_http(method: str, params: dict, body: bytes | None = None) -> 
     if method.upper() == "POST":
         form = _parse_urlencoded(body or b"")
         reviews = _parse_form_reviews(form)
+        from src.qa.candidate_triage import (
+            format_promoted_markdown,
+            parse_triage_from_form,
+            save_candidate_triage,
+        )
+
+        triage_items = parse_triage_from_form(form)
         try:
             record = save_human_review(run_id, reviews)
-            context = load_review_context(run_id) or {"run_id": run_id, "agents": []}
-            msg = f"Saved — {record.get('summary', 'review recorded')}."
-            return 200, render_review_page(context, success=msg), {"Content-Type": "text/html; charset=utf-8"}
+            triage_record = save_candidate_triage(run_id, triage_items)
+            context = _load_full_review_context(run_id)
+            msg = (
+                f"Saved — {record.get('summary', 'review recorded')}; "
+                f"{triage_record.get('summary', 'triage recorded')}."
+            )
+            promoted_md = format_promoted_markdown(run_id, triage_items)
+            return 200, render_review_page(
+                context, success=msg, promoted_markdown=promoted_md or None,
+            ), {"Content-Type": "text/html; charset=utf-8"}
         except Exception as e:
             logger.error(f"Failed to save human review for {run_id}: {e}")
-            context = load_review_context(run_id) or {"run_id": run_id, "agents": []}
+            context = _load_full_review_context(run_id)
             return 500, render_review_page(context, error=str(e)), {"Content-Type": "text/html; charset=utf-8"}
 
-    context = load_review_context(run_id)
+    context = _load_full_review_context(run_id)
     if not context:
         return 404, f"<h1>404 Not Found</h1><p>No QA data for run {html.escape(run_id)}.</p>", {"Content-Type": "text/html; charset=utf-8"}
 
@@ -309,7 +354,25 @@ def handle_review_http(method: str, params: dict, body: bytes | None = None) -> 
     success = None
     if existing:
         success = f"Previously reviewed — {existing.get('summary', 'on file')}."
+    existing_triage = (context.get("triage") or {}).get("existing_triage")
+    if existing_triage:
+        triage_msg = existing_triage.get("summary", "on file")
+        success = f"{success} Triage: {triage_msg}." if success else f"Previously triaged — {triage_msg}."
     return 200, render_review_page(context, success=success), {"Content-Type": "text/html; charset=utf-8"}
+
+
+def _load_full_review_context(run_id: str) -> dict | None:
+    from src.qa.candidate_triage import load_triage_context
+
+    context = load_review_context(run_id)
+    if not context:
+        triage = load_triage_context(run_id)
+        if not triage.get("candidates"):
+            return None
+        context = {"run_id": run_id, "agents": [], "triage": triage}
+    else:
+        context["triage"] = load_triage_context(run_id)
+    return context
 
 
 def _parse_urlencoded(body: bytes) -> dict[str, str]:
