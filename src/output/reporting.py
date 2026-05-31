@@ -273,18 +273,18 @@ def fetch_briefing_visual_assets(
 
 
 _UNICORN_ACTIONABLE_VERDICTS = frozenset({
-    "STRONG BUY", "BUY", "TRIM", "SELL", "STRONG SELL",
+    "HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE", "REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)",
 })
 
 _TODAYS_ACTIONS_MAX = 12
 _TODAYS_ACTIONS_CONTEXT_MAX = 110
-_TODAYS_ACTIONS_CATEGORIES = ("STRONG SELL", "SELL", "TRIM", "STRONG BUY", "BUY")
+_TODAYS_ACTIONS_CATEGORIES = ("STRONG BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE", "HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE")
 _TODAYS_ACTIONS_VERDICT_RANK = {
-    "STRONG SELL": 0,
-    "STRONG BUY": 1,
-    "SELL": 2,
-    "BUY": 3,
-    "TRIM": 4,
+    "STRONG BEARISH (LIQUIDATE)": 0,
+    "HIGH CONVICTION (OVERWEIGHT)": 1,
+    "BEARISH (LIQUIDATE)": 2,
+    "ACCUMULATE CANDIDATE": 3,
+    "REDUCE EXPOSURE": 4,
 }
 
 
@@ -310,7 +310,7 @@ def _action_panelist_label(name: str) -> str:
 
 
 def _action_panelists_from_narrative(narrative: dict | None) -> tuple[str, str]:
-    """Return (champion, dissenter) display labels for a Today's Actions row."""
+    """Return (champion, dissenter) display labels for a Theoretical Scenario Adjustments row."""
     narrative = narrative or {}
     champion = _action_panelist_label(narrative.get("champion", ""))
     dissenter = (narrative.get("dissenter") or "").strip()
@@ -320,7 +320,7 @@ def _action_panelists_from_narrative(narrative: dict | None) -> tuple[str, str]:
 
 
 def _action_summary_context(pos: dict) -> str:
-    """One-line rationale for Today's Actions — synthesis first, champion quote fallback."""
+    """One-line rationale for Theoretical Scenario Adjustments — synthesis first, champion quote fallback."""
     ctx = _sanitize_briefing_text(pos.get("strategic_context") or pos.get("synthesis", ""))
     if ctx and ctx != _DEFAULT_SYNTHESIS and len(ctx.strip()) >= 12:
         return _truncate_action_context(ctx)
@@ -337,7 +337,7 @@ def build_todays_actions_summary(
     *,
     max_items: int = _TODAYS_ACTIONS_MAX,
 ) -> tuple[list[dict], int]:
-    """Compact scannable rows for the Today's Actions briefing section (AP-2)."""
+    """Compact scannable rows for the Theoretical Scenario Adjustments briefing section (AP-2)."""
     rows: list[dict] = []
     seen: set[str] = set()
 
@@ -421,7 +421,7 @@ def build_unicorn_protocol_items(unicorn_trades, chairman_data, advanced_data=No
         if r.get("symbol")
     }
 
-    verdict_rank = {"STRONG BUY": 0, "BUY": 1, "HOLD": 2, "TRIM": 3, "SELL": 4, "STRONG SELL": 5, "PASS": 6}
+    verdict_rank = {"HIGH CONVICTION (OVERWEIGHT)": 0, "ACCUMULATE CANDIDATE": 1, "HOLD": 2, "REDUCE EXPOSURE": 3, "BEARISH (LIQUIDATE)": 4, "STRONG BEARISH (LIQUIDATE)": 5, "PASS": 6}
     items = []
     unicorn_symbols = set()
 
@@ -964,7 +964,7 @@ def _rebase_index_series(values):
 _BRIEFING_JARGON_RULES: list[tuple[str, str]] = [
     (
         r"\[SYSTEM OVERRIDE:\s*10%\s*Liquidation Cap Reached\.\s*Fractional trim only[^\]]+\]",
-        "Trim size was capped by the daily liquidation limit; the verdict was adjusted accordingly.",
+        "Reduce Exposure size was capped by the daily liquidation limit; the verdict was adjusted accordingly.",
     ),
     (
         r"\[SYSTEM OVERRIDE:\s*10%\s*Liquidation Cap Reached\.\s*Deferred trim[^\]]+\]",
@@ -979,12 +979,12 @@ _BRIEFING_JARGON_RULES: list[tuple[str, str]] = [
         "Action canceled after reaching the daily liquidation limit.",
     ),
     (
-        r"\[SYSTEM OVERRIDE:\s*Sell mathematically capped at[^\]]+\]",
-        "Sell size was capped by the daily liquidation limit; the verdict was adjusted accordingly.",
+        r"\[SYSTEM OVERRIDE:\s*Bearish (Liquidate) mathematically capped at[^\]]+\]",
+        "Bearish (Liquidate) size was capped by the daily liquidation limit; the verdict was adjusted accordingly.",
     ),
     (
-        r"\[SYSTEM OVERRIDE:\s*Trim mathematically capped at[^\]]+\]",
-        "Trim size was capped by the daily liquidation limit; the verdict was adjusted accordingly.",
+        r"\[SYSTEM OVERRIDE:\s*Reduce Exposure mathematically capped at[^\]]+\]",
+        "Reduce Exposure size was capped by the daily liquidation limit; the verdict was adjusted accordingly.",
     ),
     (
         r"\[SYSTEM OVERRIDE:\s*Maximum\s+\d+\s+Buys limit[^\]]+\]",
@@ -992,10 +992,10 @@ _BRIEFING_JARGON_RULES: list[tuple[str, str]] = [
     ),
     (
         r"\[SYSTEM OVERRIDE:\s*Wash-Sale Rule[^\]]+\]",
-        "Sell deferred due to wash-sale rules on a recent purchase.",
+        "Bearish (Liquidate) deferred due to wash-sale rules on a recent purchase.",
     ),
     (
-        r"\[SYSTEM OVERRIDE:\s*Board majority Buy[^\]]+\]",
+        r"\[SYSTEM OVERRIDE:\s*Board majority Accumulate Candidate[^\]]+\]",
         "",
     ),
     (
@@ -1565,7 +1565,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {% endif %}
 
             {% if todays_actions or hedge_action %}
-            <h2 style="{{ email_styles.h2 }}">Today&rsquo;s Actions</h2>
+            <h2 style="{{ email_styles.h2 }}">Theoretical Scenario Adjustments</h2>
             <p style="{{ email_styles.muted_p }}">Key board decisions at a glance &mdash; champion and dissent; full context in the action plan below.</p>
             <div style="{{ email_styles.actions_summary_box }}">
                 {% if hedge_action %}
@@ -1625,7 +1625,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             </div>
             {% endif %}
 
-            {% set action_categories = ['STRONG BUY', 'BUY', 'HOLD', 'TRIM', 'SELL', 'STRONG SELL'] %}
+            {% set action_categories = ['HIGH CONVICTION (OVERWEIGHT)', 'ACCUMULATE CANDIDATE', 'HOLD', 'REDUCE EXPOSURE', 'BEARISH (LIQUIDATE)', 'STRONG BEARISH (LIQUIDATE)'] %}
             {% for category in action_categories %}
                 {% if grouped_actions[category] %}
                     {% for pos in grouped_actions[category] %}
@@ -1692,7 +1692,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
 
             <div style="{{ email_styles.footer }}">
                 Invest AI Daily Briefing<br>
-                Data provided by Financial Modeling Prep and brokerage activity logs.
+                Data provided by Financial Modeling Prep and brokerage activity logs.<br><br>
+                <em style="color: #6b7280; font-size: 0.85em;">Disclaimer: This briefing represents theoretical sentiment based on a simulated scenario. It is for informational purposes only and does not constitute financial, legal, or investment advice.</em>
                 <!-- QA_REVIEW_LINK_ANCHOR -->
             </div>
             
@@ -1725,7 +1726,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     all_positions = chairman_data.get('portfolio_positions', []) + chairman_data.get('watchlist_positions', [])
     
     if advanced_data is None: advanced_data = {}
-    grouped_actions = {cat: [] for cat in ['STRONG BUY', 'BUY', 'HOLD', 'TRIM', 'SELL', 'STRONG SELL']}
+    grouped_actions = {cat: [] for cat in ['HIGH CONVICTION (OVERWEIGHT)', 'ACCUMULATE CANDIDATE', 'HOLD', 'REDUCE EXPOSURE', 'BEARISH (LIQUIDATE)', 'STRONG BEARISH (LIQUIDATE)']}
     for pos in all_positions:
         sym = pos.get('symbol')
         if sym in unicorn_symbols:

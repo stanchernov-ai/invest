@@ -54,9 +54,9 @@ def _majority_buy_raw(symbol: str, buy_conviction: int = 7) -> dict:
     return _raw_watchlist_symbol(
         symbol,
         [
-            ("Buy", buy_conviction),
-            ("Buy", buy_conviction),
-            ("Buy", buy_conviction),
+            ("Accumulate Candidate", buy_conviction),
+            ("Accumulate Candidate", buy_conviction),
+            ("Accumulate Candidate", buy_conviction),
             ("Pass", 3),
             ("Pass", 3),
         ],
@@ -68,52 +68,52 @@ class TestVoteEnginePhaseC(unittest.TestCase):
         raw = _raw_portfolio_symbol(
             "NVDA",
             [
-                ("Strong Buy", 9),
-                ("Strong Buy", 8),
-                ("Strong Buy", 7),
-                ("Sell", 4),
-                ("Strong Sell", 3),
+                ("High Conviction (Overweight)", 9),
+                ("High Conviction (Overweight)", 8),
+                ("High Conviction (Overweight)", 7),
+                ("Bearish (Liquidate)", 4),
+                ("Strong Bearish (Liquidate)", 3),
             ],
         )
         summaries = build_vote_summaries(raw, ["NVDA"], portfolio_symbols={"NVDA"})
-        self.assertEqual(mandate_verdict(summaries["NVDA"]), "Strong Buy")
+        self.assertEqual(mandate_verdict(summaries["NVDA"]), "High Conviction (Overweight)")
 
     def test_three_regular_buys_mandate_buy(self):
         raw = _raw_portfolio_symbol(
             "NVDA",
             [
-                ("Buy", 9),
-                ("Buy", 8),
-                ("Buy", 7),
-                ("Sell", 4),
-                ("Strong Sell", 3),
+                ("Accumulate Candidate", 9),
+                ("Accumulate Candidate", 8),
+                ("Accumulate Candidate", 7),
+                ("Bearish (Liquidate)", 4),
+                ("Strong Bearish (Liquidate)", 3),
             ],
         )
         summaries = build_vote_summaries(raw, ["NVDA"], portfolio_symbols={"NVDA"})
-        self.assertEqual(mandate_verdict(summaries["NVDA"]), "Buy")
+        self.assertEqual(mandate_verdict(summaries["NVDA"]), "Accumulate Candidate")
 
     def test_three_sell_two_buy_mandate_strong_sell(self):
         raw = _raw_portfolio_symbol(
             "ASML",
             [
-                ("Strong Sell", 8),
-                ("Strong Sell", 7),
-                ("Strong Sell", 6),
-                ("Buy", 5),
-                ("Buy", 4),
+                ("Strong Bearish (Liquidate)", 8),
+                ("Strong Bearish (Liquidate)", 7),
+                ("Strong Bearish (Liquidate)", 6),
+                ("Accumulate Candidate", 5),
+                ("Accumulate Candidate", 4),
             ],
         )
         summaries = build_vote_summaries(raw, ["ASML"], portfolio_symbols={"ASML"})
-        self.assertEqual(mandate_verdict(summaries["ASML"]), "Strong Sell")
+        self.assertEqual(mandate_verdict(summaries["ASML"]), "Strong Bearish (Liquidate)")
 
     def test_two_two_split_hold(self):
         raw = _raw_portfolio_symbol(
             "AVGO",
             [
-                ("Buy", 7),
-                ("Buy", 6),
-                ("Sell", 5),
-                ("Strong Sell", 4),
+                ("Accumulate Candidate", 7),
+                ("Accumulate Candidate", 6),
+                ("Bearish (Liquidate)", 5),
+                ("Strong Bearish (Liquidate)", 4),
                 ("Hold", 3),
             ],
         )
@@ -125,7 +125,7 @@ class TestVoteEnginePhaseC(unittest.TestCase):
         raw = _raw_watchlist_symbol(
             "ARM",
             [
-                ("Buy", 5),
+                ("Accumulate Candidate", 5),
                 ("Pass", 4),
                 ("Pass", 4),
                 ("Pass", 4),
@@ -138,10 +138,10 @@ class TestVoteEnginePhaseC(unittest.TestCase):
     def test_watchlist_strong_buy_unanimous(self):
         raw = _raw_watchlist_symbol(
             "META",
-            [("Strong Buy", 9)] * 5,
+            [("High Conviction (Overweight)", 9)] * 5,
         )
         summaries = build_vote_summaries(raw, ["META"])
-        self.assertEqual(mandate_verdict(summaries["META"]), "Strong Buy")
+        self.assertEqual(mandate_verdict(summaries["META"]), "High Conviction (Overweight)")
 
     def test_five_majority_buys_max_three(self):
         symbols = ["META", "PLTR", "NVDA", "AMZN", "GOOG"]
@@ -153,7 +153,7 @@ class TestVoteEnginePhaseC(unittest.TestCase):
         buys = {
             p["symbol"]
             for p in allocation["watchlist_positions"]
-            if p["final_verdict"] in ("Buy", "Strong Buy")
+            if p["final_verdict"] in ("Accumulate Candidate", "High Conviction (Overweight)")
         }
         self.assertEqual(len(buys), 3)
 
@@ -207,7 +207,7 @@ class TestVoteEnginePhaseC(unittest.TestCase):
         self.assertTrue(any("MAJORITY VOTE ALIGNMENT" in v for v in violations))
 
     def test_unanimous_actionable_buy_bypass(self):
-        raw = _raw_watchlist_symbol("META", [("Strong Buy", 9)] * 5)
+        raw = _raw_watchlist_symbol("META", [("High Conviction (Overweight)", 9)] * 5)
         summaries = build_vote_summaries(raw, ["META"])
         self.assertTrue(can_bypass_chairman(summaries))
         unicorns = detect_unicorn_trades(summaries)
@@ -222,17 +222,17 @@ class TestVoteEnginePhaseC(unittest.TestCase):
     def test_build_matrix_from_json(self):
         raw = _majority_buy_raw("META")
         matrix = build_matrix_from_raw_verdicts(raw, ["META"])
-        self.assertEqual(matrix["META"]["hypatia"], "Buy")
+        self.assertEqual(matrix["META"]["hypatia"], "Accumulate Candidate")
 
     def test_apply_max_three_buys_standalone(self):
         chairman = {
             "capital_flow_audit": {"liquidated_tickers": [], "target_tickers": ["TLT"]},
             "portfolio_positions": [],
             "watchlist_positions": [
-                {"symbol": "A", "final_verdict": "Strong Buy", "aggregate_conviction_score": 10, "synthesis": ""},
-                {"symbol": "B", "final_verdict": "Buy", "aggregate_conviction_score": 8, "synthesis": ""},
-                {"symbol": "C", "final_verdict": "Buy", "aggregate_conviction_score": 6, "synthesis": ""},
-                {"symbol": "D", "final_verdict": "Buy", "aggregate_conviction_score": 4, "synthesis": ""},
+                {"symbol": "A", "final_verdict": "High Conviction (Overweight)", "aggregate_conviction_score": 10, "synthesis": ""},
+                {"symbol": "B", "final_verdict": "Accumulate Candidate", "aggregate_conviction_score": 8, "synthesis": ""},
+                {"symbol": "C", "final_verdict": "Accumulate Candidate", "aggregate_conviction_score": 6, "synthesis": ""},
+                {"symbol": "D", "final_verdict": "Accumulate Candidate", "aggregate_conviction_score": 4, "synthesis": ""},
             ],
         }
         apply_max_three_buys(chairman)
@@ -244,9 +244,9 @@ def _majority_sell_portfolio(symbol: str) -> dict:
     return _raw_portfolio_symbol(
         symbol,
         [
-            ("Sell", 8),
-            ("Sell", 7),
-            ("Trim", 6),
+            ("Bearish (Liquidate)", 8),
+            ("Bearish (Liquidate)", 7),
+            ("Reduce Exposure", 6),
             ("Hold", 5),
             ("Hold", 4),
         ],
@@ -273,7 +273,7 @@ class TestFundingSell(unittest.TestCase):
             watchlist_symbols={"META"},
         )
         by_sym = {p["symbol"]: p for p in allocation["portfolio_positions"]}
-        self.assertEqual(by_sym["MSFT"]["final_verdict"], "Sell")
+        self.assertEqual(by_sym["MSFT"]["final_verdict"], "Bearish (Liquidate)")
         self.assertTrue(is_funding_sell_override(by_sym["MSFT"]))
         self.assertEqual(by_sym["AAPL"]["final_verdict"], "Hold")
         self.assertIn("MSFT", allocation["capital_flow_audit"]["liquidated_tickers"])
@@ -291,8 +291,8 @@ class TestFundingSell(unittest.TestCase):
             watchlist_symbols={"META"},
         )
         by_sym = {p["symbol"]: p for p in allocation["portfolio_positions"]}
-        self.assertEqual(by_sym["AAPL"]["final_verdict"], "Sell")
-        self.assertEqual(by_sym["MSFT"]["final_verdict"], "Sell")
+        self.assertEqual(by_sym["AAPL"]["final_verdict"], "Bearish (Liquidate)")
+        self.assertEqual(by_sym["MSFT"]["final_verdict"], "Bearish (Liquidate)")
         self.assertFalse(is_funding_sell_override(by_sym["AAPL"]))
         self.assertFalse(is_funding_sell_override(by_sym["MSFT"]))
 
@@ -309,7 +309,7 @@ class TestFundingSell(unittest.TestCase):
             watchlist_symbols={"META"},
         )
         by_sym = {p["symbol"]: p for p in allocation["portfolio_positions"]}
-        self.assertEqual(by_sym["AAPL"]["final_verdict"], "Sell")
+        self.assertEqual(by_sym["AAPL"]["final_verdict"], "Bearish (Liquidate)")
         self.assertEqual(by_sym["MSFT"]["final_verdict"], "Hold")
         self.assertFalse(is_funding_sell_override(by_sym["MSFT"]))
 
@@ -342,11 +342,11 @@ class TestFundingSell(unittest.TestCase):
             _majority_buy_raw("META"),
             _raw_portfolio_symbol(
                 "NVDA",
-                [("Buy", 9), ("Buy", 8), ("Buy", 7), ("Hold", 4), ("Hold", 3)],
+                [("Accumulate Candidate", 9), ("Accumulate Candidate", 8), ("Accumulate Candidate", 7), ("Hold", 4), ("Hold", 3)],
             ),
             _raw_portfolio_symbol(
                 "AAPL",
-                [("Buy", 8), ("Buy", 7), ("Buy", 6), ("Hold", 4), ("Hold", 3)],
+                [("Accumulate Candidate", 8), ("Accumulate Candidate", 7), ("Accumulate Candidate", 6), ("Hold", 4), ("Hold", 3)],
             ),
         )
         allocation = build_chairman_allocation(
@@ -356,8 +356,8 @@ class TestFundingSell(unittest.TestCase):
             watchlist_symbols={"META"},
         )
         by_sym = {p["symbol"]: p for p in allocation["portfolio_positions"]}
-        self.assertIn(by_sym["NVDA"]["final_verdict"], ("Buy", "Strong Buy"))
-        self.assertIn(by_sym["AAPL"]["final_verdict"], ("Buy", "Strong Buy"))
+        self.assertIn(by_sym["NVDA"]["final_verdict"], ("Accumulate Candidate", "High Conviction (Overweight)"))
+        self.assertIn(by_sym["AAPL"]["final_verdict"], ("Accumulate Candidate", "High Conviction (Overweight)"))
         funding_liquidations = [
             sym for sym in allocation["capital_flow_audit"]["liquidated_tickers"]
             if sym in {"NVDA", "AAPL"}
@@ -366,20 +366,20 @@ class TestFundingSell(unittest.TestCase):
         self.assertFalse(any(is_funding_sell_override(p) for p in allocation["portfolio_positions"]))
 
     def test_existing_trim_satisfies_sell_requirement(self):
-        """Trim/Sell on portfolio counts as sell-side — no funding-sell override."""
+        """Reduce Exposure/Bearish (Liquidate) on portfolio counts as sell-side — no funding-sell override."""
         chairman = {
             "capital_flow_audit": {"liquidated_tickers": [], "target_tickers": ["TLT", "META"]},
             "portfolio_positions": [
-                {"symbol": "MSFT", "final_verdict": "Trim", "aggregate_conviction_score": 6, "synthesis": ""},
+                {"symbol": "MSFT", "final_verdict": "Reduce Exposure", "aggregate_conviction_score": 6, "synthesis": ""},
                 {"symbol": "AAPL", "final_verdict": "Hold", "aggregate_conviction_score": 20, "synthesis": ""},
             ],
             "watchlist_positions": [
-                {"symbol": "META", "final_verdict": "Buy", "aggregate_conviction_score": 21, "synthesis": ""},
+                {"symbol": "META", "final_verdict": "Accumulate Candidate", "aggregate_conviction_score": 21, "synthesis": ""},
             ],
         }
         result = ensure_funding_sell(chairman)
         by_sym = {p["symbol"]: p for p in result["portfolio_positions"]}
-        self.assertEqual(by_sym["MSFT"]["final_verdict"], "Trim")
+        self.assertEqual(by_sym["MSFT"]["final_verdict"], "Reduce Exposure")
         self.assertFalse(is_funding_sell_override(by_sym["MSFT"]))
         self.assertEqual(by_sym["AAPL"]["final_verdict"], "Hold")
 

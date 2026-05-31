@@ -5,8 +5,8 @@ import re
 
 from src.core.board_roster import PANELIST_KEYS, PANELIST_ROLES
 
-BUY_VERDICTS = frozenset({"STRONG BUY", "BUY"})
-SELL_VERDICTS = frozenset({"SELL", "TRIM", "STRONG SELL"})
+BUY_VERDICTS = frozenset({"HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE"})
+SELL_VERDICTS = frozenset({"BEARISH (LIQUIDATE)", "REDUCE EXPOSURE", "STRONG BEARISH (LIQUIDATE)"})
 
 # Round 2 overall_portfolio_critique is peer rebuttal prose — not briefing SoTU material.
 _REBUTTAL_OPENERS = re.compile(
@@ -73,7 +73,7 @@ def _pick_sotu_quote(
 
 
 def condense_sotu_quote(text: str, *, max_sentences: int = 2) -> str:
-    """Trim SoTU quotes for executive scan (1-2 sentences)."""
+    """Reduce Exposure SoTU quotes for executive scan (1-2 sentences)."""
     text = (text or "").strip()
     if not text:
         return text

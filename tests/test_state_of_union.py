@@ -7,15 +7,15 @@ from src.core.state_of_union import build_state_of_union_quotes, _stance_label, 
 class TestStateOfUnion(unittest.TestCase):
     def test_stance_bullish_on_net_buys(self):
         verdicts = [
-            {"verdict": "Strong Buy", "conviction_score": 9},
-            {"verdict": "Buy", "conviction_score": 8},
+            {"verdict": "High Conviction (Overweight)", "conviction_score": 9},
+            {"verdict": "Accumulate Candidate", "conviction_score": 8},
         ]
         self.assertIn("Bullish", _stance_label(verdicts))
 
     def test_stance_bearish_on_net_sells(self):
         verdicts = [
-            {"verdict": "Sell", "conviction_score": 9},
-            {"verdict": "Trim", "conviction_score": 8},
+            {"verdict": "Bearish (Liquidate)", "conviction_score": 9},
+            {"verdict": "Reduce Exposure", "conviction_score": 8},
         ]
         self.assertIn("Bearish", _stance_label(verdicts))
 
@@ -25,7 +25,7 @@ class TestStateOfUnion(unittest.TestCase):
                 "overall_portfolio_critique": (
                     "I disagree with Charles davinci on NVDA — his growth thesis ignores moat erosion."
                 ),
-                "portfolio_verdicts": [{"verdict": "Trim", "conviction_score": 8}],
+                "portfolio_verdicts": [{"verdict": "Reduce Exposure", "conviction_score": 8}],
             },
             "davinci": {
                 "overall_portfolio_critique": "I agree with hypatia that we hold too much mega-cap tech.",

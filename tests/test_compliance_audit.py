@@ -15,17 +15,17 @@ from src.core.compliance_audit import (
 def _chairman(**overrides) -> dict:
     base = {
         "chain_of_thought_scratchpad": "Establish hedge in TLT.",
-        "capital_allocation_narrative": "Buy META and hedge with TLT.",
+        "capital_allocation_narrative": "Accumulate Candidate META and hedge with TLT.",
         "capital_flow_audit": {
             "liquidated_tickers": ["ASML"],
             "target_tickers": ["META", "TLT"],
         },
         "portfolio_positions": [
-            {"symbol": "ASML", "final_verdict": "Sell"},
+            {"symbol": "ASML", "final_verdict": "Bearish (Liquidate)"},
         ],
         "watchlist_positions": [
-            {"symbol": "META", "final_verdict": "Buy"},
-            {"symbol": "MNDY", "final_verdict": "Buy"},
+            {"symbol": "META", "final_verdict": "Accumulate Candidate"},
+            {"symbol": "MNDY", "final_verdict": "Accumulate Candidate"},
         ],
         "alpha_pick": {"symbol": "META", "champion_quote": "test"},
     }
@@ -42,10 +42,10 @@ class TestComplianceAudit(unittest.TestCase):
 
     def test_fails_four_buys(self):
         chair = _chairman(watchlist_positions=[
-            {"symbol": "META", "final_verdict": "Buy"},
-            {"symbol": "MNDY", "final_verdict": "Buy"},
-            {"symbol": "AMZN", "final_verdict": "Strong Buy"},
-            {"symbol": "VRT", "final_verdict": "Buy"},
+            {"symbol": "META", "final_verdict": "Accumulate Candidate"},
+            {"symbol": "MNDY", "final_verdict": "Accumulate Candidate"},
+            {"symbol": "AMZN", "final_verdict": "High Conviction (Overweight)"},
+            {"symbol": "VRT", "final_verdict": "Accumulate Candidate"},
         ])
         violations = audit_chairman_compliance(chair)
         self.assertTrue(any("MAX 3 BUYS" in v for v in violations))
@@ -60,7 +60,7 @@ class TestComplianceAudit(unittest.TestCase):
     def test_fails_missing_hedge_entirely(self):
         chair = _chairman(
             chain_of_thought_scratchpad="No hedge today.",
-            capital_allocation_narrative="Buy META only.",
+            capital_allocation_narrative="Accumulate Candidate META only.",
             capital_flow_audit={"liquidated_tickers": ["ASML"], "target_tickers": ["META"]},
         )
         violations = audit_chairman_compliance(chair)
@@ -88,13 +88,13 @@ class TestComplianceAudit(unittest.TestCase):
             "davinci": {
                 "portfolio_verdicts": [],
                 "watchlist_verdicts": [
-                    {"symbol": "AMZN", "verdict": "Buy", "conviction_score": 8, "analysis": "growth"},
+                    {"symbol": "AMZN", "verdict": "Accumulate Candidate", "conviction_score": 8, "analysis": "growth"},
                 ],
             },
             "suntzu": {
                 "portfolio_verdicts": [],
                 "watchlist_verdicts": [
-                    {"symbol": "AMZN", "verdict": "Buy", "conviction_score": 7, "analysis": "tape"},
+                    {"symbol": "AMZN", "verdict": "Accumulate Candidate", "conviction_score": 7, "analysis": "tape"},
                 ],
             },
             "hypatia": {
@@ -105,13 +105,13 @@ class TestComplianceAudit(unittest.TestCase):
             },
         }
         chair = _chairman(
-            watchlist_positions=[{"symbol": "AMZN", "final_verdict": "Buy"}],
+            watchlist_positions=[{"symbol": "AMZN", "final_verdict": "Accumulate Candidate"}],
             alpha_pick={"symbol": "AMZN", "champion_quote": "test"},
         )
         violations = audit_chairman_compliance(
             chair, raw, all_symbols=["AMZN"], portfolio_symbols=set()
         )
-        self.assertTrue(any("MAJORITY BUY MANDATE" in v for v in violations))
+        self.assertTrue(any("MAJORITY ACCUMULATE CANDIDATE MANDATE" in v for v in violations))
 
     def test_merge_python_only_passes_when_no_violations(self):
         merged = merge_compliance_reports([], None, chairman={"portfolio_positions": []})
@@ -133,19 +133,19 @@ class TestComplianceAudit(unittest.TestCase):
             raw[agent] = {
                 "portfolio_verdicts": [],
                 "watchlist_verdicts": [
-                    {"symbol": "META", "verdict": "Buy", "conviction_score": 9},
-                    {"symbol": "PLTR", "verdict": "Buy", "conviction_score": 8},
-                    {"symbol": "NVDA", "verdict": "Buy", "conviction_score": 7},
-                    {"symbol": "MNDY", "verdict": "Buy" if i < 3 else "Pass", "conviction_score": 6},
+                    {"symbol": "META", "verdict": "Accumulate Candidate", "conviction_score": 9},
+                    {"symbol": "PLTR", "verdict": "Accumulate Candidate", "conviction_score": 8},
+                    {"symbol": "NVDA", "verdict": "Accumulate Candidate", "conviction_score": 7},
+                    {"symbol": "MNDY", "verdict": "Accumulate Candidate" if i < 3 else "Pass", "conviction_score": 6},
                 ],
             }
         chairman = {
             "alpha_pick": {"symbol": "META", "champion_quote": "test"},
             "portfolio_positions": [],
             "watchlist_positions": [
-                {"symbol": "META", "final_verdict": "Buy", "synthesis": ""},
-                {"symbol": "PLTR", "final_verdict": "Buy", "synthesis": ""},
-                {"symbol": "NVDA", "final_verdict": "Buy", "synthesis": ""},
+                {"symbol": "META", "final_verdict": "Accumulate Candidate", "synthesis": ""},
+                {"symbol": "PLTR", "final_verdict": "Accumulate Candidate", "synthesis": ""},
+                {"symbol": "NVDA", "final_verdict": "Accumulate Candidate", "synthesis": ""},
                 {"symbol": "MNDY", "final_verdict": "Pass", "synthesis": "Max 3 buys."},
             ],
         }

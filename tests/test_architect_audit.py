@@ -45,7 +45,7 @@ class TestArchitectAudit(unittest.TestCase):
         chairman = _minimal_chairman(
             portfolio_positions=[
                 {"symbol": "NVDA", "final_verdict": "Hold", "synthesis": "a"},
-                {"symbol": "NVDA", "final_verdict": "Sell", "synthesis": "b"},
+                {"symbol": "NVDA", "final_verdict": "Bearish (Liquidate)", "synthesis": "b"},
             ],
             watchlist_positions=[],
         )

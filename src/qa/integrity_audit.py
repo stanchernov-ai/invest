@@ -456,7 +456,7 @@ def format_vote_ground_truth_digest(vote_ctx: dict) -> str:
     lines.append("")
     lines.append(
         f"MAX EQUITY BUYS: {vote_ctx.get('equity_buy_count', 0)}/"
-        f"{vote_ctx.get('max_equity_buys', 3)} Buy/Strong Buy equity positions "
+        f"{vote_ctx.get('max_equity_buys', 3)} Accumulate Candidate/High Conviction (Overweight) equity positions "
         f"(TLT/VXX hedge excluded from cap). "
         f"capital_flow_audit.target_tickers may list TLT/VXX plus equity targets — "
         f"do NOT flag a max-3 violation from target_tickers length alone."

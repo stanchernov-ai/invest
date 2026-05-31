@@ -28,7 +28,7 @@ _SYSTEM_VOTE_ENGINE = "[VOTE ENGINE]"
 
 
 def count_buy_verdicts(chairman: dict) -> int:
-    """Count Buy/Strong Buy across portfolio and watchlist positions."""
+    """Count Accumulate Candidate/High Conviction (Overweight) across portfolio and watchlist positions."""
     count = 0
     for section in ("portfolio_positions", "watchlist_positions"):
         for pos in chairman.get(section) or []:
@@ -68,7 +68,7 @@ def _chairman_aligns_with_mandate(final_verdict: str, expected_mandate: str) -> 
         return True
     if expected in BUY_VERDICTS and final in BUY_VERDICTS:
         return True
-    if expected in ("SELL", "STRONG SELL", "TRIM") and final in ("SELL", "STRONG SELL", "TRIM"):
+    if expected in ("BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)", "REDUCE EXPOSURE") and final in ("BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)", "REDUCE EXPOSURE"):
         return True
     if expected == "HOLD" and final == "HOLD":
         return True
@@ -158,14 +158,14 @@ def audit_chairman_vote_alignment(
             summary = summaries.get(sym)
             if not summary:
                 violations.append(
-                    f"ORIGINATOR RULE: {sym} is Buy/Strong Buy in chairman JSON but has no Round 2 panel votes."
+                    f"ORIGINATOR RULE: {sym} is Accumulate Candidate/High Conviction (Overweight) in chairman JSON but has no Round 2 panel votes."
                 )
                 continue
             buy_votes = summary.buy_side_count()
             if buy_votes < MAJORITY_THRESHOLD:
                 violations.append(
-                    f"MAJORITY BUY MANDATE: {sym} chairman Buy/Strong Buy requires "
-                    f"{MAJORITY_THRESHOLD}/5 panel Buy votes but only {buy_votes}/5 voted Buy "
+                    f"MAJORITY ACCUMULATE CANDIDATE MANDATE: {sym} chairman Accumulate Candidate/High Conviction (Overweight) requires "
+                    f"{MAJORITY_THRESHOLD}/5 panel Accumulate Candidate votes but only {buy_votes}/5 voted Accumulate Candidate "
                     f"(plurality is not a majority)."
                 )
 
@@ -182,7 +182,7 @@ def audit_chairman_vote_alignment(
             )
         elif alpha_summary.buy_side_count() < MAJORITY_THRESHOLD:
             violations.append(
-                f"ALPHA PICK: {alpha_sym} requires majority Buy support "
+                f"ALPHA PICK: {alpha_sym} requires majority Accumulate Candidate support "
                 f"({alpha_summary.buy_side_count()}/{MAJORITY_THRESHOLD} panelists)."
             )
 
@@ -227,7 +227,7 @@ def audit_chairman_compliance_limits(chairman: dict) -> list[str]:
                 if _normalize_verdict(pos.get("final_verdict", "")) in BUY_VERDICTS:
                     symbols.append(sym)
         violations.append(
-            f"MAX 3 BUYS: output contains {buy_count} equity Buy/Strong Buy verdicts "
+            f"MAX 3 BUYS: output contains {buy_count} equity Accumulate Candidate/High Conviction (Overweight) verdicts "
             f"({', '.join(symbols)}) — limit is {MAX_DAILY_BUYS} (TLT/VXX hedge excluded)."
         )
 
@@ -235,7 +235,7 @@ def audit_chairman_compliance_limits(chairman: dict) -> list[str]:
     if not hedge_executed:
         violations.append(
             "HEDGE MANDATE: TLT or VXX must appear in capital_flow_audit.target_tickers "
-            "and/or as a Buy/Strong Buy position — mandatory hedge was not executed in JSON."
+            "and/or as a Accumulate Candidate/High Conviction (Overweight) position — mandatory hedge was not executed in JSON."
         )
     elif _narrative_mentions_hedge(chairman) and not _hedge_in_targets(chairman):
         violations.append(
@@ -246,7 +246,7 @@ def audit_chairman_compliance_limits(chairman: dict) -> list[str]:
     audit = chairman.get("capital_flow_audit")
     if buy_count > 0 and not audit:
         violations.append(
-            "CAPITAL FLOW: Buy verdicts present but capital_flow_audit is missing."
+            "CAPITAL FLOW: Accumulate Candidate verdicts present but capital_flow_audit is missing."
         )
 
     return violations

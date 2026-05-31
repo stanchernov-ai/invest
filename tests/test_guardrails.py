@@ -33,17 +33,17 @@ class TestMaxBuys(unittest.TestCase):
             "capital_flow_audit": {"target_tickers": ["A", "B", "C", "D"], "liquidated_tickers": []},
             "portfolio_positions": [],
             "watchlist_positions": [
-                _pos("A", "Buy", 30),
-                _pos("B", "Strong Buy", 25),
-                _pos("C", "Buy", 20),
-                _pos("D", "Buy", 15),
+                _pos("A", "Accumulate Candidate", 30),
+                _pos("B", "High Conviction (Overweight)", 25),
+                _pos("C", "Accumulate Candidate", 20),
+                _pos("D", "Accumulate Candidate", 15),
             ],
         }
         result = enforce_max_buys(chairman)
         verdicts = {p["symbol"]: p["final_verdict"] for p in result["watchlist_positions"]}
-        self.assertEqual(verdicts["A"], "Buy")
-        self.assertEqual(verdicts["B"], "Strong Buy")
-        self.assertEqual(verdicts["C"], "Buy")
+        self.assertEqual(verdicts["A"], "Accumulate Candidate")
+        self.assertEqual(verdicts["B"], "High Conviction (Overweight)")
+        self.assertEqual(verdicts["C"], "Accumulate Candidate")
         self.assertEqual(verdicts["D"], "Pass")
         self.assertIn("Maximum 3 Buys", result["watchlist_positions"][3]["synthesis"])
         self.assertEqual(result["capital_flow_audit"]["target_tickers"], ["A", "B", "C"])
@@ -57,10 +57,10 @@ class TestMaxBuys(unittest.TestCase):
             },
             "portfolio_positions": [],
             "watchlist_positions": [
-                _pos("META", "Buy", 30),
-                _pos("MNDY", "Buy", 25),
-                _pos("AMZN", "Buy", 20),
-                _pos("VRT", "Buy", 15),
+                _pos("META", "Accumulate Candidate", 30),
+                _pos("MNDY", "Accumulate Candidate", 25),
+                _pos("AMZN", "Accumulate Candidate", 20),
+                _pos("VRT", "Accumulate Candidate", 15),
             ],
         }
         result = enforce_max_buys(chairman)
@@ -77,26 +77,26 @@ class TestMaxBuys(unittest.TestCase):
             "capital_flow_audit": {"target_tickers": ["A", "B", "C", "TLT"], "liquidated_tickers": []},
             "portfolio_positions": [],
             "watchlist_positions": [
-                _pos("A", "Buy", 40),
-                _pos("B", "Buy", 35),
-                _pos("C", "Buy", 30),
-                _pos("D", "Buy", 25),
-                _pos("TLT", "Buy", 5),
+                _pos("A", "Accumulate Candidate", 40),
+                _pos("B", "Accumulate Candidate", 35),
+                _pos("C", "Accumulate Candidate", 30),
+                _pos("D", "Accumulate Candidate", 25),
+                _pos("TLT", "Accumulate Candidate", 5),
             ],
         }
         result = enforce_max_buys(chairman)
         tlt = next(p for p in result["watchlist_positions"] if p["symbol"] == "TLT")
-        self.assertEqual(tlt["final_verdict"], "Buy")
+        self.assertEqual(tlt["final_verdict"], "Accumulate Candidate")
         self.assertIn("TLT", result["capital_flow_audit"]["target_tickers"])
 
     def test_portfolio_buys_demoted_to_hold(self):
         chairman = {
             "capital_flow_audit": {"target_tickers": [], "liquidated_tickers": []},
             "portfolio_positions": [
-                _pos("NVDA", "Buy", 40),
-                _pos("META", "Buy", 35),
-                _pos("AMZN", "Buy", 30),
-                _pos("GOOG", "Buy", 25),
+                _pos("NVDA", "Accumulate Candidate", 40),
+                _pos("META", "Accumulate Candidate", 35),
+                _pos("AMZN", "Accumulate Candidate", 30),
+                _pos("GOOG", "Accumulate Candidate", 25),
             ],
             "watchlist_positions": [],
         }
@@ -111,7 +111,7 @@ class TestWashSale(unittest.TestCase):
     def test_blocks_recent_purchase(self):
         chairman = {
             "capital_flow_audit": {"liquidated_tickers": ["XYZ"], "target_tickers": []},
-            "portfolio_positions": [_pos("XYZ", "Sell", synthesis="Exit.")],
+            "portfolio_positions": [_pos("XYZ", "Bearish (Liquidate)", synthesis="Exit.")],
             "watchlist_positions": [],
         }
         purchase_dates = {"XYZ": "05/20/2026"}
@@ -124,12 +124,12 @@ class TestWashSale(unittest.TestCase):
     def test_allows_old_purchase(self):
         chairman = {
             "capital_flow_audit": {"liquidated_tickers": ["XYZ"], "target_tickers": []},
-            "portfolio_positions": [_pos("XYZ", "Sell")],
+            "portfolio_positions": [_pos("XYZ", "Bearish (Liquidate)")],
             "watchlist_positions": [],
         }
         purchase_dates = {"XYZ": "01/01/2026"}
         result = enforce_wash_sale(chairman, purchase_dates, ref=self.REF)
-        self.assertEqual(result["portfolio_positions"][0]["final_verdict"], "Sell")
+        self.assertEqual(result["portfolio_positions"][0]["final_verdict"], "Bearish (Liquidate)")
         self.assertEqual(result["capital_flow_audit"]["liquidated_tickers"], ["XYZ"])
 
     def test_unknown_date_not_blocked(self):
@@ -140,7 +140,7 @@ class TestLiquidationCap(unittest.TestCase):
     def test_converts_oversized_sell_to_trim(self):
         chairman = {
             "capital_flow_audit": {"liquidated_tickers": ["BIG"], "target_tickers": ["NEW"]},
-            "portfolio_positions": [_pos("BIG", "Sell")],
+            "portfolio_positions": [_pos("BIG", "Bearish (Liquidate)")],
             "watchlist_positions": [],
         }
         holdings = {"BIG": 50_000.0}
@@ -150,14 +150,14 @@ class TestLiquidationCap(unittest.TestCase):
             portfolio_holdings=holdings,
         )
         pos = result["portfolio_positions"][0]
-        self.assertEqual(pos["final_verdict"], "Trim")
+        self.assertEqual(pos["final_verdict"], "Reduce Exposure")
         self.assertIn("10% limit", pos["synthesis"])
 
     def test_deferred_trims_stay_trim_when_cap_exhausted(self):
         """CHAIR-1: board-mandated trims must not become HOLD when the 10% cap is full."""
         chairman = {
             "capital_flow_audit": {"liquidated_tickers": ["A", "B"], "target_tickers": []},
-            "portfolio_positions": [_pos("A", "Sell"), _pos("B", "Trim")],
+            "portfolio_positions": [_pos("A", "Bearish (Liquidate)"), _pos("B", "Reduce Exposure")],
             "watchlist_positions": [],
         }
         holdings = {"A": 12_000.0, "B": 5_000.0}
@@ -167,22 +167,22 @@ class TestLiquidationCap(unittest.TestCase):
             portfolio_holdings=holdings,
         )
         verdicts = {p["symbol"]: p["final_verdict"] for p in result["portfolio_positions"]}
-        self.assertEqual(verdicts["A"], "Trim")
-        self.assertEqual(verdicts["B"], "Trim")
+        self.assertEqual(verdicts["A"], "Reduce Exposure")
+        self.assertEqual(verdicts["B"], "Reduce Exposure")
         self.assertIn("B", result["capital_flow_audit"]["liquidated_tickers"])
 
     def test_chair1_prod_scenario_googl_first_then_avgo_asml(self):
-        """Run 20260530_010432: GOOGL Sell + TSM Trim consume cap; AVGO/ASML stay Trim."""
+        """Run 20260530_010432: GOOGL Bearish (Liquidate) + TSM Reduce Exposure consume cap; AVGO/ASML stay Reduce Exposure."""
         chairman = {
             "capital_flow_audit": {
                 "liquidated_tickers": ["GOOGL", "TSM", "AVGO", "ASML"],
                 "target_tickers": [],
             },
             "portfolio_positions": [
-                _pos("GOOGL", "Sell"),
-                _pos("TSM", "Trim"),
-                _pos("AVGO", "Trim"),
-                _pos("ASML", "Trim"),
+                _pos("GOOGL", "Bearish (Liquidate)"),
+                _pos("TSM", "Reduce Exposure"),
+                _pos("AVGO", "Reduce Exposure"),
+                _pos("ASML", "Reduce Exposure"),
             ],
             "watchlist_positions": [],
         }
@@ -198,10 +198,10 @@ class TestLiquidationCap(unittest.TestCase):
             portfolio_holdings=holdings,
         )
         verdicts = {p["symbol"]: p["final_verdict"] for p in result["portfolio_positions"]}
-        self.assertEqual(verdicts["AVGO"], "Trim")
-        self.assertEqual(verdicts["ASML"], "Trim")
-        self.assertEqual(verdicts["TSM"], "Trim")
-        self.assertIn(verdicts["GOOGL"], ("Sell", "Trim"))
+        self.assertEqual(verdicts["AVGO"], "Reduce Exposure")
+        self.assertEqual(verdicts["ASML"], "Reduce Exposure")
+        self.assertEqual(verdicts["TSM"], "Reduce Exposure")
+        self.assertIn(verdicts["GOOGL"], ("Bearish (Liquidate)", "Reduce Exposure"))
 
 
 class TestApplyChairmanGuardrails(unittest.TestCase):
@@ -214,14 +214,14 @@ class TestApplyChairmanGuardrails(unittest.TestCase):
                 "target_tickers": ["W1", "W2", "W3", "W4"],
             },
             "portfolio_positions": [
-                _pos("RECENT", "Trim"),
-                _pos("OLD", "Trim"),
+                _pos("RECENT", "Reduce Exposure"),
+                _pos("OLD", "Reduce Exposure"),
             ],
             "watchlist_positions": [
-                _pos("W1", "Buy", 40),
-                _pos("W2", "Buy", 30),
-                _pos("W3", "Buy", 20),
-                _pos("W4", "Buy", 10),
+                _pos("W1", "Accumulate Candidate", 40),
+                _pos("W2", "Accumulate Candidate", 30),
+                _pos("W3", "Accumulate Candidate", 20),
+                _pos("W4", "Accumulate Candidate", 10),
             ],
         }
         purchase_dates = {"RECENT": "05/25/2026", "OLD": "01/01/2026"}
@@ -244,7 +244,7 @@ class TestApplyChairmanGuardrails(unittest.TestCase):
 
         buy_count = sum(
             1 for p in result["watchlist_positions"]
-            if p["final_verdict"] in ("Buy", "Strong Buy")
+            if p["final_verdict"] in ("Accumulate Candidate", "High Conviction (Overweight)")
         )
         self.assertLessEqual(buy_count, MAX_DAILY_BUYS)
 

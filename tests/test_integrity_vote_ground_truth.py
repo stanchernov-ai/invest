@@ -63,19 +63,19 @@ class TestVoteGroundTruthContext(unittest.TestCase):
                     return line
             return ""
 
-        # Cached runs vary: sell_side 3–5/5; mandate Sell/Strong Sell/Trim (not Buy).
+        # Cached runs vary: sell_side 3–5/5; mandate Bearish (Liquidate)/Strong Bearish (Liquidate)/Reduce Exposure (not Accumulate Candidate).
         asml_line = _digest_line("ASML")
         tsm_line = _digest_line("TSM")
         self.assertRegex(asml_line, r"sell_side=[345]/5")
-        self.assertRegex(asml_line, r"mandate=(?:Strong Sell|Sell|Trim)")
+        self.assertRegex(asml_line, r"mandate=(?:Strong Bearish (Liquidate)|Bearish (Liquidate)|Reduce Exposure)")
         self.assertRegex(tsm_line, r"sell_side=[345]/5")
-        self.assertRegex(tsm_line, r"mandate=(?:Strong Sell|Sell|Trim)")
+        self.assertRegex(tsm_line, r"mandate=(?:Strong Bearish (Liquidate)|Bearish (Liquidate)|Reduce Exposure)")
 
 
 class TestPostMortemReportAccuracy(unittest.TestCase):
     def test_flags_rubber_stamped_pass(self):
         vote_ctx = {
-            "deterministic_violations": ["MAJORITY BUY MANDATE: AMZN 2/5"],
+            "deterministic_violations": ["MAJORITY ACCUMULATE CANDIDATE MANDATE: AMZN 2/5"],
         }
         qa_reports = [{
             "agent_role": "Post Mortem QA Auditor",
@@ -115,7 +115,7 @@ class TestIntegritySanitizerMaxBuy(unittest.TestCase):
         findings = sanitize_llm_integrity_findings([{
             "severity": "CRITICAL",
             "category": "Verdict Accuracy",
-            "description": "Chairman JSON lists 4 equity Buy verdicts exceeding max 3.",
+            "description": "Chairman JSON lists 4 equity Accumulate Candidate verdicts exceeding max 3.",
             "recommendation": "Fail post mortem.",
         }], {}, vote_ctx=vote_ctx)
         self.assertEqual(len(findings), 1)
@@ -125,10 +125,10 @@ class TestComplianceEquityBuyCap(unittest.TestCase):
     def test_hedge_excluded_from_max_buy_count(self):
         chairman = {
             "portfolio_positions": [
-                {"symbol": "AMZN", "final_verdict": "Buy"},
-                {"symbol": "NVDA", "final_verdict": "Strong Buy"},
-                {"symbol": "VRT", "final_verdict": "Buy"},
-                {"symbol": "TLT", "final_verdict": "Buy"},
+                {"symbol": "AMZN", "final_verdict": "Accumulate Candidate"},
+                {"symbol": "NVDA", "final_verdict": "High Conviction (Overweight)"},
+                {"symbol": "VRT", "final_verdict": "Accumulate Candidate"},
+                {"symbol": "TLT", "final_verdict": "Accumulate Candidate"},
             ],
             "watchlist_positions": [],
             "capital_flow_audit": {

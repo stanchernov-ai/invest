@@ -229,12 +229,12 @@ CSS_ROOT_BLOCK = f""":root {{
 def verdict_pill_styles() -> dict[str, str]:
     """Inline styles for action-plan verdict pills (email-client safe)."""
     return {
-        "STRONG BUY": f"background-color:{BULL_BG}; color:{BULL_TEXT};",
-        "BUY": f"background-color:{BULL_BG}; color:{BULL_TEXT};",
+        "HIGH CONVICTION (OVERWEIGHT)": f"background-color:{BULL_BG}; color:{BULL_TEXT};",
+        "ACCUMULATE CANDIDATE": f"background-color:{BULL_BG}; color:{BULL_TEXT};",
         "HOLD": f"background-color:{BG_SURFACE}; color:{TEXT_PRIMARY}; border: 1px solid {BORDER_SUBTLE};",
-        "TRIM": f"background-color:{WARN_BG}; color:{WARN_TEXT};",
-        "SELL": f"background-color:{BEAR_BG}; color:{BEAR_TEXT};",
-        "STRONG SELL": f"background-color:{BEAR_BG}; color:{BEAR_TEXT};",
+        "REDUCE EXPOSURE": f"background-color:{WARN_BG}; color:{WARN_TEXT};",
+        "BEARISH (LIQUIDATE)": f"background-color:{BEAR_BG}; color:{BEAR_TEXT};",
+        "STRONG BEARISH (LIQUIDATE)": f"background-color:{BEAR_BG}; color:{BEAR_TEXT};",
     }
 
 
@@ -721,8 +721,8 @@ Typography: primary body {TEXT_PRIMARY}; critical numbers and strong labels {TEX
 Brand accent (h1, h2, chart titles): matte sage {BRAND_SAGE}. Borders/dividers: {BORDER_SUBTLE}.
 
 Financial semantics:
-- Bullish (Buy / Strong Buy pills, champion quotes): {BULL_TEXT} on {BULL_BG}.
-- Bearish (Sell / Strong Sell pills, SoTU 1–2 star): {BEAR_TEXT} on {BEAR_BG}.
+- Bullish (Accumulate Candidate / High Conviction (Overweight) pills, champion quotes): {BULL_TEXT} on {BULL_BG}.
+- Bearish (Bearish (Liquidate) / Strong Bearish (Liquidate) pills, SoTU 1–2 star): {BEAR_TEXT} on {BEAR_BG}.
 - The Crucible rebuttal (Alpha Pick / Unicorn): {CRUCIBLE_TEXT} on {CRUCIBLE_BG}, {CRUCIBLE_BORDER} left accent, header {CRUCIBLE_HEADER}. NOT bear-red.
 - Warning / hedge mandate: {WARN_TEXT} on {WARN_BG}.
 

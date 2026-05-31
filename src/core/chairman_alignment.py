@@ -1,6 +1,6 @@
 """Chairman ↔ board majority coherence (deterministic).
 
-Fixes cases like run 20260529_134042: board majority Buy on AMZN while the
+Fixes cases like run 20260529_134042: board majority Accumulate Candidate on AMZN while the
 chairman JSON says Pass citing a false "Maximum 3 Buys" excuse when only two
 equity buys were executed.
 """
@@ -44,7 +44,7 @@ def _minimal_watchlist_position(symbol: str) -> dict:
         "synthesis": "Position row added for board-majority reconciliation.",
         "narrative": {
             "champion": "Board",
-            "champion_quote": "Majority Buy mandate from Round 2 panel votes.",
+            "champion_quote": "Majority Accumulate Candidate mandate from Round 2 panel votes.",
             "dissenter": "None",
             "dissenter_quote": "N/A",
         },
@@ -166,10 +166,10 @@ def fill_majority_buys_within_cap(chairman: dict, raw_verdicts: dict[str, dict] 
             break
         sym = pos["symbol"]
         slot = count_equity_buys(chairman) + 1
-        pos["final_verdict"] = "Buy"
+        pos["final_verdict"] = "Accumulate Candidate"
         _prepend_override(
             pos,
-            f"[SYSTEM OVERRIDE: Board majority Buy ({panel_votes}/5 panelists, "
+            f"[SYSTEM OVERRIDE: Board majority Accumulate Candidate ({panel_votes}/5 panelists, "
             f"conviction {conviction}). Slot {slot}/{MAX_DAILY_BUYS}.]",
         )
         if sym not in targets:

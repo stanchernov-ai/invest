@@ -18,7 +18,7 @@ def _raw_verdicts_amzn_buy_votes(buy_count: int) -> dict:
     buy_agents = agents[:buy_count]
     raw = {}
     for agent in agents:
-        verdict = "Buy" if agent in buy_agents else "Pass"
+        verdict = "Accumulate Candidate" if agent in buy_agents else "Pass"
         raw[agent] = {
             "overall_portfolio_critique": f"{agent} round 2 view.",
             "portfolio_verdicts": [],
@@ -31,7 +31,7 @@ def _raw_verdicts_amzn_buy_votes(buy_count: int) -> dict:
 
 def _chairman_amzn_buy() -> dict:
     return {
-        "chain_of_thought_scratchpad": "Buy AMZN.",
+        "chain_of_thought_scratchpad": "Accumulate Candidate AMZN.",
         "capital_allocation_narrative": "Hedge with TLT.",
         "capital_flow_audit": {
             "liquidated_tickers": ["AVGO"],
@@ -39,7 +39,7 @@ def _chairman_amzn_buy() -> dict:
         },
         "portfolio_positions": [],
         "watchlist_positions": [
-            {"symbol": "AMZN", "final_verdict": "Buy", "synthesis": "Majority buy."},
+            {"symbol": "AMZN", "final_verdict": "Accumulate Candidate", "synthesis": "Majority buy."},
         ],
         "alpha_pick": {"symbol": "NVDA", "champion_quote": "test"},
     }
@@ -53,7 +53,7 @@ class TestPostMortemAudit(unittest.TestCase):
             all_symbols=["AMZN"],
             portfolio_symbols=set(),
         )
-        self.assertTrue(any("MAJORITY BUY MANDATE" in v and "AMZN" in v for v in violations))
+        self.assertTrue(any("MAJORITY ACCUMULATE CANDIDATE MANDATE" in v and "AMZN" in v for v in violations))
 
     def test_majority_buy_passes_compliance(self):
         violations = audit_chairman_compliance(
@@ -62,7 +62,7 @@ class TestPostMortemAudit(unittest.TestCase):
             all_symbols=["AMZN"],
             portfolio_symbols=set(),
         )
-        majority_violations = [v for v in violations if "MAJORITY BUY MANDATE" in v and "AMZN" in v]
+        majority_violations = [v for v in violations if "MAJORITY ACCUMULATE CANDIDATE MANDATE" in v and "AMZN" in v]
         self.assertEqual(majority_violations, [])
 
     def test_missing_raw_verdicts_fails_post_mortem(self):
@@ -86,7 +86,7 @@ class TestPostMortemAudit(unittest.TestCase):
             {"is_compliant": True, "findings": [], "summary": "All good.", "agent_role": "Post Mortem QA Auditor"},
         )
         self.assertFalse(merged["is_compliant"])
-        self.assertTrue(any("MAJORITY BUY MANDATE" in f["description"] for f in merged["findings"]))
+        self.assertTrue(any("MAJORITY ACCUMULATE CANDIDATE MANDATE" in f["description"] for f in merged["findings"]))
 
     def test_digest_includes_vote_counts(self):
         digest = format_post_mortem_digest(
@@ -122,11 +122,11 @@ class TestPostMortemAudit(unittest.TestCase):
                 f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['hypatia']}**:\n"
                 "* **AMZN**: Pass (2/10).\n"
                 f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['davinci']}**:\n"
-                "* **AMZN**: Buy (8/10).\n"
+                "* **AMZN**: Accumulate Candidate (8/10).\n"
             )
         }]
-        # hypatia Pass in prose but Buy in raw for first agent — fix raw to create drift
-        raw["hypatia"]["watchlist_verdicts"][0]["verdict"] = "Buy"
+        # hypatia Pass in prose but Accumulate Candidate in raw for first agent — fix raw to create drift
+        raw["hypatia"]["watchlist_verdicts"][0]["verdict"] = "Accumulate Candidate"
         violations = audit_debate_prose_vs_raw_verdicts(
             messages, raw, all_symbols=["AMZN"]
         )

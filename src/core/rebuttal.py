@@ -46,7 +46,7 @@ def extract_panelist_round2_block(messages: list[dict], agent_key: str) -> str:
 
 
 def parse_ticker_verdict_from_line(line: str) -> tuple[str, str] | None:
-    """Parse `* **NVDA**: Strong Sell (7/10).` → (symbol, verdict)."""
+    """Parse `* **NVDA**: Strong Bearish (Liquidate) (7/10).` → (symbol, verdict)."""
     match = _TICKER_VERDICT_LINE_RE.match((line or "").strip())
     if not match:
         return None
@@ -55,16 +55,16 @@ def parse_ticker_verdict_from_line(line: str) -> tuple[str, str] | None:
     # Verdict is before optional (score) or first sentence — ignore rationale prose.
     verdict_part = rest.split("(")[0].split(".")[0].strip()
     lower = verdict_part.lower()
-    if "strong sell" in lower:
-        return ticker, "Strong Sell"
-    if "strong buy" in lower:
-        return ticker, "Strong Buy"
-    if re.search(r"\btrim\b", lower):
-        return ticker, "Trim"
-    if re.search(r"\bsell\b", lower):
-        return ticker, "Sell"
-    if re.search(r"\bbuy\b", lower):
-        return ticker, "Buy"
+    if "strong bearish" in lower:
+        return ticker, "Strong Bearish (Liquidate)"
+    if "high conviction" in lower:
+        return ticker, "High Conviction (Overweight)"
+    if re.search(r"\breduce\b", lower):
+        return ticker, "Reduce Exposure"
+    if re.search(r"\bbearish\b", lower):
+        return ticker, "Bearish (Liquidate)"
+    if re.search(r"\baccumulate\b", lower):
+        return ticker, "Accumulate Candidate"
     if re.search(r"\bpass\b", lower):
         return ticker, "Pass"
     if re.search(r"\bhold\b", lower):

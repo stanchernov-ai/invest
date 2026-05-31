@@ -11,15 +11,15 @@ class OwnedAssetVerdict(BaseModel):
     symbol: str = Field(description="The ticker symbol from the CURRENT PORTFOLIO list.")
     analysis: str = Field(description="The unvarnished mathematical and strategic rationale. STRICT LIMIT: 2 sentences maximum.")
     verdict: str = Field(
-        description="MUST BE EXACTLY ONE OF: Strong Buy, Buy, Strong Sell, Sell. "
-        "No Hold or Trim — unclear board splits resolve to Hold in execution."
+        description="MUST BE EXACTLY ONE OF: High Conviction (Overweight), Accumulate Candidate, Strong Bearish (Liquidate), Bearish (Liquidate). "
+        "No Hold or Reduce Exposure — unclear board splits resolve to Hold in execution."
     )
     conviction_score: int = Field(description="Confidence level from 1 to 10.")
 
 class WatchlistAssetVerdict(BaseModel):
     symbol: str = Field(description="The ticker symbol from the APPROVED WATCHLIST TARGETS list.")
     analysis: str = Field(description="The unvarnished mathematical and strategic rationale. STRICT LIMIT: 2 sentences maximum.")
-    verdict: str = Field(description="MUST BE EXACTLY ONE OF: Strong Buy, Buy, or Pass. You CANNOT Hold, Trim, or Sell what you do not own.")
+    verdict: str = Field(description="MUST BE EXACTLY ONE OF: High Conviction (Overweight), Accumulate Candidate, or Pass. You CANNOT Hold, Reduce Exposure, or Bearish (Liquidate) what you do not own.")
     conviction_score: int = Field(description="Confidence level from 1 to 10.")
 
 class PanelistPortfolioVerdict(BaseModel):
@@ -74,7 +74,7 @@ class TradeNarrative(BaseModel):
 class ChairmanPortfolioSynthesis(BaseModel):
     symbol: str = Field(description="The ticker symbol.")
     final_verdict: str = Field(
-        description="MUST BE EXACTLY ONE OF: Strong Buy, Buy, Strong Sell, Sell, Hold, Trim, or Pass."
+        description="MUST BE EXACTLY ONE OF: High Conviction (Overweight), Accumulate Candidate, Strong Bearish (Liquidate), Bearish (Liquidate), Hold, Reduce Exposure, or Pass."
     )
     synthesis: str = Field(description="A detailed strategic justification for this decision.")
     narrative: TradeNarrative = Field(description="The opposing arguments from the board members.")
@@ -83,7 +83,7 @@ class ChairmanPortfolioSynthesis(BaseModel):
 
 class ChairmanWatchlistSynthesis(BaseModel):
     symbol: str = Field(description="The ticker symbol.")
-    final_verdict: str = Field(description="MUST BE EXACTLY ONE OF: Strong Buy, Buy, or Pass.")
+    final_verdict: str = Field(description="MUST BE EXACTLY ONE OF: High Conviction (Overweight), Accumulate Candidate, or Pass.")
     synthesis: str = Field(description="A detailed strategic justification for this decision.")
     narrative: TradeNarrative = Field(description="The opposing arguments from the board members.")
     supporting_members: list[str] = Field(description="List of board members who explicitly supported this action.")
@@ -179,12 +179,12 @@ TONE_OVERRIDE = "TONE OVERRIDE: You are speaking to Stan. Drop all cinematic flu
 
 WATCHLIST_RULING = (
     "MANDATE VOTING (Phase C — Round 2 JSON is authoritative):\n"
-    "* PORTFOLIO (owned): vote ONLY Strong Buy, Buy, Strong Sell, or Sell. "
-    "Never Hold or Trim in panel JSON — execution Hold is applied in Python when neither side reaches 3/5.\n"
-    "* WATCHLIST: vote ONLY Strong Buy, Buy, or Pass.\n"
-    "* ≥3/5 on buy-side (Strong Buy + Buy) → buy mandate; ≥3/5 on sell-side (Strong Sell + Sell) → reduce mandate; "
+    "* PORTFOLIO (owned): vote ONLY High Conviction (Overweight), Accumulate Candidate, Strong Bearish (Liquidate), or Bearish (Liquidate). "
+    "Never Hold or Reduce Exposure in panel JSON — execution Hold is applied in Python when neither side reaches 3/5.\n"
+    "* WATCHLIST: vote ONLY High Conviction (Overweight), Accumulate Candidate, or Pass.\n"
+    "* ≥3/5 on buy-side (High Conviction (Overweight) + Accumulate Candidate) → buy mandate; ≥3/5 on sell-side (Strong Bearish (Liquidate) + Bearish (Liquidate)) → reduce mandate; "
     "otherwise portfolio → Hold, watchlist → Pass.\n"
-    "* Use conviction_score to express intensity; Strong Buy / Strong Sell signal highest conviction."
+    "* Use conviction_score to express intensity; High Conviction (Overweight) / Strong Bearish (Liquidate) signal highest conviction."
 )
 
 MANDATE_VOTING_RULES = WATCHLIST_RULING

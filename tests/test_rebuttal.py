@@ -31,7 +31,7 @@ class TestRebuttalHelpers(unittest.TestCase):
                 "content": (
                     f"**[ROUND 2 REBUTTAL] {hypatia}**:\n"
                     "* **Rebuttal Summary**: davinci is wrong about NVDA — cash flow supports it.\n"
-                    "* **NVDA**: Buy (8/10). Margin of safety emerging.\n"
+                    "* **NVDA**: Accumulate Candidate (8/10). Margin of safety emerging.\n"
                 )
             }
         ]

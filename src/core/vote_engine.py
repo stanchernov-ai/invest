@@ -32,8 +32,8 @@ AGENT_DISPLAY = PANELIST_ROLES
 
 Bucket = Literal["buy", "reduce", "hold", "pass"]
 
-BUY_SIDE_VERDICTS = frozenset({"STRONG BUY", "BUY"})
-SELL_SIDE_VERDICTS = frozenset({"STRONG SELL", "SELL", "TRIM"})
+BUY_SIDE_VERDICTS = frozenset({"HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE"})
+SELL_SIDE_VERDICTS = frozenset({"STRONG BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE"})
 
 
 def panel_verdict_side(verdict: str, section: Literal["portfolio", "watchlist"]) -> Literal["buy", "sell", "pass", "neutral"]:
@@ -134,7 +134,7 @@ class SymbolVoteSummary:
         return None
 
     def is_actionable_unanimous(self) -> bool:
-        """5/5 on Buy or 5/5 on Reduce only."""
+        """5/5 on Accumulate Candidate or 5/5 on Reduce only."""
         return self.is_unanimous("buy") or self.is_unanimous("reduce")
 
     def has_actionable_majority(self) -> bool:
@@ -173,7 +173,7 @@ def build_vote_summaries(
 
 
 def board_majority_buy_counts(raw_verdicts: dict[str, dict] | None) -> dict[str, int]:
-    """Round 2 panel votes: symbol -> count of Buy/Strong Buy."""
+    """Round 2 panel votes: symbol -> count of Accumulate Candidate/High Conviction (Overweight)."""
     counts: dict[str, int] = {}
     for _, sym, _, verdict, _ in _iter_panel_verdicts(raw_verdicts):
         if _normalize_verdict(verdict) in BUY_VERDICTS:
@@ -182,7 +182,7 @@ def board_majority_buy_counts(raw_verdicts: dict[str, dict] | None) -> dict[str,
 
 
 def detect_unicorn_trades(summaries: dict[str, SymbolVoteSummary]) -> list[dict]:
-    """Unanimous 5/5 Buy-side or Reduce-side mandates only — not unanimous Hold/Pass."""
+    """Unanimous 5/5 Accumulate Candidate-side or Reduce-side mandates only — not unanimous Hold/Pass."""
     trades: list[dict] = []
     for sym, summary in summaries.items():
         if not summary.is_actionable_unanimous():
@@ -203,37 +203,37 @@ def detect_sell_candidates(summaries: dict[str, SymbolVoteSummary]) -> list[str]
 
 
 def _buy_rank_score(summary: SymbolVoteSummary) -> int:
-    """Rank max-3 candidates: Strong Buy votes weighted above Buy."""
+    """Rank max-3 candidates: High Conviction (Overweight) votes weighted above Accumulate Candidate."""
     score = 0
     for verdict, conviction in summary.votes.values():
         v = _normalize_verdict(verdict)
-        if v == "STRONG BUY":
+        if v == "HIGH CONVICTION (OVERWEIGHT)":
             score += int(conviction) + 100
-        elif v == "BUY":
+        elif v == "ACCUMULATE CANDIDATE":
             score += int(conviction)
     return score
 
 
 def _mandate_from_buy_votes(summary: SymbolVoteSummary) -> str:
     strong = sum(
-        1 for v, _ in summary.votes.values() if _normalize_verdict(v) == "STRONG BUY"
+        1 for v, _ in summary.votes.values() if _normalize_verdict(v) == "HIGH CONVICTION (OVERWEIGHT)"
     )
     if strong >= MAJORITY_THRESHOLD:
-        return "Strong Buy"
-    return "Buy"
+        return "High Conviction (Overweight)"
+    return "Accumulate Candidate"
 
 
 def _mandate_from_sell_votes(summary: SymbolVoteSummary) -> str:
     strong = sum(
-        1 for v, _ in summary.votes.values() if _normalize_verdict(v) == "STRONG SELL"
+        1 for v, _ in summary.votes.values() if _normalize_verdict(v) == "STRONG BEARISH (LIQUIDATE)"
     )
     if strong >= MAJORITY_THRESHOLD:
-        return "Strong Sell"
+        return "Strong Bearish (Liquidate)"
     regular = sum(
         1 for v, _ in summary.votes.values()
-        if _normalize_verdict(v) in ("SELL", "TRIM")
+        if _normalize_verdict(v) in ("BEARISH (LIQUIDATE)", "REDUCE EXPOSURE")
     )
-    return "Sell" if regular >= MAJORITY_THRESHOLD else "Trim"
+    return "Bearish (Liquidate)" if regular >= MAJORITY_THRESHOLD else "Reduce Exposure"
 
 
 def mandate_verdict(summary: SymbolVoteSummary) -> str:
@@ -275,7 +275,7 @@ def _supporting_for_mandate(summary: SymbolVoteSummary, final_verdict: str) -> t
         matched = False
         if final in BUY_VERDICTS and side == "buy":
             matched = True
-        elif final in ("STRONG SELL", "SELL", "TRIM") and side == "sell":
+        elif final in ("STRONG BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE") and side == "sell":
             matched = True
         elif final == "PASS" and side == "pass":
             matched = True
@@ -306,8 +306,8 @@ def format_vote_digest(
     portfolio_symbols = portfolio_symbols or set()
     lines = [
         "DETERMINISTIC VOTE DIGEST (Round 2 JSON — authoritative; do not re-count from prose):",
-        f"Phase C mandate: ≥{MAJORITY_THRESHOLD}/{PANEL_SIZE} buy-side (Strong Buy+Buy) or "
-        f"sell-side (Strong Sell+Sell); else Hold/Pass. Strong Buy/Sell rank above Buy/Sell.",
+        f"Phase C mandate: ≥{MAJORITY_THRESHOLD}/{PANEL_SIZE} buy-side (High Conviction (Overweight)+Accumulate Candidate) or "
+        f"sell-side (Strong Bearish (Liquidate)+Bearish (Liquidate)); else Hold/Pass. High Conviction (Overweight)/Bearish (Liquidate) rank above Accumulate Candidate/Bearish (Liquidate).",
         "",
     ]
     for sym in sorted(summaries.keys(), key=lambda s: (s not in portfolio_symbols, s)):
@@ -344,7 +344,7 @@ def _pick_alpha_pick_from_chairman(
     chairman: dict,
     summaries: dict[str, SymbolVoteSummary],
 ) -> dict:
-    """Alpha pick from executed Buy rows only (post max-3 cap)."""
+    """Alpha pick from executed Accumulate Candidate rows only (post max-3 cap)."""
     candidates: list[tuple[int, str]] = []
     for section in ("portfolio_positions", "watchlist_positions"):
         for pos in chairman.get(section) or []:
@@ -361,7 +361,7 @@ def _pick_alpha_pick_from_chairman(
     candidates.sort(key=lambda x: (-x[0], x[1]))
     if not candidates:
         sym = next(iter(summaries.keys()), "N/A")
-        return {"symbol": sym, "champion_quote": "No executed majority Buy for alpha pick."}
+        return {"symbol": sym, "champion_quote": "No executed majority Accumulate Candidate for alpha pick."}
     sym = candidates[0][1]
     summary = summaries[sym]
     members, _ = _supporting_for_mandate(summary, mandate_verdict(summary))
@@ -385,7 +385,7 @@ def _pick_alpha_pick(
     candidates.sort(key=lambda x: (-x[0], x[1]))
     if not candidates:
         sym = next(iter(summaries.keys()), "N/A")
-        return {"symbol": sym, "champion_quote": "No majority Buy candidate in Round 2."}
+        return {"symbol": sym, "champion_quote": "No majority Accumulate Candidate candidate in Round 2."}
     sym = candidates[0][1]
     members, _ = _supporting_for_mandate(summaries[sym], mandate_verdict(summaries[sym]))
     champion = members[0] if members else "Board"
@@ -404,7 +404,7 @@ def count_board_portfolio_sell_mandates(
     summaries: dict[str, SymbolVoteSummary],
     portfolio_symbols: set[str],
 ) -> int:
-    """Portfolio symbols with a Round 2 majority sell-side mandate (Trim/Sell/Strong Sell)."""
+    """Portfolio symbols with a Round 2 majority sell-side mandate (Reduce Exposure/Bearish (Liquidate)/Strong Bearish (Liquidate))."""
     count = 0
     for sym, summary in summaries.items():
         if sym not in portfolio_symbols:
@@ -425,7 +425,7 @@ def _portfolio_has_sell(chairman: dict) -> bool:
 
 
 def _funding_sell_candidates(chairman: dict) -> list[dict]:
-    """Portfolio equities eligible to fund buys: Hold, Trim, Sell, Strong Sell — never Buy."""
+    """Portfolio equities eligible to fund buys: Hold, Reduce Exposure, Bearish (Liquidate), Strong Bearish (Liquidate) — never Accumulate Candidate."""
     candidates: list[dict] = []
     for pos in chairman.get("portfolio_positions") or []:
         sym = (pos.get("symbol") or "").strip()
@@ -438,7 +438,7 @@ def _funding_sell_candidates(chairman: dict) -> list[dict]:
 
 
 def _all_portfolio_equities_are_buys(chairman: dict) -> bool:
-    """True when every non-hedge portfolio row is Buy/Strong Buy (no sell funding possible)."""
+    """True when every non-hedge portfolio row is Accumulate Candidate/High Conviction (Overweight) (no sell funding possible)."""
     equities = [
         pos for pos in (chairman.get("portfolio_positions") or [])
         if (pos.get("symbol") or "").strip() and not _is_hedge_symbol(pos.get("symbol", ""))
@@ -459,16 +459,16 @@ def ensure_funding_sell(
     raw_verdicts: dict[str, dict] | None = None,
     all_symbols: list[str] | None = None,
 ) -> dict:
-    """When equity buys exist, authorize one portfolio Sell — lowest conviction — to fund them.
+    """When equity buys exist, authorize one portfolio Bearish (Liquidate) — lowest conviction — to fund them.
 
     Funding sell candidate pool (portfolio only):
-      - Allowed: Hold, Trim, Sell, Strong Sell (any non-Buy equity).
-      - Forbidden: Buy, Strong Buy, hedge symbols (TLT/VXX).
+      - Allowed: Hold, Reduce Exposure, Bearish (Liquidate), Strong Bearish (Liquidate) (any non-Accumulate Candidate equity).
+      - Forbidden: Accumulate Candidate, High Conviction (Overweight), hedge symbols (TLT/VXX).
 
-    Hard stop: if every portfolio equity is Buy/Strong Buy, no sell is added.
+    Hard stop: if every portfolio equity is Accumulate Candidate/High Conviction (Overweight), no sell is added.
 
     Skipped when the board already voted sell on more than one portfolio name.
-    Skipped when a portfolio Sell/Trim/Strong Sell is already present.
+    Skipped when a portfolio Bearish (Liquidate)/Reduce Exposure/Strong Bearish (Liquidate) is already present.
     """
     if count_equity_buys(chairman) < 1:
         return chairman
@@ -486,7 +486,7 @@ def ensure_funding_sell(
 
     if _all_portfolio_equities_are_buys(chairman):
         logger.info(
-            "Funding sell skipped — all portfolio equities are Buy/Strong Buy; "
+            "Funding sell skipped — all portfolio equities are Accumulate Candidate/High Conviction (Overweight); "
             "no non-buy holding available to fund equity purchases."
         )
         return chairman
@@ -500,7 +500,7 @@ def ensure_funding_sell(
         key=lambda p: (int(p.get("aggregate_conviction_score") or 0), p.get("symbol", "")),
     )
     score = int(victim.get("aggregate_conviction_score") or 0)
-    victim["final_verdict"] = "Sell"
+    victim["final_verdict"] = "Bearish (Liquidate)"
     _prepend_override(
         victim,
         f"{FUNDING_SELL_MARKER} — lowest conviction portfolio holding "
@@ -524,7 +524,7 @@ def apply_max_three_buys(
     *,
     max_buys: int = MAX_DAILY_BUYS,
 ) -> dict:
-    """Keep top ``max_buys`` equity Buy mandates by board conviction; demote the rest."""
+    """Keep top ``max_buys`` equity Accumulate Candidate mandates by board conviction; demote the rest."""
     ranked: list[tuple[int, str, dict]] = []
     for section_key in ("portfolio_positions", "watchlist_positions"):
         for pos in chairman.get(section_key) or []:
@@ -572,7 +572,7 @@ def enforce_alpha_pick_from_executed_buys(
     *,
     portfolio_symbols: set[str] | None = None,
 ) -> dict:
-    """Overwrite alpha_pick from executed Buy rows (guards against LLM chairman errors)."""
+    """Overwrite alpha_pick from executed Accumulate Candidate rows (guards against LLM chairman errors)."""
     if not chairman or not raw_verdicts:
         return chairman
     summaries = build_vote_summaries(
@@ -635,7 +635,7 @@ def build_chairman_allocation(
             "liquidated_tickers": [
                 sym for sym, s in summaries.items()
                 if sym in portfolio_symbols
-                and _normalize_verdict(mandate_verdict(s)) in ("TRIM", "SELL", "STRONG SELL")
+                and _normalize_verdict(mandate_verdict(s)) in ("REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)")
             ],
             "target_tickers": target_tickers,
         },

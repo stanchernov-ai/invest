@@ -12,8 +12,8 @@ from src.config.settings import now_local
 MAX_DAILY_BUYS = 3
 WASH_SALE_DAYS = 30
 
-BUY_VERDICTS = frozenset({"BUY", "STRONG BUY"})
-SELL_VERDICTS = frozenset({"SELL", "STRONG SELL", "TRIM"})
+BUY_VERDICTS = frozenset({"ACCUMULATE CANDIDATE", "HIGH CONVICTION (OVERWEIGHT)"})
+SELL_VERDICTS = frozenset({"BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)", "REDUCE EXPOSURE"})
 HEDGE_SYMBOLS = frozenset({"TLT", "VXX"})
 
 _DATE_FORMATS = (
@@ -62,7 +62,7 @@ def _is_hedge_symbol(symbol: str) -> bool:
 
 
 def count_equity_buys(chairman: dict) -> int:
-    """Buy/Strong Buy equity positions only (TLT/VXX hedge excluded from the cap)."""
+    """Accumulate Candidate/High Conviction (Overweight) equity positions only (TLT/VXX hedge excluded from the cap)."""
     count = 0
     for section in ("portfolio_positions", "watchlist_positions"):
         for pos in chairman.get(section) or []:
@@ -75,7 +75,7 @@ def count_equity_buys(chairman: dict) -> int:
 
 
 def enforce_max_buys(chairman: dict, *, max_buys: int = MAX_DAILY_BUYS) -> dict:
-    """Keep at most ``max_buys`` equity Buy/Strong Buy verdicts; demote the rest by conviction.
+    """Keep at most ``max_buys`` equity Accumulate Candidate/High Conviction (Overweight) verdicts; demote the rest by conviction.
 
     Mandatory hedge symbols (TLT/VXX) are exempt from the buy cap and are always
     preserved in ``capital_flow_audit.target_tickers`` so the compliance gate can
@@ -122,7 +122,7 @@ def enforce_wash_sale(
     ref: datetime | None = None,
     wash_days: int = WASH_SALE_DAYS,
 ) -> dict:
-    """Block Sell/Trim on assets purchased within the wash-sale window."""
+    """Block Bearish (Liquidate)/Reduce Exposure on assets purchased within the wash-sale window."""
     ref = ref or now_local()
     pos_dict = {p["symbol"]: p for p in chairman.get("portfolio_positions", [])}
     blocked: set[str] = set()
@@ -138,7 +138,7 @@ def enforce_wash_sale(
         _prepend_override(
             pos,
             f"[SYSTEM OVERRIDE: Wash-Sale Rule — purchased {purchase_date} "
-            f"(<{wash_days} days). Sell/Trim blocked.]",
+            f"(<{wash_days} days). Bearish (Liquidate)/Reduce Exposure blocked.]",
         )
         blocked.add(sym)
 
@@ -158,7 +158,7 @@ def enforce_liquidation_cap(
     portfolio_holdings: dict[str, float],
     cap_pct: float | None = None,
 ) -> dict:
-    """Cap total Sell/Trim notional to ``cap_pct`` of portfolio value."""
+    """Cap total Bearish (Liquidate)/Reduce Exposure notional to ``cap_pct`` of portfolio value."""
     from src.config.settings import LIQUIDATION_CAP_PCT
 
     if cap_pct is None:
@@ -184,9 +184,9 @@ def enforce_liquidation_cap(
             continue
 
         if cap_remaining <= 0:
-            # CHAIR-1: board reduce mandates stay TRIM when cap is exhausted — never demote to HOLD.
-            if verdict != "TRIM":
-                pos["final_verdict"] = "Trim"
+            # CHAIR-1: board reduce mandates stay REDUCE EXPOSURE when cap is exhausted — never demote to HOLD.
+            if verdict != "REDUCE EXPOSURE":
+                pos["final_verdict"] = "Reduce Exposure"
             _prepend_override(
                 pos,
                 "[SYSTEM OVERRIDE: 10% Liquidation Cap Reached. Fractional trim only — "
@@ -195,21 +195,21 @@ def enforce_liquidation_cap(
             valid_liquidations.append(sym)
             continue
 
-        if verdict == "SELL" and holding_value > cap_remaining:
-            pos["final_verdict"] = "Trim"
+        if verdict == "BEARISH (LIQUIDATE)" and holding_value > cap_remaining:
+            pos["final_verdict"] = "Reduce Exposure"
             _prepend_override(
                 pos,
-                f"[SYSTEM OVERRIDE: Sell mathematically capped at ${cap_remaining:,.2f} "
+                f"[SYSTEM OVERRIDE: Bearish (Liquidate) mathematically capped at ${cap_remaining:,.2f} "
                 f"to respect 10% limit. Converted to fractional trim.]",
             )
             cap_remaining = 0
             valid_liquidations.append(sym)
         else:
-            deduction = holding_value if verdict == "SELL" else (holding_value / 2.0)
+            deduction = holding_value if verdict == "BEARISH (LIQUIDATE)" else (holding_value / 2.0)
             if deduction > cap_remaining:
                 _prepend_override(
                     pos,
-                    f"[SYSTEM OVERRIDE: Trim mathematically capped at ${cap_remaining:,.2f} "
+                    f"[SYSTEM OVERRIDE: Reduce Exposure mathematically capped at ${cap_remaining:,.2f} "
                     f"to respect 10% limit.]",
                 )
                 cap_remaining = 0
@@ -219,7 +219,7 @@ def enforce_liquidation_cap(
 
     for sym, pos in pos_dict.items():
         if _normalize_verdict(pos.get("final_verdict", "")) in SELL_VERDICTS and sym not in valid_liquidations:
-            pos["final_verdict"] = "Trim"
+            pos["final_verdict"] = "Reduce Exposure"
             _prepend_override(
                 pos,
                 "[SYSTEM OVERRIDE: 10% Liquidation Cap Reached. Deferred trim — cap exhausted.]",

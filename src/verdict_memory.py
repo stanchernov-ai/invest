@@ -88,7 +88,7 @@ def extract_watchlist_pass_entries(
     """Build append-only Pass records from chairman watchlist positions.
 
     The chairman JSON often omits non-actionable Pass rows; when ``watchlist_symbols``
-    is supplied, symbols not assigned Buy/Strong Buy are treated as implicit Pass."""
+    is supplied, symbols not assigned Accumulate Candidate/High Conviction (Overweight) are treated as implicit Pass."""
     if not chairman_data and not watchlist_symbols:
         return {}
 
@@ -105,7 +105,7 @@ def extract_watchlist_pass_entries(
             entries.setdefault(sym, []).append(
                 {"verdict": "Pass", "date": date_str, "unanimous_pass": False}
             )
-        elif verdict.upper() in ("BUY", "STRONG BUY"):
+        elif verdict.upper() in ("ACCUMULATE CANDIDATE", "HIGH CONVICTION (OVERWEIGHT)"):
             actionable.add(sym)
 
     if watchlist_symbols:

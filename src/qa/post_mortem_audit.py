@@ -167,7 +167,7 @@ def merge_post_mortem_reports(deterministic_violations: list[str], llm_report: d
             "description": v,
             "recommendation": (
                 "Chairman JSON must match Round 2 raw_verdicts majority math; "
-                "plurality Buy (e.g. 2/5) cannot authorize a purchase."
+                "plurality Accumulate Candidate (e.g. 2/5) cannot authorize a purchase."
             ),
         })
 

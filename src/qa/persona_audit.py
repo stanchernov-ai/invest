@@ -60,9 +60,9 @@ _FABRICATED_INVESTOR_QUOTE_RE = re.compile(
 
 def _verdict_bucket(verdict: str) -> str:
     v = (verdict or "").upper()
-    if "BUY" in v:
+    if "ACCUMULATE CANDIDATE" in v:
         return "buy"
-    if "SELL" in v or "TRIM" in v:
+    if "BEARISH (LIQUIDATE)" in v or "REDUCE EXPOSURE" in v:
         return "reduce"
     if "PASS" in v:
         return "pass"

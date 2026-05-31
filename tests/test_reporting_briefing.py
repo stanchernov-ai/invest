@@ -69,7 +69,7 @@ class BriefingCopyTests(unittest.TestCase):
     def test_sanitize_position_replaces_boilerplate_champion(self):
         pos = reporting._sanitize_position_for_briefing({
             "symbol": "NVDA",
-            "final_verdict": "Buy",
+            "final_verdict": "Accumulate Candidate",
             "synthesis": "[VOTE ENGINE] Deterministic mandate from Round 2 panel votes (buy_side=3/5, sell_side=2/5).",
             "narrative": {
                 "champion": PANELIST_ROLES["davinci"],
@@ -133,7 +133,7 @@ class BriefingCopyTests(unittest.TestCase):
                 "portfolio_positions": [],
                 "watchlist_positions": [{
                     "symbol": "VRT",
-                    "final_verdict": "Buy",
+                    "final_verdict": "Accumulate Candidate",
                     "synthesis": "The board sees AI infrastructure as the cycle winner.",
                     "supporting_members": [PANELIST_ROLES["tesla"]],
                     "narrative": {
@@ -213,14 +213,14 @@ class BriefingCopyTests(unittest.TestCase):
                 "content": (
                     f"**[ROUND 1] {hypatia}**:\n"
                     "* **Portfolio Overview**: Moats matter more than momentum.\n"
-                    "* **NVDA**: Sell (6/10). Premium multiple with no FCF support.\n"
+                    "* **NVDA**: Bearish (Liquidate) (6/10). Premium multiple with no FCF support.\n"
                 ),
             },
             {
                 "content": (
                     f"**[ROUND 2 REBUTTAL] {suntzu}**:\n"
                     "* **Rebuttal Summary**: hypatia ignores the tape.\n"
-                    "* **NVDA**: Strong Buy (9/10). Relative strength confirms leadership.\n"
+                    "* **NVDA**: High Conviction (Overweight) (9/10). Relative strength confirms leadership.\n"
                 ),
             },
         ]
@@ -411,7 +411,7 @@ class BriefingHtmlTests(unittest.TestCase):
                 "portfolio_positions": [
                     {
                         "symbol": "TSM",
-                        "final_verdict": "Sell",
+                        "final_verdict": "Bearish (Liquidate)",
                         "synthesis": "Unanimous sell mandate.",
                         "narrative": {
                             "champion": PANELIST_ROLES["aurelius"],
@@ -440,7 +440,7 @@ class BriefingHtmlTests(unittest.TestCase):
         self.assertIn("Strategic Context:", after_action)
         self.assertIn("The Champion (", after_action)
         self.assertIn("The Dissent (None):", after_action)
-        self.assertIn("SELL : TSM", after_action)
+        self.assertIn("BEARISH (LIQUIDATE) : TSM", after_action)
         self.assertIn(PANELIST_AVATAR_URLS["aurelius"], after_action)
 
     def test_action_plan_shows_champion_and_dissenter_avatars(self):
@@ -453,7 +453,7 @@ class BriefingHtmlTests(unittest.TestCase):
                 "portfolio_positions": [
                     {
                         "symbol": "NVDA",
-                        "final_verdict": "Buy",
+                        "final_verdict": "Accumulate Candidate",
                         "synthesis": "Strong AI momentum.",
                         "narrative": {
                             "champion": PANELIST_ROLES["tesla"],
@@ -521,9 +521,9 @@ class BriefingHtmlTests(unittest.TestCase):
                 "portfolio_positions": [
                     {
                         "symbol": "NVDA",
-                        "final_verdict": "Buy",
+                        "final_verdict": "Accumulate Candidate",
                         "synthesis": "Strong momentum.",
-                        "narrative": {"champion": "hypatia", "champion_quote": "Buy.", "dissenter": "NONE", "dissenter_quote": "N/A"},
+                        "narrative": {"champion": "hypatia", "champion_quote": "Accumulate Candidate.", "dissenter": "NONE", "dissenter_quote": "N/A"},
                     }
                 ],
                 "watchlist_positions": [],
@@ -558,7 +558,7 @@ class BriefingHtmlTests(unittest.TestCase):
         pie_pos = html.find("Unrealized Gains")
         sotu_pos = html.find("The State of the Union")
         debate_pos = html.find("The Debate")
-        actions_pos = html.find("Today&rsquo;s Actions")
+        actions_pos = html.find("Theoretical Scenario Adjustments")
         action_pos = html.find("The Action Plan")
         self.assertLess(perf_pos, pie_pos)
         self.assertLess(pie_pos, sotu_pos)
@@ -731,25 +731,25 @@ class TodaysActionsTests(unittest.TestCase):
         return base
 
     def test_build_summary_sorts_strong_actions_first_and_dedupes_unicorn(self):
-        grouped = {cat: [] for cat in ["STRONG BUY", "BUY", "HOLD", "TRIM", "SELL", "STRONG SELL"]}
-        grouped["BUY"].append({
+        grouped = {cat: [] for cat in ["HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE", "HOLD", "REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)"]}
+        grouped["ACCUMULATE CANDIDATE"].append({
             "symbol": "VRT",
-            "final_verdict": "BUY",
-            "synthesis": "Committee executes BUY on infrastructure play.",
+            "final_verdict": "ACCUMULATE CANDIDATE",
+            "synthesis": "Committee executes ACCUMULATE CANDIDATE on infrastructure play.",
         })
-        grouped["SELL"].append({
+        grouped["BEARISH (LIQUIDATE)"].append({
             "symbol": "GOOGL",
-            "final_verdict": "SELL",
+            "final_verdict": "BEARISH (LIQUIDATE)",
             "synthesis": "Reallocate capital to higher-conviction names.",
         })
-        grouped["TRIM"].append({
+        grouped["REDUCE EXPOSURE"].append({
             "symbol": "ASML",
-            "final_verdict": "TRIM",
+            "final_verdict": "REDUCE EXPOSURE",
             "synthesis": "Duplicate row should be skipped.",
         })
         unicorn = [{
             "symbol": "ASML",
-            "verdict": "TRIM",
+            "verdict": "REDUCE EXPOSURE",
             "synthesis": "Unanimous reduce mandate after Round 2.",
         }]
         rows, overflow = reporting.build_todays_actions_summary(grouped, unicorn)
@@ -760,8 +760,8 @@ class TodaysActionsTests(unittest.TestCase):
         self.assertEqual(overflow, 0)
 
     def test_build_summary_caps_overflow(self):
-        grouped = {cat: [] for cat in ["STRONG BUY", "BUY", "HOLD", "TRIM", "SELL", "STRONG SELL"]}
-        grouped["BUY"] = [
+        grouped = {cat: [] for cat in ["HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE", "HOLD", "REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)"]}
+        grouped["ACCUMULATE CANDIDATE"] = [
             {"symbol": f"SYM{i}", "synthesis": f"Reason {i}."}
             for i in range(15)
         ]
@@ -779,8 +779,8 @@ class TodaysActionsTests(unittest.TestCase):
                 portfolio_positions=[
                     {
                         "symbol": "MSFT",
-                        "final_verdict": "Strong Buy",
-                        "synthesis": "Round 2 split buy_side=4/5 on MSFT; committee executes STRONG BUY.",
+                        "final_verdict": "High Conviction (Overweight)",
+                        "synthesis": "Round 2 split buy_side=4/5 on MSFT; committee executes HIGH CONVICTION (OVERWEIGHT).",
                         "narrative": {
                             "champion": PANELIST_ROLES["davinci"],
                             "champion_quote": "Growth at a reasonable price opportunity.",
@@ -802,17 +802,17 @@ class TodaysActionsTests(unittest.TestCase):
             sorted_ledger=[],
             chart_urls={},
         )
-        self.assertIn("Today&rsquo;s Actions", html)
-        self.assertIn("STRONG BUY", html)
+        self.assertIn("Theoretical Scenario Adjustments", html)
+        self.assertIn("HIGH CONVICTION (OVERWEIGHT)", html)
         self.assertIn("MSFT", html)
         self.assertIn("Risk hedge:", html)
-        actions_idx = html.index("Today&rsquo;s Actions")
+        actions_idx = html.index("Theoretical Scenario Adjustments")
         action_plan_idx = html.index("The Action Plan")
         self.assertLess(actions_idx, action_plan_idx)
 
     def test_build_summary_includes_champion_and_dissenter(self):
-        grouped = {cat: [] for cat in ["STRONG BUY", "BUY", "HOLD", "TRIM", "SELL", "STRONG SELL"]}
-        grouped["BUY"].append({
+        grouped = {cat: [] for cat in ["HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE", "HOLD", "REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)"]}
+        grouped["ACCUMULATE CANDIDATE"].append({
             "symbol": "MSFT",
             "synthesis": "Execute buy mandate.",
             "narrative": {
@@ -842,7 +842,7 @@ class TodaysActionsTests(unittest.TestCase):
             sorted_ledger=[],
             chart_urls={},
         )
-        self.assertNotIn("Today&rsquo;s Actions", html)
+        self.assertNotIn("Theoretical Scenario Adjustments", html)
 
 
 if __name__ == "__main__":

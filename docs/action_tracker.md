@@ -9,6 +9,16 @@
 
 ---
 
+## Session Handoff — May 31, 2026 CSV Deprecation & Multi-Tenant Rollout
+
+**Theme:** Full multi-user isolation, Postgres schemas, REST APIs, Expo client scaffolding, and Deprecation of local CSV imports per Legal constraints.
+
+**Details:** 
+- **CSV Deprecation:** Completely stripped `csv` processing from `pipeline.py` and `history.py` due to Legal constraints against importing static files. Re-wired these modules to query directly from the new Postgres entity tables `positions` and `portfolios`.
+- **SaaS Foundation:** See [`saas_architect_handoff.md`](saas_architect_handoff.md) for full context on the new `user_id` isolation, Auth/REST API layers, and the dispatcher queue fan-out. All code committed, tested, and pushed to prod.
+
+---
+
 ## Session Handoff — May 31, 2026 Multi-Tenant SaaS Rollout (Phase 1 & 2)
 
 **Theme:** Full multi-user isolation, Postgres schemas, REST APIs, and Expo client scaffolding.

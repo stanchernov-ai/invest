@@ -46,21 +46,21 @@ class ClerkDebateDigestTests(unittest.TestCase):
                 "content": (
                     f"**[ROUND 1] {hypatia}**:\n"
                     "* **Portfolio Overview**: Moats matter.\n"
-                    "* **NVDA**: Buy. Analysis: Great business.\n"
+                    "* **NVDA**: Accumulate Candidate. Analysis: Great business.\n"
                 ),
             },
             {
                 "content": (
                     f"**[ROUND 2 REBUTTAL] {suntzu}**:\n"
                     "* **Rebuttal Summary**: hypatia ignores the tape.\n"
-                    "* **NVDA**: Strong Buy (9/10). Momentum confirms.\n"
+                    "* **NVDA**: High Conviction (Overweight) (9/10). Momentum confirms.\n"
                 ),
             },
         ]
         digest = build_clerk_debate_digest(messages)
         self.assertIn("Portfolio Overview", digest)
         self.assertIn("Rebuttal Summary", digest)
-        self.assertNotIn("Strong Buy (9/10)", digest)
+        self.assertNotIn("High Conviction (Overweight) (9/10)", digest)
 
 
 class SplitDebateParagraphTests(unittest.TestCase):
@@ -81,14 +81,14 @@ class SplitDebateParagraphTests(unittest.TestCase):
                 "content": (
                     f"**[ROUND 1] {hypatia}**:\n"
                     "* **Portfolio Overview**: Moats matter more than momentum.\n"
-                    "* **NVDA**: Sell (7/10). Valuation leaves no margin of safety.\n"
+                    "* **NVDA**: Bearish (Liquidate) (7/10). Valuation leaves no margin of safety.\n"
                 ),
             },
             {
                 "content": (
                     f"**[ROUND 2 REBUTTAL] {suntzu}**:\n"
                     "* **Rebuttal Summary**: hypatia ignores the tape.\n"
-                    "* **NVDA**: Strong Buy (9/10). Momentum confirms the trend.\n"
+                    "* **NVDA**: High Conviction (Overweight) (9/10). Momentum confirms the trend.\n"
                 ),
             },
         ]
@@ -139,7 +139,7 @@ class ShortPeerNameTests(unittest.TestCase):
                 "content": (
                     f"**[ROUND 2 REBUTTAL] {hypatia}**:\n"
                     f"* **Rebuttal Summary**: {davinci} describes NVIDIA as a masterwork.\n"
-                    "* **NVDA**: Buy (8/10). Leonardo overstates the moat.\n"
+                    "* **NVDA**: Accumulate Candidate (8/10). Leonardo overstates the moat.\n"
                 ),
             },
         ]
@@ -156,7 +156,7 @@ class ShortPeerNameTests(unittest.TestCase):
                 "content": (
                     f"**[ROUND 1] {hypatia}**:\n"
                     "* **Portfolio Overview**: Quality over hype.\n"
-                    "* **NVDA**: Buy (8/10). Core holding.\n"
+                    "* **NVDA**: Accumulate Candidate (8/10). Core holding.\n"
                     "* **AAPL**: Pass (5/10). No edge.\n"
                     "* **MSFT**: Pass (5/10). Fully priced.\n"
                 ),

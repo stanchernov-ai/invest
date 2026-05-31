@@ -24,7 +24,7 @@ class VerdictMemoryTests(unittest.TestCase):
         chairman = {
             "watchlist_positions": [
                 {"symbol": "PLTR", "final_verdict": "Pass"},
-                {"symbol": "NVDA", "final_verdict": "Buy"},
+                {"symbol": "NVDA", "final_verdict": "Accumulate Candidate"},
             ]
         }
 
@@ -56,8 +56,8 @@ class VerdictMemoryTests(unittest.TestCase):
         mock_load.return_value = {}
         chairman = {
             "watchlist_positions": [
-                {"symbol": "MNDY", "final_verdict": "Buy"},
-                {"symbol": "LLY", "final_verdict": "Strong Buy"},
+                {"symbol": "MNDY", "final_verdict": "Accumulate Candidate"},
+                {"symbol": "LLY", "final_verdict": "High Conviction (Overweight)"},
             ]
         }
         count = verdict_memory.persist_chairman_watchlist_passes(

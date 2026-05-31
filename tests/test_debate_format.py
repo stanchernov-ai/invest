@@ -17,13 +17,13 @@ class TestDebateFormat(unittest.TestCase):
 
     def test_watchlist_buys_stay_individual(self):
         rows = [
-            {"symbol": "PLTR", "verdict": "Strong Buy", "conviction_score": 9, "analysis": "Accelerating."},
+            {"symbol": "PLTR", "verdict": "High Conviction (Overweight)", "conviction_score": 9, "analysis": "Accelerating."},
             {"symbol": "META", "verdict": "Pass", "conviction_score": 3, "analysis": "Fully priced."},
         ]
         lines = format_watchlist_verdict_markdown_lines(rows)
         self.assertEqual(len(lines), 2)
         self.assertIn("PLTR", lines[0])
-        self.assertIn("Strong Buy", lines[0])
+        self.assertIn("High Conviction (Overweight)", lines[0])
         self.assertIn("no buy case (1 names)", lines[1])
 
     def test_portfolio_lines_unchanged(self):

@@ -23,7 +23,7 @@ CHAIRMAN = {
         },
     }, {
         "symbol": "NVDA",
-        "final_verdict": "Buy",
+        "final_verdict": "Accumulate Candidate",
         "synthesis": "Add on AI strength.",
         "narrative": {
             "champion": PANELIST_ROLES["tesla"],
@@ -61,7 +61,7 @@ _EMAIL_UNSAFE = re.compile(r"(display\s*:\s*flex|flex-direction|display\s*:\s*gr
 class TestUnicornProtocol(unittest.TestCase):
     def test_enriches_chairman_and_red_team(self):
         items, symbols = build_unicorn_protocol_items(
-            [{"symbol": "NVDA", "verdict": "Buy"}],
+            [{"symbol": "NVDA", "verdict": "Accumulate Candidate"}],
             CHAIRMAN,
             {"NVDA": {"image": "https://example.com/nvda.png"}},
             RED_TEAM,
@@ -112,7 +112,7 @@ class TestUnicornProtocol(unittest.TestCase):
             100000, 5.0, 3.0,
             "CAGR of 15.00 percent projected balance at age 65 is $2,000,000",
             CHAIRMAN, COS, "",
-            [{"symbol": "NVDA", "verdict": "Buy"}],
+            [{"symbol": "NVDA", "verdict": "Accumulate Candidate"}],
             [("GOOGL", {"Total": 50000})],
             red_team_data=RED_TEAM,
             advanced_data={

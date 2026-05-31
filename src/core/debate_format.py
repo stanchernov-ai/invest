@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 
-_BUY_SIDE_RE = re.compile(r"\b(?:strong\s+buy|buy)\b", re.I)
+_BUY_SIDE_RE = re.compile(r"(?:high\s+conviction\s+\(overweight\)|accumulate\s+candidate)", re.I)
 _TICKER_LINE = re.compile(r"^\*\s*\*\*(.+?)\*\*:\s*(.+)$", re.M)
 
 

@@ -59,9 +59,9 @@ class BriefingStyleTests(unittest.TestCase):
 
     def test_verdict_pills_use_semantic_colors(self):
         pills = briefing_style.verdict_pill_styles()
-        self.assertIn(briefing_style.BULL_BG, pills["BUY"])
-        self.assertIn(briefing_style.BEAR_BG, pills["SELL"])
-        self.assertIn(briefing_style.WARN_BG, pills["TRIM"])
+        self.assertIn(briefing_style.BULL_BG, pills["ACCUMULATE CANDIDATE"])
+        self.assertIn(briefing_style.BEAR_BG, pills["BEARISH (LIQUIDATE)"])
+        self.assertIn(briefing_style.WARN_BG, pills["REDUCE EXPOSURE"])
 
     def test_chart_typography_tokens(self):
         self.assertEqual(briefing_style.CHART_DATALABEL_ON_DARK, briefing_style.TEXT_HIGHLIGHT)
