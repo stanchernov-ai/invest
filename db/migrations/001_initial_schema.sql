@@ -12,7 +12,7 @@ CREATE TABLE users (
     plan_tier       TEXT NOT NULL DEFAULT 'beta'
                     CHECK (plan_tier IN ('beta', 'free', 'pro', 'paused')),
     portfolio_source TEXT NOT NULL DEFAULT 'manual'
-                    CHECK (portfolio_source IN ('csv', 'manual')),
+                    CHECK (portfolio_source IN ('xls', 'manual')),
     status          TEXT NOT NULL DEFAULT 'active'
                     CHECK (status IN ('active', 'paused', 'deleted')),
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),

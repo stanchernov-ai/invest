@@ -233,7 +233,7 @@ No Entra required. Operator workflow:
 
 **Target script:** `scripts/admin_provision_user.py` (Phase 2 deliverable) — reads JSON fixture or interactive prompts; idempotent on `slug`.
 
-**Stan migration:** separate script `scripts/migrate_stan_to_postgres.py` — reads existing CSV via `pipeline.process_portfolios()`, writes Postgres, sets `portfolio_source='csv'` until validated then `'manual'`.
+**Stan migration:** separate script `scripts/migrate_stan_to_postgres.py` — reads existing legacy DB state, writes Postgres, sets `portfolio_source='manual'`. Legacy CSV logic has been deprecated per legal team requirements.
 
 ---
 

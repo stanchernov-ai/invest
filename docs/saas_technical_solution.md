@@ -84,7 +84,7 @@ User
 | **Run artifacts** | Azure Blob (existing) | HTML briefings, debate logs, telemetry, checkpoints |
 | **Credentials** | Microsoft Entra External ID (Phase 4) | Passwords, OAuth, MFA — never in Postgres |
 
-**Stan migration:** four current account buckets → four `portfolios` for `users.slug = 'stan'`. One-time load from existing CSVs; CSV path remains available via `portfolio_source = 'csv'` for dev.
+**Stan migration:** four current account buckets → four `portfolios` for `users.slug = 'stan'`. One-time load from existing DB entry; legacy CSV functionality is deprecated in favor of `portfolio_source = 'manual'` or future `xls` uploads.
 
 ---
 

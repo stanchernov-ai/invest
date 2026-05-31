@@ -1,19 +1,21 @@
-import logging
+import os
+
+pipeline_code = """import logging
 from src.data.db import fetch_query
 
 logger = logging.getLogger(__name__)
 
 async def process_portfolios(user_id="stan"):
-    logger.info("Initializing database portfolio query. CSV processing is deprecated.")
+    logger.info("Initializing database portfolio query.")
     master_ledger = {}
     
-    query = """
+    query = \"\"\"
         SELECT p.symbol, p.shares, p.cost_basis, p.purchase_date,
                port.bucket_type, port.name as portfolio_name
         FROM positions p
         JOIN portfolios port ON p.portfolio_id = port.id
         WHERE port.user_id = $1
-    """
+    \"\"\"
     try:
         rows = await fetch_query(query, user_id)
     except Exception as e:
@@ -43,21 +45,22 @@ async def process_portfolios(user_id="stan"):
         else:
             master_ledger[sym]["_shares_by_bucket"]["custom"] += shares
 
+    # We return total_portfolio_value = 0.0 here, prepare.py will compute it properly
     return master_ledger, 0.0
 
 async def build_account_holdings(user_id="stan"):
-    """Build symbol-level holdings grouped by individual account for the per-account
+    \"\"\"Build symbol-level holdings grouped by individual account for the per-account
     allocation pie charts.
     Returns: {account_name: {symbol: {"value": float, "return_pct": float, "shares": float}}}
-    """
+    \"\"\"
     holdings = {}
     
-    query = """
+    query = \"\"\"
         SELECT p.symbol, p.shares, p.cost_basis, port.name as portfolio_name
         FROM positions p
         JOIN portfolios port ON p.portfolio_id = port.id
         WHERE port.user_id = $1
-    """
+    \"\"\"
     try:
         rows = await fetch_query(query, user_id)
     except Exception as e:
@@ -80,3 +83,7 @@ async def build_account_holdings(user_id="stan"):
         holdings[acct][sym]["cost"] += cost
         
     return holdings
+"""
+
+with open("src/pipeline.py", "w", encoding="utf-8") as f:
+    f.write(pipeline_code)

@@ -92,8 +92,8 @@ async def run_prepare(run_id: str = None, user_id: str = "stan") -> dict:
     try:
         storage_client.sync_inputs_from_cloud(user_id=user_id)
 
-        master_ledger, total_portfolio_value = pipeline.process_portfolios()
-        account_holdings = pipeline.build_account_holdings()
+        master_ledger, total_portfolio_value = await pipeline.process_portfolios(user_id=user_id)
+        account_holdings = await pipeline.build_account_holdings(user_id=user_id)
 
         keys_to_delete = [sym for sym, data in master_ledger.items() if data["Total"] < 50.0]
         for k in keys_to_delete:
@@ -115,7 +115,7 @@ async def run_prepare(run_id: str = None, user_id: str = "stan") -> dict:
             news_feed = await fetch_ticker_news(clean_symbols, settings.FMP_API_KEY, session)
             api_telemetry['FUNDAMENTAL_NEWS'] = news_feed
 
-            history_symbols = history.collect_symbol_universe(DATA_DIR)
+            history_symbols = await history.collect_symbol_universe(user_id=user_id)
             eod_symbols = sorted(
                 set(clean_symbols) | history_symbols | _BENCHMARK_SYMBOLS | {"TLT", "VXX"}
             )
@@ -169,14 +169,19 @@ async def run_prepare(run_id: str = None, user_id: str = "stan") -> dict:
             shares = data.get("Shares", 0)
             if shares > 0:
                 adv = advanced_data.get(sym, {})
-                live_price = adv.get("current_price", data["Total"] / shares)
+                live_price = adv.get("current_price", 0.0)
                 old_total = data["Total"]
                 live_total = live_price * shares
-                if old_total > 0:
-                    ratio = live_total / old_total
-                    data["Taxable"] *= ratio
-                    data["Roth"] *= ratio
-                    data["401K"] *= ratio
+                
+                # Assign values to buckets based on shares
+                taxable_shares = data.get("_shares_by_bucket", {}).get("taxable", 0.0)
+                roth_shares = data.get("_shares_by_bucket", {}).get("roth", 0.0)
+                k401_shares = data.get("_shares_by_bucket", {}).get("401k", 0.0)
+
+                data["Taxable"] = taxable_shares * live_price
+                data["Roth"] = roth_shares * live_price
+                data["401K"] = k401_shares * live_price
+
                 data["Total"] = live_total
                 data["Unrealized"] = live_total - data["Cost_Basis"]
                 data["Personal_Return_Pct"] = (data["Unrealized"] / data["Cost_Basis"]) * 100 if data["Cost_Basis"] > 0 else 0.0

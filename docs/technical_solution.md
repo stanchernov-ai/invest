@@ -521,7 +521,7 @@ The metaphor layer (Buffett, Livermore, etc.) is not decorative: prompts encode 
 - Post-flight QA: `src/qa_pipeline.py` + `src/jobs/deliver.py`
 - Verdict memory: `src/verdict_memory.py` (deliver, compliance-gated)
 - Scheduled entry: `function_app.py` — `boardroom_daily_run`
-- CSV ingestion: `src/pipeline.py` — `process_portfolios`, `parse_broker_csv`
+- Data ingestion: `src/pipeline.py` — Database queries via `process_portfolios` (Legacy CSV imports deprecated)
 - Market data: `src/data/fmp_client.py` — `get_fmp_advanced_metrics`, `get_fmp_macro`, `fetch_momentum_trend`
 - News: `src/data/news_client.py` — `fetch_ticker_news`
 
