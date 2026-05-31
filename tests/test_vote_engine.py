@@ -72,7 +72,7 @@ class TestVoteEnginePhaseC(unittest.TestCase):
                 ("High Conviction (Overweight)", 8),
                 ("High Conviction (Overweight)", 7),
                 ("Bearish (Liquidate)", 4),
-                ("Strong Bearish (Liquidate)", 3),
+                ("Extreme Bearish (Liquidate)", 3),
             ],
         )
         summaries = build_vote_summaries(raw, ["NVDA"], portfolio_symbols={"NVDA"})
@@ -86,7 +86,7 @@ class TestVoteEnginePhaseC(unittest.TestCase):
                 ("Accumulate Candidate", 8),
                 ("Accumulate Candidate", 7),
                 ("Bearish (Liquidate)", 4),
-                ("Strong Bearish (Liquidate)", 3),
+                ("Extreme Bearish (Liquidate)", 3),
             ],
         )
         summaries = build_vote_summaries(raw, ["NVDA"], portfolio_symbols={"NVDA"})
@@ -96,15 +96,15 @@ class TestVoteEnginePhaseC(unittest.TestCase):
         raw = _raw_portfolio_symbol(
             "ASML",
             [
-                ("Strong Bearish (Liquidate)", 8),
-                ("Strong Bearish (Liquidate)", 7),
-                ("Strong Bearish (Liquidate)", 6),
+                ("Extreme Bearish (Liquidate)", 8),
+                ("Extreme Bearish (Liquidate)", 7),
+                ("Extreme Bearish (Liquidate)", 6),
                 ("Accumulate Candidate", 5),
                 ("Accumulate Candidate", 4),
             ],
         )
         summaries = build_vote_summaries(raw, ["ASML"], portfolio_symbols={"ASML"})
-        self.assertEqual(mandate_verdict(summaries["ASML"]), "Strong Bearish (Liquidate)")
+        self.assertEqual(mandate_verdict(summaries["ASML"]), "Extreme Bearish (Liquidate)")
 
     def test_two_two_split_hold(self):
         raw = _raw_portfolio_symbol(
@@ -113,7 +113,7 @@ class TestVoteEnginePhaseC(unittest.TestCase):
                 ("Accumulate Candidate", 7),
                 ("Accumulate Candidate", 6),
                 ("Bearish (Liquidate)", 5),
-                ("Strong Bearish (Liquidate)", 4),
+                ("Extreme Bearish (Liquidate)", 4),
                 ("Hold", 3),
             ],
         )

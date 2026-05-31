@@ -273,14 +273,14 @@ def fetch_briefing_visual_assets(
 
 
 _UNICORN_ACTIONABLE_VERDICTS = frozenset({
-    "HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE", "REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)",
+    "HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE", "REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "EXTREME BEARISH (LIQUIDATE)",
 })
 
 _TODAYS_ACTIONS_MAX = 12
 _TODAYS_ACTIONS_CONTEXT_MAX = 110
-_TODAYS_ACTIONS_CATEGORIES = ("STRONG BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE", "HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE")
+_TODAYS_ACTIONS_CATEGORIES = ("EXTREME BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE", "HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE")
 _TODAYS_ACTIONS_VERDICT_RANK = {
-    "STRONG BEARISH (LIQUIDATE)": 0,
+    "EXTREME BEARISH (LIQUIDATE)": 0,
     "HIGH CONVICTION (OVERWEIGHT)": 1,
     "BEARISH (LIQUIDATE)": 2,
     "ACCUMULATE CANDIDATE": 3,
@@ -421,7 +421,7 @@ def build_unicorn_protocol_items(unicorn_trades, chairman_data, advanced_data=No
         if r.get("symbol")
     }
 
-    verdict_rank = {"HIGH CONVICTION (OVERWEIGHT)": 0, "ACCUMULATE CANDIDATE": 1, "HOLD": 2, "REDUCE EXPOSURE": 3, "BEARISH (LIQUIDATE)": 4, "STRONG BEARISH (LIQUIDATE)": 5, "PASS": 6}
+    verdict_rank = {"HIGH CONVICTION (OVERWEIGHT)": 0, "ACCUMULATE CANDIDATE": 1, "HOLD": 2, "REDUCE EXPOSURE": 3, "BEARISH (LIQUIDATE)": 4, "EXTREME BEARISH (LIQUIDATE)": 5, "PASS": 6}
     items = []
     unicorn_symbols = set()
 
@@ -1625,7 +1625,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             </div>
             {% endif %}
 
-            {% set action_categories = ['HIGH CONVICTION (OVERWEIGHT)', 'ACCUMULATE CANDIDATE', 'HOLD', 'REDUCE EXPOSURE', 'BEARISH (LIQUIDATE)', 'STRONG BEARISH (LIQUIDATE)'] %}
+            {% set action_categories = ['HIGH CONVICTION (OVERWEIGHT)', 'ACCUMULATE CANDIDATE', 'HOLD', 'REDUCE EXPOSURE', 'BEARISH (LIQUIDATE)', 'EXTREME BEARISH (LIQUIDATE)'] %}
             {% for category in action_categories %}
                 {% if grouped_actions[category] %}
                     {% for pos in grouped_actions[category] %}
@@ -1726,7 +1726,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     all_positions = chairman_data.get('portfolio_positions', []) + chairman_data.get('watchlist_positions', [])
     
     if advanced_data is None: advanced_data = {}
-    grouped_actions = {cat: [] for cat in ['HIGH CONVICTION (OVERWEIGHT)', 'ACCUMULATE CANDIDATE', 'HOLD', 'REDUCE EXPOSURE', 'BEARISH (LIQUIDATE)', 'STRONG BEARISH (LIQUIDATE)']}
+    grouped_actions = {cat: [] for cat in ['HIGH CONVICTION (OVERWEIGHT)', 'ACCUMULATE CANDIDATE', 'HOLD', 'REDUCE EXPOSURE', 'BEARISH (LIQUIDATE)', 'EXTREME BEARISH (LIQUIDATE)']}
     for pos in all_positions:
         sym = pos.get('symbol')
         if sym in unicorn_symbols:

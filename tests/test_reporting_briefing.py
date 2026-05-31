@@ -731,7 +731,7 @@ class TodaysActionsTests(unittest.TestCase):
         return base
 
     def test_build_summary_sorts_strong_actions_first_and_dedupes_unicorn(self):
-        grouped = {cat: [] for cat in ["HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE", "HOLD", "REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)"]}
+        grouped = {cat: [] for cat in ["HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE", "HOLD", "REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "EXTREME BEARISH (LIQUIDATE)"]}
         grouped["ACCUMULATE CANDIDATE"].append({
             "symbol": "VRT",
             "final_verdict": "ACCUMULATE CANDIDATE",
@@ -760,7 +760,7 @@ class TodaysActionsTests(unittest.TestCase):
         self.assertEqual(overflow, 0)
 
     def test_build_summary_caps_overflow(self):
-        grouped = {cat: [] for cat in ["HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE", "HOLD", "REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)"]}
+        grouped = {cat: [] for cat in ["HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE", "HOLD", "REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "EXTREME BEARISH (LIQUIDATE)"]}
         grouped["ACCUMULATE CANDIDATE"] = [
             {"symbol": f"SYM{i}", "synthesis": f"Reason {i}."}
             for i in range(15)
@@ -811,7 +811,7 @@ class TodaysActionsTests(unittest.TestCase):
         self.assertLess(actions_idx, action_plan_idx)
 
     def test_build_summary_includes_champion_and_dissenter(self):
-        grouped = {cat: [] for cat in ["HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE", "HOLD", "REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)"]}
+        grouped = {cat: [] for cat in ["HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE", "HOLD", "REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "EXTREME BEARISH (LIQUIDATE)"]}
         grouped["ACCUMULATE CANDIDATE"].append({
             "symbol": "MSFT",
             "synthesis": "Execute buy mandate.",

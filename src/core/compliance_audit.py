@@ -68,7 +68,7 @@ def _chairman_aligns_with_mandate(final_verdict: str, expected_mandate: str) -> 
         return True
     if expected in BUY_VERDICTS and final in BUY_VERDICTS:
         return True
-    if expected in ("BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)", "REDUCE EXPOSURE") and final in ("BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)", "REDUCE EXPOSURE"):
+    if expected in ("BEARISH (LIQUIDATE)", "EXTREME BEARISH (LIQUIDATE)", "REDUCE EXPOSURE") and final in ("BEARISH (LIQUIDATE)", "EXTREME BEARISH (LIQUIDATE)", "REDUCE EXPOSURE"):
         return True
     if expected == "HOLD" and final == "HOLD":
         return True

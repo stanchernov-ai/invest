@@ -46,7 +46,7 @@ def extract_panelist_round2_block(messages: list[dict], agent_key: str) -> str:
 
 
 def parse_ticker_verdict_from_line(line: str) -> tuple[str, str] | None:
-    """Parse `* **NVDA**: Strong Bearish (Liquidate) (7/10).` → (symbol, verdict)."""
+    """Parse `* **NVDA**: Extreme Bearish (Liquidate) (7/10).` → (symbol, verdict)."""
     match = _TICKER_VERDICT_LINE_RE.match((line or "").strip())
     if not match:
         return None
@@ -55,8 +55,8 @@ def parse_ticker_verdict_from_line(line: str) -> tuple[str, str] | None:
     # Verdict is before optional (score) or first sentence — ignore rationale prose.
     verdict_part = rest.split("(")[0].split(".")[0].strip()
     lower = verdict_part.lower()
-    if "strong bearish" in lower:
-        return ticker, "Strong Bearish (Liquidate)"
+    if "strong bearish" in lower or "extreme bearish" in lower:
+        return ticker, "Extreme Bearish (Liquidate)"
     if "high conviction" in lower:
         return ticker, "High Conviction (Overweight)"
     if re.search(r"\breduce\b", lower):

@@ -234,7 +234,7 @@ def verdict_pill_styles() -> dict[str, str]:
         "HOLD": f"background-color:{BG_SURFACE}; color:{TEXT_PRIMARY}; border: 1px solid {BORDER_SUBTLE};",
         "REDUCE EXPOSURE": f"background-color:{WARN_BG}; color:{WARN_TEXT};",
         "BEARISH (LIQUIDATE)": f"background-color:{BEAR_BG}; color:{BEAR_TEXT};",
-        "STRONG BEARISH (LIQUIDATE)": f"background-color:{BEAR_BG}; color:{BEAR_TEXT};",
+        "EXTREME BEARISH (LIQUIDATE)": f"background-color:{BEAR_BG}; color:{BEAR_TEXT};",
     }
 
 
@@ -722,7 +722,7 @@ Brand accent (h1, h2, chart titles): matte sage {BRAND_SAGE}. Borders/dividers: 
 
 Financial semantics:
 - Bullish (Accumulate Candidate / High Conviction (Overweight) pills, champion quotes): {BULL_TEXT} on {BULL_BG}.
-- Bearish (Bearish (Liquidate) / Strong Bearish (Liquidate) pills, SoTU 1–2 star): {BEAR_TEXT} on {BEAR_BG}.
+- Bearish (Bearish (Liquidate) / Extreme Bearish (Liquidate) pills, SoTU 1–2 star): {BEAR_TEXT} on {BEAR_BG}.
 - The Crucible rebuttal (Alpha Pick / Unicorn): {CRUCIBLE_TEXT} on {CRUCIBLE_BG}, {CRUCIBLE_BORDER} left accent, header {CRUCIBLE_HEADER}. NOT bear-red.
 - Warning / hedge mandate: {WARN_TEXT} on {WARN_BG}.
 

@@ -6,7 +6,7 @@ import re
 from src.core.board_roster import PANELIST_KEYS, PANELIST_ROLES
 
 BUY_VERDICTS = frozenset({"HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE"})
-SELL_VERDICTS = frozenset({"BEARISH (LIQUIDATE)", "REDUCE EXPOSURE", "STRONG BEARISH (LIQUIDATE)"})
+SELL_VERDICTS = frozenset({"BEARISH (LIQUIDATE)", "REDUCE EXPOSURE", "EXTREME BEARISH (LIQUIDATE)"})
 
 # Round 2 overall_portfolio_critique is peer rebuttal prose — not briefing SoTU material.
 _REBUTTAL_OPENERS = re.compile(

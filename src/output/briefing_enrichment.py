@@ -111,7 +111,7 @@ def _side_matches_final(side: str, final_verdict: str, section: str) -> bool:
     final = _normalize_verdict(final_verdict)
     if final in BUY_VERDICTS:
         return side == "buy"
-    if final in ("STRONG BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE"):
+    if final in ("EXTREME BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE"):
         return side == "sell"
     if final == "PASS":
         return side == "pass"
@@ -124,7 +124,7 @@ def _side_opposes_final(side: str, final_verdict: str, section: str) -> bool:
     final = _normalize_verdict(final_verdict)
     if final in BUY_VERDICTS:
         return side == "sell"
-    if final in ("STRONG BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE"):
+    if final in ("EXTREME BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE"):
         return side == "buy"
     if final == "PASS":
         return side == "buy"
@@ -373,7 +373,7 @@ def _committee_camps_sentence(rows: list[dict], final_verdict: str) -> str:
             )
         return f"The committee aligned on the buy-side ({lead}) for an executed {final} on {sym}."
 
-    if final in ("STRONG BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE") and sell:
+    if final in ("EXTREME BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE") and sell:
         lead = _join(sell)
         if buy:
             return (

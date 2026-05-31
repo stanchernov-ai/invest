@@ -33,7 +33,7 @@ AGENT_DISPLAY = PANELIST_ROLES
 Bucket = Literal["buy", "reduce", "hold", "pass"]
 
 BUY_SIDE_VERDICTS = frozenset({"HIGH CONVICTION (OVERWEIGHT)", "ACCUMULATE CANDIDATE"})
-SELL_SIDE_VERDICTS = frozenset({"STRONG BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE"})
+SELL_SIDE_VERDICTS = frozenset({"EXTREME BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE"})
 
 
 def panel_verdict_side(verdict: str, section: Literal["portfolio", "watchlist"]) -> Literal["buy", "sell", "pass", "neutral"]:
@@ -225,10 +225,10 @@ def _mandate_from_buy_votes(summary: SymbolVoteSummary) -> str:
 
 def _mandate_from_sell_votes(summary: SymbolVoteSummary) -> str:
     strong = sum(
-        1 for v, _ in summary.votes.values() if _normalize_verdict(v) == "STRONG BEARISH (LIQUIDATE)"
+        1 for v, _ in summary.votes.values() if _normalize_verdict(v) == "EXTREME BEARISH (LIQUIDATE)"
     )
     if strong >= MAJORITY_THRESHOLD:
-        return "Strong Bearish (Liquidate)"
+        return "Extreme Bearish (Liquidate)"
     regular = sum(
         1 for v, _ in summary.votes.values()
         if _normalize_verdict(v) in ("BEARISH (LIQUIDATE)", "REDUCE EXPOSURE")
@@ -275,7 +275,7 @@ def _supporting_for_mandate(summary: SymbolVoteSummary, final_verdict: str) -> t
         matched = False
         if final in BUY_VERDICTS and side == "buy":
             matched = True
-        elif final in ("STRONG BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE") and side == "sell":
+        elif final in ("EXTREME BEARISH (LIQUIDATE)", "BEARISH (LIQUIDATE)", "REDUCE EXPOSURE") and side == "sell":
             matched = True
         elif final == "PASS" and side == "pass":
             matched = True
@@ -307,7 +307,7 @@ def format_vote_digest(
     lines = [
         "DETERMINISTIC VOTE DIGEST (Round 2 JSON — authoritative; do not re-count from prose):",
         f"Phase C mandate: ≥{MAJORITY_THRESHOLD}/{PANEL_SIZE} buy-side (High Conviction (Overweight)+Accumulate Candidate) or "
-        f"sell-side (Strong Bearish (Liquidate)+Bearish (Liquidate)); else Hold/Pass. High Conviction (Overweight)/Bearish (Liquidate) rank above Accumulate Candidate/Bearish (Liquidate).",
+        f"sell-side (Extreme Bearish (Liquidate)+Bearish (Liquidate)); else Hold/Pass. High Conviction (Overweight)/Bearish (Liquidate) rank above Accumulate Candidate/Bearish (Liquidate).",
         "",
     ]
     for sym in sorted(summaries.keys(), key=lambda s: (s not in portfolio_symbols, s)):
@@ -404,7 +404,7 @@ def count_board_portfolio_sell_mandates(
     summaries: dict[str, SymbolVoteSummary],
     portfolio_symbols: set[str],
 ) -> int:
-    """Portfolio symbols with a Round 2 majority sell-side mandate (Reduce Exposure/Bearish (Liquidate)/Strong Bearish (Liquidate))."""
+    """Portfolio symbols with a Round 2 majority sell-side mandate (Reduce Exposure/Bearish (Liquidate)/Extreme Bearish (Liquidate))."""
     count = 0
     for sym, summary in summaries.items():
         if sym not in portfolio_symbols:
@@ -425,7 +425,7 @@ def _portfolio_has_sell(chairman: dict) -> bool:
 
 
 def _funding_sell_candidates(chairman: dict) -> list[dict]:
-    """Portfolio equities eligible to fund buys: Hold, Reduce Exposure, Bearish (Liquidate), Strong Bearish (Liquidate) — never Accumulate Candidate."""
+    """Portfolio equities eligible to fund buys: Hold, Reduce Exposure, Bearish (Liquidate), Extreme Bearish (Liquidate) — never Accumulate Candidate."""
     candidates: list[dict] = []
     for pos in chairman.get("portfolio_positions") or []:
         sym = (pos.get("symbol") or "").strip()
@@ -462,13 +462,13 @@ def ensure_funding_sell(
     """When equity buys exist, authorize one portfolio Bearish (Liquidate) — lowest conviction — to fund them.
 
     Funding sell candidate pool (portfolio only):
-      - Allowed: Hold, Reduce Exposure, Bearish (Liquidate), Strong Bearish (Liquidate) (any non-Accumulate Candidate equity).
+      - Allowed: Hold, Reduce Exposure, Bearish (Liquidate), Extreme Bearish (Liquidate) (any non-Accumulate Candidate equity).
       - Forbidden: Accumulate Candidate, High Conviction (Overweight), hedge symbols (TLT/VXX).
 
     Hard stop: if every portfolio equity is Accumulate Candidate/High Conviction (Overweight), no sell is added.
 
     Skipped when the board already voted sell on more than one portfolio name.
-    Skipped when a portfolio Bearish (Liquidate)/Reduce Exposure/Strong Bearish (Liquidate) is already present.
+    Skipped when a portfolio Bearish (Liquidate)/Reduce Exposure/Extreme Bearish (Liquidate) is already present.
     """
     if count_equity_buys(chairman) < 1:
         return chairman
@@ -635,7 +635,7 @@ def build_chairman_allocation(
             "liquidated_tickers": [
                 sym for sym, s in summaries.items()
                 if sym in portfolio_symbols
-                and _normalize_verdict(mandate_verdict(s)) in ("REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "STRONG BEARISH (LIQUIDATE)")
+                and _normalize_verdict(mandate_verdict(s)) in ("REDUCE EXPOSURE", "BEARISH (LIQUIDATE)", "EXTREME BEARISH (LIQUIDATE)")
             ],
             "target_tickers": target_tickers,
         },

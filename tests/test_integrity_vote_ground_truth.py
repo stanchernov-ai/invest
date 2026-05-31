@@ -63,13 +63,13 @@ class TestVoteGroundTruthContext(unittest.TestCase):
                     return line
             return ""
 
-        # Cached runs vary: sell_side 3–5/5; mandate Bearish (Liquidate)/Strong Bearish (Liquidate)/Reduce Exposure (not Accumulate Candidate).
+        # Cached runs vary: sell_side 3–5/5; mandate Bearish (Liquidate)/Extreme Bearish (Liquidate)/Reduce Exposure (not Accumulate Candidate).
         asml_line = _digest_line("ASML")
         tsm_line = _digest_line("TSM")
         self.assertRegex(asml_line, r"sell_side=[345]/5")
-        self.assertRegex(asml_line, r"mandate=(?:Strong Bearish (Liquidate)|Bearish (Liquidate)|Reduce Exposure)")
+        self.assertRegex(asml_line, r"mandate=(?:Extreme Bearish (Liquidate)|Bearish (Liquidate)|Reduce Exposure)")
         self.assertRegex(tsm_line, r"sell_side=[345]/5")
-        self.assertRegex(tsm_line, r"mandate=(?:Strong Bearish (Liquidate)|Bearish (Liquidate)|Reduce Exposure)")
+        self.assertRegex(tsm_line, r"mandate=(?:Extreme Bearish (Liquidate)|Bearish (Liquidate)|Reduce Exposure)")
 
 
 class TestPostMortemReportAccuracy(unittest.TestCase):

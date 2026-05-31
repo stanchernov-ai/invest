@@ -127,7 +127,7 @@ class TestPersonaAudit(unittest.TestCase):
                 "* **NET**: Pass (2/10). This is a story stock with no earnings.\n\n"
                 f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['suntzu']}**:\n"
                 "* **Rebuttal Summary**: The tape is the only truth.\n"
-                "* **NVDA**: Strong Bearish (Liquidate) (10/10). Lagging the QQQ.\n\n"
+                "* **NVDA**: Extreme Bearish (Liquidate) (10/10). Lagging the QQQ.\n\n"
                 f"**[ROUND 2 REBUTTAL] {PANELIST_ROLES['aurelius']}**:\n"
                 "* **Rebuttal Summary**: Alpha decay requires reallocation.\n"
                 "* **NVDA**: High Conviction (Overweight) (10/10). PEG 0.29 supports the edge.\n"
