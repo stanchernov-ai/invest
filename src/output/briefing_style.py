@@ -70,6 +70,10 @@ CHART_LINE_BENCHMARK = "#71717a"
 CHART_LINE_NASDAQ = CHART_NEUTRAL
 
 # Side-by-side row (Performance + Returns) — identical PNG geometry for visual balance.
+# QuickChart renders at width×height CSS px, then scales bitmap by devicePixelRatio.
+# 3× matches premium phone retina (iPhone Pro class); HTML max-width stays 388px.
+QUICKCHART_DEVICE_PIXEL_RATIO = 3
+
 BRIEFING_PAIR_CHART_WIDTH = 388
 BRIEFING_PAIR_CHART_HEIGHT = 300
 BAR_CHART_WIDTH = BRIEFING_PAIR_CHART_WIDTH

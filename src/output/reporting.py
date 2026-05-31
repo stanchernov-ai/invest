@@ -9,7 +9,13 @@ from jinja2 import Template
 import logging
 
 from src.output.briefing_enrichment import enrich_chairman_for_briefing_sync, _is_generic_synthesis
-from src.core.board_roster import PANELIST_AVATAR_URLS, PANELIST_ROLES, resolve_panelist_key, shorten_panelist_references
+from src.core.board_roster import (
+    PANELIST_AVATAR_URLS,
+    PANELIST_ROLES,
+    panelist_short_name,
+    resolve_panelist_key,
+    shorten_panelist_references,
+)
 from src.output.briefing_style import (
     executive_briefing_css,
     executive_briefing_inline_styles,
@@ -66,6 +72,7 @@ from src.output.briefing_style import (
     BAR_Y_SCALE_GRACE,
     ACTION_PLAN_AVATAR_SIZE,
     BRIEFING_PAIR_CHART_WIDTH,
+    QUICKCHART_DEVICE_PIXEL_RATIO,
     LINE_CHART_WIDTH,
     LINE_CHART_HEIGHT,
     PIE_OUTLABEL_COLOR,
@@ -93,7 +100,7 @@ def get_quickchart_short_url(chart_config, width=600, height=300, background_col
         "width": width,
         "height": height,
         "backgroundColor": background_color,
-        "devicePixelRatio": 2,
+        "devicePixelRatio": QUICKCHART_DEVICE_PIXEL_RATIO,
     }
     last_err = None
     for attempt in range(2):
@@ -113,7 +120,11 @@ def get_quickchart_short_url(chart_config, width=600, height=300, background_col
     logger.error(f"Failed to create short URL for chart after retries: {last_err}")
     encoded_config = urllib.parse.quote(json.dumps(chart_config))
     bkg = urllib.parse.quote(background_color)
-    return f"https://quickchart.io/chart?w={width}&h={height}&bkg={bkg}&c={encoded_config}"
+    dpr = QUICKCHART_DEVICE_PIXEL_RATIO
+    return (
+        f"https://quickchart.io/chart?w={width}&h={height}&bkg={bkg}"
+        f"&devicePixelRatio={dpr}&c={encoded_config}"
+    )
 
 
 def _fetch_image_url(url):
@@ -280,6 +291,27 @@ def _truncate_action_context(text: str, max_len: int = _TODAYS_ACTIONS_CONTEXT_M
     return cut.rstrip(".,; ") + "…"
 
 
+def _action_panelist_label(name: str) -> str:
+    """Compact panelist label for the actions table (short name when resolvable)."""
+    name = (name or "").strip()
+    if not name or name.upper() in {"NONE", "N/A"}:
+        return "—"
+    key = resolve_panelist_key(name)
+    if key:
+        return panelist_short_name(key)
+    return name
+
+
+def _action_panelists_from_narrative(narrative: dict | None) -> tuple[str, str]:
+    """Return (champion, dissenter) display labels for a Today's Actions row."""
+    narrative = narrative or {}
+    champion = _action_panelist_label(narrative.get("champion", ""))
+    dissenter = (narrative.get("dissenter") or "").strip()
+    if dissenter.upper() in {"NONE", "N/A", ""}:
+        return champion, "—"
+    return champion, _action_panelist_label(dissenter)
+
+
 def _action_summary_context(pos: dict) -> str:
     """One-line rationale for Today's Actions — synthesis first, champion quote fallback."""
     ctx = _sanitize_briefing_text(pos.get("strategic_context") or pos.get("synthesis", ""))
@@ -302,27 +334,55 @@ def build_todays_actions_summary(
     rows: list[dict] = []
     seen: set[str] = set()
 
-    def _add(symbol: str, verdict: str, context: str, *, image: str = "", unanimous: bool = False) -> None:
+    narrative_by_symbol: dict[str, dict] = {}
+    for positions in grouped_actions.values():
+        for pos in positions:
+            sym = (pos.get("symbol") or "").strip().upper()
+            if sym and pos.get("narrative"):
+                narrative_by_symbol[sym] = pos["narrative"]
+
+    def _add(
+        symbol: str,
+        verdict: str,
+        context: str,
+        *,
+        image: str = "",
+        unanimous: bool = False,
+        narrative: dict | None = None,
+        champion: str = "",
+        dissenter: str = "",
+    ) -> None:
         sym = (symbol or "").strip().upper()
         v = (verdict or "").upper()
         if not sym or v in {"HOLD", "PASS"} or sym in seen:
             return
         seen.add(sym)
+        nar = narrative or narrative_by_symbol.get(sym) or {}
+        champ_label, dissent_label = _action_panelists_from_narrative(nar)
+        if champion:
+            champ_label = _action_panelist_label(champion)
+        if dissenter:
+            dissent_label = _action_panelist_label(dissenter) if dissenter.upper() not in {"NONE", "N/A"} else "—"
         rows.append({
             "symbol": sym,
             "verdict": v,
             "context": _truncate_action_context(context),
             "image": image or "",
             "unanimous": unanimous,
+            "champion": champ_label,
+            "dissenter": dissent_label,
         })
 
     for item in unicorn_protocol_items or []:
+        sym = (item.get("symbol") or "").strip().upper()
         _add(
             item.get("symbol", ""),
             item.get("verdict", ""),
             item.get("synthesis") or item.get("strategic_context", ""),
             image=item.get("image", ""),
             unanimous=True,
+            narrative=narrative_by_symbol.get(sym),
+            champion=item.get("champion", ""),
         )
 
     for category in _TODAYS_ACTIONS_CATEGORIES:
@@ -332,6 +392,7 @@ def build_todays_actions_summary(
                 category,
                 _action_summary_context(pos),
                 image=pos.get("image", ""),
+                narrative=pos.get("narrative"),
             )
 
     rows.sort(key=lambda r: (
@@ -1216,46 +1277,6 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             </table>
             {% endif %}
 
-            {% if todays_actions or hedge_action %}
-            <h2 style="{{ email_styles.h2 }}">Today&rsquo;s Actions</h2>
-            <p style="{{ email_styles.muted_p }}">Key board decisions at a glance &mdash; details in each section below.</p>
-            <div style="{{ email_styles.actions_summary_box }}">
-                {% if hedge_action %}
-                <div style="{{ email_styles.hedge_box }};margin-top:0;margin-bottom:14px;">
-                    <strong style="{{ email_styles.strong }}">Risk hedge:</strong> {{ hedge_action }}
-                </div>
-                {% endif %}
-                {% if todays_actions %}
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                    {% for action in todays_actions %}
-                    <tr>
-                        <td style="{{ email_styles.actions_row_cell }};width:36px;padding-right:10px;">
-                            {% if action.image %}
-                            <img src="{{ action.image }}" alt="{{ action.symbol }} logo" style="{{ email_styles.ticker_logo_sm }}">
-                            {% endif %}
-                        </td>
-                        <td style="{{ email_styles.actions_row_cell }};width:130px;white-space:nowrap;">
-                            <span style="{{ pill_styles[action.verdict] if action.verdict in pill_styles else pill_styles['HOLD'] }} {{ email_styles.actions_pill }}">{{ action.verdict }}</span>
-                            <span style="{{ email_styles.actions_symbol }}">&nbsp;{{ action.symbol }}</span>
-                            {% if action.unanimous %}
-                            <span style="{{ email_styles.actions_unanimous_badge }}">Unanimous</span>
-                            {% endif %}
-                        </td>
-                        <td style="{{ email_styles.actions_row_cell }}">
-                            {% if action.context %}
-                            <span style="{{ email_styles.actions_context }}">{{ action.context }}</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </table>
-                {% if todays_actions_overflow %}
-                <p style="{{ email_styles.actions_overflow_note }}">+ {{ todays_actions_overflow }} more decision(s) in the full action plan.</p>
-                {% endif %}
-                {% endif %}
-            </div>
-            {% endif %}
-
             {% if sotu_quotes %}
             <h2 style="{{ email_styles.h2 }}">The State of the Union</h2>
             <p style="{{ email_styles.muted_p }}">Each panelist&rsquo;s opening portfolio thesis in 1&ndash;2 sentences &mdash; concentration, regime, and mandate.</p>
@@ -1374,6 +1395,59 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                     {% endif %}
                 </div>
             {% endfor %}
+            {% endif %}
+
+            {% if todays_actions or hedge_action %}
+            <h2 style="{{ email_styles.h2 }}">Today&rsquo;s Actions</h2>
+            <p style="{{ email_styles.muted_p }}">Key board decisions at a glance &mdash; champion and dissent; full context in the action plan below.</p>
+            <div style="{{ email_styles.actions_summary_box }}">
+                {% if hedge_action %}
+                <div style="{{ email_styles.hedge_box }};margin-top:0;margin-bottom:14px;">
+                    <strong style="{{ email_styles.strong }}">Risk hedge:</strong> {{ hedge_action }}
+                </div>
+                {% endif %}
+                {% if todays_actions %}
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="{{ email_styles.actions_row_cell }};width:36px;"></td>
+                        <td style="{{ email_styles.actions_row_cell }};width:128px;font-size:0.72em;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:{{ text_primary }};">Action</td>
+                        <td style="{{ email_styles.actions_row_cell }};width:72px;font-size:0.72em;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:{{ text_primary }};">Champion</td>
+                        <td style="{{ email_styles.actions_row_cell }};width:72px;font-size:0.72em;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:{{ text_primary }};">Dissent</td>
+                        <td style="{{ email_styles.actions_row_cell }};font-size:0.72em;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:{{ text_primary }};">Context</td>
+                    </tr>
+                    {% for action in todays_actions %}
+                    <tr>
+                        <td style="{{ email_styles.actions_row_cell }};width:36px;padding-right:10px;">
+                            {% if action.image %}
+                            <img src="{{ action.image }}" alt="{{ action.symbol }} logo" style="{{ email_styles.ticker_logo_sm }}">
+                            {% endif %}
+                        </td>
+                        <td style="{{ email_styles.actions_row_cell }};width:128px;white-space:nowrap;">
+                            <span style="{{ pill_styles[action.verdict] if action.verdict in pill_styles else pill_styles['HOLD'] }} {{ email_styles.actions_pill }}">{{ action.verdict }}</span>
+                            <span style="{{ email_styles.actions_symbol }}">&nbsp;{{ action.symbol }}</span>
+                            {% if action.unanimous %}
+                            <span style="{{ email_styles.actions_unanimous_badge }}">Unanimous</span>
+                            {% endif %}
+                        </td>
+                        <td style="{{ email_styles.actions_row_cell }};width:72px;white-space:nowrap;">
+                            <span style="{{ email_styles.champion }}">{{ action.champion }}</span>
+                        </td>
+                        <td style="{{ email_styles.actions_row_cell }};width:72px;white-space:nowrap;">
+                            <span style="{{ email_styles.dissenter }}">{{ action.dissenter }}</span>
+                        </td>
+                        <td style="{{ email_styles.actions_row_cell }}">
+                            {% if action.context %}
+                            <span style="{{ email_styles.actions_context }}">{{ action.context }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% if todays_actions_overflow %}
+                <p style="{{ email_styles.actions_overflow_note }}">+ {{ todays_actions_overflow }} more decision(s) in the full action plan.</p>
+                {% endif %}
+                {% endif %}
+            </div>
             {% endif %}
 
             <h2 style="{{ email_styles.h2 }}">The Action Plan</h2>

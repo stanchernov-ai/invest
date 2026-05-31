@@ -1,5 +1,6 @@
 """Tests for Invest AI briefing visual style SSOT."""
 import unittest
+from unittest.mock import MagicMock, patch
 
 from src.core.board_roster import PANELIST_ROLES
 from src.output import briefing_style, reporting
@@ -67,6 +68,17 @@ class BriefingStyleTests(unittest.TestCase):
         self.assertEqual(briefing_style.CHART_DATALABEL_WEIGHT, 700)
         self.assertEqual(briefing_style.CHART_LEGEND_FONT_SIZE, 14)
         self.assertEqual(briefing_style.CHART_CANVAS_DARK, briefing_style.BG_CANVAS)
+        self.assertEqual(briefing_style.QUICKCHART_DEVICE_PIXEL_RATIO, 3)
+
+    def test_quickchart_short_url_requests_retina_device_pixel_ratio(self):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"url": "https://quickchart.io/chart/render/abc"}
+        mock_resp.raise_for_status = MagicMock()
+        with patch("src.output.reporting.requests.post", return_value=mock_resp) as post:
+            url = reporting.get_quickchart_short_url({"type": "bar"}, width=388, height=300)
+        self.assertEqual(url, "https://quickchart.io/chart/render/abc")
+        payload = post.call_args.kwargs.get("json") or post.call_args[1].get("json")
+        self.assertEqual(payload["devicePixelRatio"], briefing_style.QUICKCHART_DEVICE_PIXEL_RATIO)
 
         bull = briefing_style.sotu_quote_style(f"{PANELIST_ROLES['hypatia']} (⭐⭐⭐⭐ Bullish)")
         self.assertEqual(bull[0], briefing_style.SOTU_BULL_BG)

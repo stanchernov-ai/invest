@@ -109,7 +109,7 @@ Constants live at top of `reporting.py`. `colors_for_metric(values, theme="light
 3. **Pie outlabels:** Off-white `#f4f4f5` at weight 700 on dark `#121212` canvas — no CSS filter.
 4. **Bar legend:** Same boolean `false` in `plugins.legend` plus top-level `"legend": {"display": false}`.
 5. **Datalabel formatter:** QuickChart accepts JS string: `BAR_DATALABEL_FORMATTER` → `function(value){...}+'%'`.
-6. **Short URL API:** `get_quickchart_short_url(..., background_color=...)` POSTs to `quickchart.io/chart/create` — prefer over inline URL (line chart URL length).
+6. **Short URL API:** `get_quickchart_short_url(..., background_color=...)` POSTs to `quickchart.io/chart/create` with `devicePixelRatio` from `briefing_style.QUICKCHART_DEVICE_PIXEL_RATIO` (3× for premium phone retina; layout width stays 388px). Prefer over inline GET fallback (line chart URL length).
 7. **Pie size:** `PIE_CHART_WIDTH=600`, `PIE_CHART_HEIGHT=420` after legend removal.
 
 ---
@@ -134,9 +134,10 @@ After metric box and charts:
 4. **The Alpha Pick** (if displayable)
 5. **The Debate** (hidden if `boardroom_brawl` incomplete)
 6. **Unicorn Protocol** (only if 5/5 Buy or 5/5 Reduce — **UNICORN-1:** unanimous Hold omitted; section hidden when empty)
-7. **The Action Plan** — per symbol: Strategic Context → Champion → Dissent (no summary table)
-8. Chairman's Closing Thoughts
-9. Upcoming Catalysts
+7. **Today's Actions** — scannable summary (verdict, champion, dissent, one-line context) after Unicorn, before Action Plan
+8. **The Action Plan** — per symbol: Strategic Context → Champion → Dissent (no summary table)
+9. Chairman's Closing Thoughts
+10. Upcoming Catalysts
 
 **Removed May 30:** Time-Weighted Returns **table** (`04af83d`). Account return JSON still drives CAGR mandate text and pie allocation chart.
 

@@ -505,15 +505,15 @@ class BriefingHtmlTests(unittest.TestCase):
         )
         perf_pos = html.find("Performance vs. Benchmark")
         pie_pos = html.find("Unrealized Gains")
-        actions_pos = html.find("Today&rsquo;s Actions")
         sotu_pos = html.find("The State of the Union")
         debate_pos = html.find("The Debate")
+        actions_pos = html.find("Today&rsquo;s Actions")
         action_pos = html.find("The Action Plan")
         self.assertLess(perf_pos, pie_pos)
-        self.assertLess(pie_pos, actions_pos)
-        self.assertLess(actions_pos, sotu_pos)
+        self.assertLess(pie_pos, sotu_pos)
         self.assertLess(sotu_pos, debate_pos)
-        self.assertLess(debate_pos, action_pos)
+        self.assertLess(debate_pos, actions_pos)
+        self.assertLess(actions_pos, action_pos)
         self.assertNotIn("Time-Weighted Returns", html)
         self.assertIn("NVDA", html)
         self.assertIn("Invest AI Daily Briefing", html)
@@ -718,7 +718,7 @@ class TodaysActionsTests(unittest.TestCase):
         self.assertEqual(len(rows), 5)
         self.assertEqual(overflow, 10)
 
-    def test_todays_actions_section_before_state_of_union(self):
+    def test_todays_actions_section_after_debate_before_action_plan(self):
         html = reporting.generate_html_briefing(
             total_val=150_000,
             qqq_trend=5.0,
@@ -756,8 +756,25 @@ class TodaysActionsTests(unittest.TestCase):
         self.assertIn("MSFT", html)
         self.assertIn("Risk hedge:", html)
         actions_idx = html.index("Today&rsquo;s Actions")
-        sotu_idx = html.index("The State of the Union")
-        self.assertLess(actions_idx, sotu_idx)
+        action_plan_idx = html.index("The Action Plan")
+        self.assertLess(actions_idx, action_plan_idx)
+
+    def test_build_summary_includes_champion_and_dissenter(self):
+        grouped = {cat: [] for cat in ["STRONG BUY", "BUY", "HOLD", "TRIM", "SELL", "STRONG SELL"]}
+        grouped["BUY"].append({
+            "symbol": "MSFT",
+            "synthesis": "Execute buy mandate.",
+            "narrative": {
+                "champion": PANELIST_ROLES["davinci"],
+                "champion_quote": "Growth opportunity.",
+                "dissenter": PANELIST_ROLES["hypatia"],
+                "dissenter_quote": "Valuation stretched.",
+            },
+        })
+        rows, _ = reporting.build_todays_actions_summary(grouped)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["champion"], "Leonardo")
+        self.assertEqual(rows[0]["dissenter"], "Hypatia")
 
     def test_todays_actions_hidden_when_only_hold(self):
         html = reporting.generate_html_briefing(
