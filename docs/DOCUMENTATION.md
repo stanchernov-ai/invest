@@ -43,6 +43,7 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | Map FMP endpoints / fields / Starter tier | [`fmp_data_dictionary.md`](fmp_data_dictionary.md) |
 | Review subscriptions, SaaS costs, finance oversight | [`tech_stack_and_subscriptions.md`](tech_stack_and_subscriptions.md) + `subscriptions_registry.json` |
 | Run post-deliver retrospective | [`post_deliver_checklist.md`](post_deliver_checklist.md) |
+| **Overnight self-healing flywheel (Tier 1 skeleton)** | [`overnight_flywheel_review.md`](overnight_flywheel_review.md) · `tools/overnight_fix.py` |
 | Add backlog or record a decision | [`action_tracker.md`](action_tracker.md) |
 | Doc health / which files to clean | [`doc_health_snapshot.md`](doc_health_snapshot.md) |
 | Change guardrails or Cursor workflow | [`.cursorrules`](../.cursorrules) only |

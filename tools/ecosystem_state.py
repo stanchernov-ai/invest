@@ -29,6 +29,7 @@ ARRAY_KEYS = (
     "supervisor_summaries",
     "qa_scorecards",
     "qa_human_reviews",
+    "overnight_runs",
 )
 MAX_ENTRIES = 50
 

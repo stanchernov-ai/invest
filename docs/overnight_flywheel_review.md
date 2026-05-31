@@ -88,3 +88,30 @@ overnight_fix.py --issue QA-090637-03 --max-iterations 3
 2. **PR-B (infra):** queue bootstrap doc + optional `scripts/ensure_azure_queues.py`  
 3. **PR-C (Tier 0):** C2 digest blob + golden fixtures  
 4. **PR-D (Tier 1):** `overnight_fix.py` skeleton + `fix_plan_` template only  
+
+**Shipped (PR-D skeleton):** `src/overnight/`, `tools/overnight_fix.py`, `tools/issue_roi.py`, `tools/validate_fix_plan.py`, template at `.cursor/agent_state/overnight/templates/fix_plan.template.md`.
+
+---
+
+## Artifact schemas (PR-D)
+
+| File | Format | Writer | Reader |
+|------|--------|--------|--------|
+| `manifest.json` | JSON | `overnight_fix.py init` | Orchestrator, validate-plan |
+| `fix_plan.md` | Markdown + YAML frontmatter | Architect (human/Cursor) | Developer, Tester |
+| `test_result.json` | JSON | `overnight_fix.py test` | Developer retry, Supervisor |
+| `supervisor_summary.json` | JSON | Tester on PASS/ESCALATE | `ecosystem_state` → `supervisor_summaries`, `overnight_runs` |
+
+**Handoff rule:** Developer reads `fix_plan.md` + prior `test_result.json` only — not freeform chat between agents.
+
+**Supervisor fields:** `run_kind: overnight_fix`, `issue_id`, `verdict` ∈ `PASS` | `PASS_WITH_WARNINGS` | `BLOCKED` | `ESCALATE`.
+
+**CLI quick start:**
+
+```powershell
+.venv\Scripts\python.exe tools/issue_roi.py --fix-type code --limit 5
+.venv\Scripts\python.exe tools/overnight_fix.py init --issue QA-090637-02
+# edit fix_plan.md → verdict: READY
+.venv\Scripts\python.exe tools/overnight_fix.py validate-plan --issue QA-090637-02
+.venv\Scripts\python.exe tools/overnight_fix.py test --issue QA-090637-02 --iteration 1
+```

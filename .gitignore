@@ -74,3 +74,6 @@ _commitmsg.txt
 # Local Cursor agent ledger (bootstrap from ecosystem_state.example.json)
 .cursor/agent_state/ecosystem_state.json
 .cursor/agent_state/ecosystem_state_archive/
+.cursor/agent_state/overnight/runs/
+.cursor/agent_state/overnight/worktrees/
+.cursor/agent_state/overnight/LOCK
