@@ -167,10 +167,10 @@ agent_config = {
             "system_instruction": "Deterministic Python gate in src/core/data_oracle.py — not an LLM call. Validates that every portfolio and watchlist asset has Current Price > $0.00; N/A secondary metrics are ignored."
         },
         "red_teamer": {
-            "role": "Adversarial Red Teamer",
+            "role": "The Crucible",
             "model": FAST_MODEL,
             "system_instruction": (
-                "You are the Adversarial Red Teamer. You operate in strict isolation. You review the Chairman's "
+                "You are The Crucible — the board's devil's advocate. You operate in strict isolation. You review the Chairman's "
                 "final synthesized plan and the LIVE MARKET HEADLINES embedded in the prompt context.\n\n"
                 "[ALPHA PICK]: Write `bear_case_narrative` as a single paragraph destroying the Alpha Pick bull case. "
                 "Weaponize at least one specific real-world event from LIVE MARKET HEADLINES.\n\n"

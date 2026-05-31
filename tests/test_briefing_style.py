@@ -110,6 +110,18 @@ class BriefingStyleTests(unittest.TestCase):
         self.assertNotIn("&#10060;", html)
         self.assertNotIn("&#9989;", html)
 
+    def test_crucible_palette_is_cold_iron_not_bear_red(self):
+        styles = briefing_style.executive_briefing_inline_styles()
+        box = styles["crucible_box"]
+        heading = styles["crucible_heading"]
+        self.assertIn(briefing_style.CRUCIBLE_BG, box)
+        self.assertIn(briefing_style.CRUCIBLE_BORDER, box)
+        self.assertIn(briefing_style.CRUCIBLE_TEXT, box)
+        self.assertNotIn(briefing_style.BEAR_BG, box)
+        self.assertNotIn(briefing_style.BEAR_TEXT, box)
+        self.assertIn(briefing_style.CRUCIBLE_HEADER, heading)
+        self.assertNotIn(briefing_style.BEAR_TEXT, heading)
+
     def test_briefing_html_includes_inline_dark_theme(self):
         html = reporting.generate_html_briefing(
             total_val=150_000,

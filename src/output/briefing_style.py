@@ -28,6 +28,12 @@ BEAR_BG = "#450a0a"
 WARN_TEXT = "#fcd34d"
 WARN_BG = "#3f2c12"
 
+# The Crucible — adversarial rebuttal block (cold iron vault; not bear-red semantics).
+CRUCIBLE_BG = "#09090b"          # void charcoal — darker/colder than BG_SURFACE
+CRUCIBLE_BORDER = "#a8b0ba"      # forged steel — ties to portrait iron ring
+CRUCIBLE_TEXT = "#e4e4e7"        # icy zinc — cold prose, no warm emotion
+CRUCIBLE_HEADER = "#c0c8d0"      # stark metallic silver
+
 # QuickChart (Chart.js) renders all chart types on CHART_CANVAS_DARK natively.
 # --- QuickChart typography (credibility gate: labels/legends must not require squinting) ---
 CHART_CANVAS_DARK = BG_CANVAS  # #121212 — all charts (line, bar, pie)
@@ -367,9 +373,13 @@ def executive_briefing_inline_styles() -> dict[str, str]:
             f"background-color:{WARN_BG};padding:15px;border-left:4px solid {WARN_TEXT};"
             f"margin-bottom:20px;color:{WARN_TEXT};{font}"
         ),
-        "red_team_box": (
-            f"background-color:{BEAR_BG};padding:12px;border-left:4px solid {BEAR_TEXT};"
-            f"color:{BEAR_TEXT};{font}"
+        "crucible_box": (
+            f"background-color:{CRUCIBLE_BG};padding:12px;border-left:4px solid {CRUCIBLE_BORDER};"
+            f"color:{CRUCIBLE_TEXT};line-height:1.55;{font}"
+        ),
+        "crucible_heading": (
+            f"color:{CRUCIBLE_HEADER};font-weight:700;font-size:0.95em;"
+            f"letter-spacing:0.06em;text-transform:uppercase;margin:0 0 8px 0;{font}"
         ),
         "chairman_box": (
             f"background-color:{BG_SURFACE};padding:15px;border-left:4px solid {BRAND_SAGE};"
@@ -707,7 +717,8 @@ Brand accent (h1, h2, chart titles): matte sage {BRAND_SAGE}. Borders/dividers: 
 
 Financial semantics:
 - Bullish (Buy / Strong Buy pills, champion quotes): {BULL_TEXT} on {BULL_BG}.
-- Bearish (Sell / Strong Sell, dissent, red team): {BEAR_TEXT} on {BEAR_BG}.
+- Bearish (Sell / Strong Sell pills, SoTU 1–2 star): {BEAR_TEXT} on {BEAR_BG}.
+- The Crucible rebuttal (Alpha Pick / Unicorn): {CRUCIBLE_TEXT} on {CRUCIBLE_BG}, {CRUCIBLE_BORDER} left accent, header {CRUCIBLE_HEADER}. NOT bear-red.
 - Warning / hedge mandate: {WARN_TEXT} on {WARN_BG}.
 
 Charts: All chart types (line, bar, pie) render natively on {CHART_CANVAS_DARK} via QuickChart (Chart.js). Do NOT apply CSS filters to chart images — filters ruin categorical color fidelity.

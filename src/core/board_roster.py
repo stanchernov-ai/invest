@@ -46,6 +46,10 @@ PANELIST_AVATAR_MATERIAL: dict[str, str] = {
     "aurelius": "black obsidian",
 }
 
+# The Crucible — adversarial rebuttals (Alpha Pick + Unicorn Protocol). See docs/briefing_avatars.md.
+CRUCIBLE_DISPLAY_NAME = "The Crucible"
+CRUCIBLE_AVATAR_URL = f"{ASSET_BASE}/crucible.png?v={AVATAR_VERSION}"
+
 # Backward compatibility for checkpoints / chairman JSON from prior rosters.
 LEGACY_AGENT_KEY_MAP: dict[str, str] = {
     "buffett": "hypatia",

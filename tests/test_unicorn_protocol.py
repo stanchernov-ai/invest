@@ -1,7 +1,8 @@
 import re
 import unittest
 
-from src.core.board_roster import PANELIST_AVATAR_URLS, PANELIST_ROLES
+from src.core.board_roster import CRUCIBLE_AVATAR_URL, CRUCIBLE_DISPLAY_NAME, PANELIST_AVATAR_URLS, PANELIST_ROLES
+from src.output import briefing_style
 from src.output.reporting import (
     build_unicorn_protocol_items,
     generate_html_briefing,
@@ -120,6 +121,11 @@ class TestUnicornProtocol(unittest.TestCase):
             },
         )
         self.assertIn("Unicorn Protocol", html)
+        self.assertIn(CRUCIBLE_DISPLAY_NAME, html)
+        self.assertIn(CRUCIBLE_AVATAR_URL, html)
+        self.assertIn(briefing_style.CRUCIBLE_BG, html)
+        self.assertIn(briefing_style.CRUCIBLE_BORDER, html)
+        self.assertNotIn("Bear Case Rebuttal", html)
         self.assertIsNone(_EMAIL_UNSAFE.search(html))
         html_findings = audit_briefing_html(html)
         critical = [f for f in html_findings if f.get("severity") == "CRITICAL"]

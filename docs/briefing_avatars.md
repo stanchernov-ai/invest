@@ -49,7 +49,10 @@ Marble pair = value anchor + growth narrator. Obsidian pair = tech architecture 
 | `davinci.jpg` | `https://stboardroomprod.blob.core.windows.net/assets/davinci.jpg` |
 | `suntzu.jpg` | `https://stboardroomprod.blob.core.windows.net/assets/suntzu.jpg` |
 | `tesla.jpg` | `https://stboardroomprod.blob.core.windows.net/assets/tesla.jpg` |
-| `aurelius.jpg` | `https://stboardroomprod.blob.core.windows.net/assets/aurelius.jpg` |
+| `aurelius.png` | `https://stboardroomprod.blob.core.windows.net/assets/aurelius.png` |
+| `crucible.png` | `https://stboardroomprod.blob.core.windows.net/assets/crucible.png` |
+
+**The Crucible** (devil's advocate — Alpha Pick + Unicorn rebuttals): upload a square bust/icon as `crucible.png` to the same `assets` container. The briefing uses `CRUCIBLE_AVATAR_URL` in `board_roster.py` (same `?v={AVATAR_VERSION}` cache-bust as panelists). Re-center with `scripts/recenter_avatars.py` if the art has a gold ring in-frame.
 
 Until new assets land, legacy placeholders may 404 in QA — upload busts to these paths before the next prod run.
 
@@ -64,7 +67,7 @@ on real card colors) before uploading the `{key}.png` files to the blob.
 
 ## HTML usage
 
-SoTU quote rows and Action Plan avatars reference `PANELIST_AVATAR_URLS` in `reporting.py`. Images use:
+SoTU quote rows, Action Plan avatars, and **The Crucible** (Alpha Pick / Unicorn rebuttals) reference `PANELIST_AVATAR_URLS` / `CRUCIBLE_AVATAR_URL` in `reporting.py`. Images use:
 
 ```html
 <img src="..." style="width: 50px; height: 50px; border-radius: 50%; ..." alt="{role} avatar">

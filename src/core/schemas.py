@@ -122,10 +122,10 @@ class UnicornRebuttal(BaseModel):
     rebuttal: str = Field(description="Original adversarial bear-case paragraph weaponizing live headlines against this unanimous trade. Do NOT quote board members.")
 
 class RedTeamReport(BaseModel):
-    bear_case_narrative: str = Field(description="Bear case rebuttal against the Alpha Pick only.")
+    bear_case_narrative: str = Field(description="The Crucible rebuttal against the Alpha Pick only.")
     unicorn_rebuttals: list[UnicornRebuttal] = Field(
         default_factory=list,
-        description="One dedicated Red Team rebuttal per Unicorn Protocol symbol (unanimous panel verdict).",
+        description="One dedicated Crucible rebuttal per Unicorn Protocol symbol (unanimous panel verdict).",
     )
 
 

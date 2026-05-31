@@ -10,6 +10,8 @@ import logging
 
 from src.output.briefing_enrichment import enrich_chairman_for_briefing_sync, _is_generic_synthesis
 from src.core.board_roster import (
+    CRUCIBLE_AVATAR_URL,
+    CRUCIBLE_DISPLAY_NAME,
     PANELIST_AVATAR_URLS,
     PANELIST_ROLES,
     panelist_short_name,
@@ -405,7 +407,7 @@ def build_todays_actions_summary(
 
 
 def build_unicorn_protocol_items(unicorn_trades, chairman_data, advanced_data=None, red_team_data=None):
-    """Enrich unanimous panel trades with chairman narrative + Red Team rebuttals."""
+    """Enrich unanimous panel trades with chairman narrative + Crucible rebuttals."""
     advanced_data = advanced_data or {}
     red_team_data = red_team_data or {}
     rebuttal_map = {
@@ -1311,10 +1313,17 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 </table>
                 
                 {% if red_team_case %}
-                <h3 style="{{ email_styles.h3 }} {{ email_styles.bear_heading }} margin-top: 20px; margin-bottom: 10px; border-bottom: none;">The Bear Case Rebuttal</h3>
-                <div style="{{ email_styles.red_team_box }}">
-                    {{ red_team_case }}
-                </div>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 20px;">
+                    <tr>
+                        <td valign="top" align="center" style="padding-right:10px;width:{{ crucible_avatar_size }}px;">
+                            <img src="{{ crucible_avatar_url }}" width="{{ crucible_avatar_img_size }}" height="{{ crucible_avatar_img_size }}" style="{{ crucible_avatar_img_style }}" alt="{{ crucible_display_name }}">
+                        </td>
+                        <td valign="top">
+                            <p style="{{ email_styles.crucible_heading }}">{{ crucible_display_name }}</p>
+                            <div style="{{ email_styles.crucible_box }}">{{ red_team_case }}</div>
+                        </td>
+                    </tr>
+                </table>
                 {% endif %}
             </div>
             {% endif %}
@@ -1368,7 +1377,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             
             {% if unicorn_protocol_items %}
             <h2 style="{{ email_styles.h2 }}">Unicorn Protocol</h2>
-            <p style="{{ email_styles.muted_p }}">Unanimous board verdict — full context with Red Team rebuttal.</p>
+            <p style="{{ email_styles.muted_p }}">Unanimous board verdict — full context with {{ crucible_display_name }} rebuttal.</p>
             {% for item in unicorn_protocol_items %}
                 <div style="{{ email_styles.section_divider }}">
                     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
@@ -1390,8 +1399,17 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                     <p style="{{ email_styles.p }}"><span style="{{ email_styles.champion }}">The Champion ({{ item.champion }}):</span> "{{ item.champion_quote }}"</p>
                     {% endif %}
                     {% if item.red_team_rebuttal %}
-                    <p style="{{ email_styles.bear_heading }}; margin-top: 12px; margin-bottom: 6px; font-weight: bold;">⚠️ Red Team Rebuttal</p>
-                    <div style="{{ email_styles.red_team_box }}">{{ item.red_team_rebuttal }}</div>
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 12px;">
+                        <tr>
+                            <td valign="top" align="center" style="padding-right:10px;width:{{ crucible_avatar_size }}px;">
+                                <img src="{{ crucible_avatar_url }}" width="{{ crucible_avatar_img_size }}" height="{{ crucible_avatar_img_size }}" style="{{ crucible_avatar_img_style }}" alt="{{ crucible_display_name }}">
+                            </td>
+                            <td valign="top">
+                                <p style="{{ email_styles.crucible_heading }};margin-top:0;">{{ crucible_display_name }}</p>
+                                <div style="{{ email_styles.crucible_box }}">{{ item.red_team_rebuttal }}</div>
+                            </td>
+                        </tr>
+                    </table>
                     {% endif %}
                 </div>
             {% endfor %}
@@ -1617,6 +1635,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     from src.config.settings import now_local
     briefing_date = now_local().strftime("%B %d, %Y")
 
+    crucible_portrait = portrait_clip_styles(size=DEBATE_AVATAR_SIZE)
+
     cagr_match = re.search(r"CAGR of ([\d\.]+)\s*percent", mandate, re.I)
     proj_match = re.search(r"projected balance at age 65 is (\$[\d\.,]+)", mandate)
     cagr_text = f"{cagr_match.group(1)}%" if cagr_match else "N/A"
@@ -1641,6 +1661,11 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         brawl_text=brawl_text,
         debate_bubbles=debate_bubbles,
         debate_avatar_size=DEBATE_AVATAR_SIZE,
+        crucible_avatar_size=DEBATE_AVATAR_SIZE,
+        crucible_avatar_url=CRUCIBLE_AVATAR_URL,
+        crucible_avatar_img_style=crucible_portrait["img"],
+        crucible_avatar_img_size=crucible_portrait["img_size"],
+        crucible_display_name=CRUCIBLE_DISPLAY_NAME,
         action_plan_avatar_size=ACTION_PLAN_AVATAR_SIZE,
         unicorn_protocol_items=unicorn_protocol_items,
         grouped_actions=grouped_actions,

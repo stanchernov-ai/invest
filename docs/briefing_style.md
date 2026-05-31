@@ -26,7 +26,8 @@
 | Matte sage (brand) | `#95b8a2` | h1, h2, chart titles, primary headers |
 | Subtle border | `#3f3f46` | Dividers, chart borders, table rows |
 | Bull text / bg | `#6ee7b7` / `#064e3b` | Buy pills, champion quotes, SoTU 4-star (bg at 50% alpha) |
-| Bear text / bg | `#fca5a5` / `#450a0a` | Sell pills, dissent, red team, SoTU 1–2 star (bg at 50% alpha) |
+| Bear text / bg | `#fca5a5` / `#450a0a` | Sell pills, SoTU 1–2 star (bg at 50% alpha) |
+| Crucible vault | `#e4e4e7` on `#09090b` | The Crucible rebuttal — steel border `#a8b0ba`, header `#c0c8d0` |
 | Warn text / bg | `#fcd34d` / `#3f2c12` | Hedge mandate, Trim pills |
 
 **State of the Union quote rows:** background uses the semantic fill at **50% opacity** (`SOTU_BG_ALPHA = 0.5` via `rgba(...)`); left border stays solid for stance color.
