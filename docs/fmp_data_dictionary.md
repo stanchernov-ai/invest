@@ -53,7 +53,7 @@ Validated May 29, 2026 via `tools/probe_starter_tier.py` on the live Starter API
 | `/api/v3/rating/{symbol}` | 403 | Use stable `grades-consensus` |
 | `/api/v3/earning_calendar?symbol=` | 403 | Use stable `earnings` |
 | `/api/v3/stock_news` | 200 | **In use** by `news_client.py` (v3 still works for news) |
-| `/api/v3/stock-screener` | 200 | **In use** by `scout.py` fallback |
+| `/stable/company-screener` | 200 | **In use** by `scout.py` fallback (v3 stock-screener 403 on Starter) |
 
 ---
 
@@ -207,7 +207,7 @@ Validated May 29, 2026 via `tools/probe_starter_tier.py` on the live Starter API
 | Endpoint | Fields used | Notes |
 |----------|-------------|--------|
 | `GET /api/v3/stock_news` | `symbol`, `title` | Add `publishedDate` when extending red team |
-| `GET /api/v3/stock-screener` | `symbol` only | Rich row discarded today |
+| `GET /stable/company-screener` | `symbol` only | Rich row discarded today; v3 screener blocked on Starter |
 
 ---
 

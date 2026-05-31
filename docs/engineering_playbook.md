@@ -58,6 +58,8 @@
 
 ### yfinance / Yahoo
 - **yfinance is unreliable for 3M momentum** — returned `"N/A"`, skewing agent behavior. *Replaced with FMP EOD.* yfinance is now a fundamentals fallback only. Yahoo IP-blackout risk remains a known fragility. (2026-05-28)
+- **Yahoo trending scrape: at most once per calendar day** — `src/scout.py` caches raw trending symbols in `DATA_DIR/yahoo_trending_cache.json` (keyed by `BOARDROOM_TIMEZONE` date). Prepare/review-universe reuses the cache; owned/cooldown filters apply per run without re-scraping. Set `YAHOO_SCRAPE_ENABLED=false` to skip Yahoo HTML entirely (FMP screener → static fallback). Manual refresh: delete cache file or call with `force_refresh=True` in dev only. (2026-05-30)
+- **Validate Scout sources before prod** — after changing `src/scout.py` or `src/data/review_universe.py`, run `.venv\Scripts\python.exe scripts\validate_scout_sources.py` from repo root (live `FMP_API_KEY`; Yahoo probe optional via `--skip-yahoo`). At least one discovery source (Yahoo or FMP stable company-screener) must pass; integration probe must pass. Do not deploy on BLOCKED. (2026-05-30)
 
 ## 4. Gemini / LLM Agents
 

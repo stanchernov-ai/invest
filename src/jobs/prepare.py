@@ -13,8 +13,9 @@ import logging
 import aiohttp
 
 from src import pipeline
-from src import scout
 from src import history
+from src import verdict_memory
+from src.data.review_universe import build_review_universe, persist_daily_target_list
 from src import storage_client
 from src.output import reporting
 from src.output import notifier
@@ -93,18 +94,15 @@ async def run_prepare(run_id: str = None) -> dict:
         master_ledger, total_portfolio_value = pipeline.process_portfolios()
         account_holdings = pipeline.build_account_holdings()
 
-        target_path = os.path.join(DATA_DIR, "daily_target_list.json")
-        if not os.path.exists(target_path):
-            scout.run_scout_pipeline(owned_tickers=master_ledger.keys())
-        try:
-            with open(target_path, "r") as f:
-                watchlist_data = json.load(f)
-        except Exception:
-            watchlist_data = {}
-
         keys_to_delete = [sym for sym, data in master_ledger.items() if data["Total"] < 50.0]
         for k in keys_to_delete:
             del master_ledger[k]
+
+        watchlist_data = build_review_universe(
+            master_ledger.keys(),
+            verdicts_history=verdict_memory.load_board_verdicts(),
+        )
+        persist_daily_target_list(watchlist_data)
 
         all_symbols = list(set(list(master_ledger.keys()) + list(watchlist_data.keys())))
         clean_symbols = [s for s in all_symbols if s != "BRK_LINK" and not s.startswith("922")]
