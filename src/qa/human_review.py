@@ -176,7 +176,7 @@ def _summarize_reviews(reviews: list[dict]) -> str:
     return f"{confirmed} confirmed · {rejected} rejected · {skipped} notes-only/skipped"
 
 
-def render_review_page(context: dict, *, error: str = None, success: str = None, promoted_markdown: str = None) -> str:
+def render_review_page(context: dict, *, error: str = None, success: str = None, sync_hint: str = None) -> str:
     """HTML review form — mobile-friendly, email-safe styling."""
     from src.qa.candidate_triage import render_triage_section_html
 
@@ -220,12 +220,12 @@ def render_review_page(context: dict, *, error: str = None, success: str = None,
     if success:
         alert = f'<div class="alert success">{html.escape(success)}</div>'
 
-    promoted_block = ""
-    if promoted_markdown:
-        promoted_block = f"""
+    sync_block = ""
+    if sync_hint:
+        sync_block = f"""
   <div class="promoted-box">
-    <h3>Promoted items — paste into action_tracker.md</h3>
-    <pre>{html.escape(promoted_markdown.strip())}</pre>
+    <h3>Update action_tracker.md</h3>
+    <pre>{html.escape(sync_hint.strip())}</pre>
   </div>"""
 
     triage_section = render_triage_section_html(context.get("triage") or {"run_id": run_id, "candidates": []})
@@ -279,8 +279,8 @@ def render_review_page(context: dict, *, error: str = None, success: str = None,
     {triage_section}
     <button type="submit">Save review &amp; triage</button>
   </form>
-  {promoted_block}
-  <p class="footer">Invest AI Boardroom · human-confirmed QA scorecard + candidate triage</p>
+  {sync_block}
+  <p class="footer">Invest AI Boardroom · QA scorecard + backlog triage → action_tracker.md</p>
 </div>
 </body></html>"""
 
@@ -323,7 +323,7 @@ def handle_review_http(method: str, params: dict, body: bytes | None = None) -> 
         form = _parse_urlencoded(body or b"")
         reviews = _parse_form_reviews(form)
         from src.qa.candidate_triage import (
-            format_promoted_markdown,
+            format_sync_hint,
             parse_triage_from_form,
             save_candidate_triage,
         )
@@ -337,9 +337,9 @@ def handle_review_http(method: str, params: dict, body: bytes | None = None) -> 
                 f"Saved — {record.get('summary', 'review recorded')}; "
                 f"{triage_record.get('summary', 'triage recorded')}."
             )
-            promoted_md = format_promoted_markdown(run_id, triage_items)
+            hint = format_sync_hint(run_id)
             return 200, render_review_page(
-                context, success=msg, promoted_markdown=promoted_md or None,
+                context, success=msg, sync_hint=hint,
             ), {"Content-Type": "text/html; charset=utf-8"}
         except Exception as e:
             logger.error(f"Failed to save human review for {run_id}: {e}")

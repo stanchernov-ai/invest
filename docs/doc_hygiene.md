@@ -9,7 +9,7 @@
 
 | Need | Document | Max size target |
 |------|----------|-----------------|
-| **Today's pickup + open backlog** | [`action_tracker.md`](action_tracker.md) | **≤ ~200 lines** — one Session Handoff at top |
+| **Today's pickup + open backlog (QA + engineering)** | [`action_tracker.md`](action_tracker.md) | **≤ ~200 lines** — one Session Handoff; Open items table logs every QA finding |
 | **Rejected approaches / gotchas** | [`engineering_playbook.md`](engineering_playbook.md) | Short bullets with dates |
 | **Which doc to open** | [`DOCUMENTATION.md`](DOCUMENTATION.md) | Index only — no duplicated prose |
 | **Resolved epics / old handoffs** | [`archive/`](archive/) | Append-only history |

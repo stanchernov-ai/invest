@@ -287,17 +287,8 @@ def render_markdown(
     if not candidates:
         lines.append("_No CRITICAL/WARNING QA findings or human notes for this run._")
     else:
-        for idx, cand in enumerate(candidates, 1):
-            lines.append(
-                f"### {idx}. [{cand.get('suggested_priority', 'P2')}] "
-                f"{cand.get('agent_role', 'General')}"
-            )
-            lines.append(f"- **Source:** {cand.get('source')}")
-            lines.append(f"- **Severity:** {cand.get('severity')}")
-            lines.append(f"- **Finding:** {cand.get('description')}")
-            if cand.get("recommendation"):
-                lines.append(f"- **Recommendation:** {cand['recommendation']}")
-            lines.append("")
+        lines.append(f"_See `docs/action_tracker.md` after `tools/sync_backlog.py --run-id {run_id}`._")
+        lines.append("")
 
     lines.extend(["## Backlog cross-check", ""])
     open_items = backlog.get("open") or []
@@ -321,8 +312,8 @@ def render_markdown(
         "## Next steps",
         "",
         "1. Validate CRITICAL findings against raw debate log / briefing (don't trust QA blindly).",
-        "2. Paste promoted items into `docs/action_tracker.md` Session Handoff → Open items.",
-        "3. Link `evidence_ref`: `qa_reports_{run_id}.json`, `qa_human_review_{run_id}.json`.",
+        "2. Triage via QA dashboard link (fix code vs fix agent vs discard).",
+        "3. Sync into the single backlog: `tools/sync_backlog.py --run-id {run_id}`.",
         "4. Add regression test or golden fixture when fixing code-enforced behavior.",
         "",
     ])

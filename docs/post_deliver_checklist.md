@@ -2,7 +2,7 @@
 
 **When:** After every successful `deliver` phase (weekday pipeline or manual `/api/prepare` kickoff).  
 **Time:** ~10–15 minutes human + 2 minutes scripted.  
-**Goal:** Turn run artifacts into validated backlog items — not lost in email or QA HTML.
+**Goal:** QA findings land in **one backlog file** — `docs/action_tracker.md` Open items. Fix the code or fix the QA agent.
 
 Related: [`engineering_playbook.md`](engineering_playbook.md) · [`action_tracker.md`](action_tracker.md) · [`agent_architecture.md`](agent_architecture.md) §6–§8
 
@@ -24,155 +24,95 @@ Or read `boardroom-state/run_status.json`:
 
 ---
 
-## 2. Pull artifacts locally
+## 2. Pull artifacts + sync backlog
 
 ```powershell
-.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id YYYYMMDD_HHMMSS
+.venv\Scripts\python.exe tools/fetch_azure_reports.py --run-id YYYYMMDD_HHMMSS --post-job
 ```
+
+`--post-job` fetches artifacts, runs post-job agents, **and** merges QA findings into `action_tracker.md` via `sync_backlog.py`.
 
 Confirm under `.cache/`:
 
 | File | Purpose |
 |------|---------|
 | `reports/executive_briefing_*.html` | Spot-check briefing (SoTU, debate section, charts) |
-| `reports/qa_dashboard_*.html` | QA PASS/FAIL summary |
-| `state/qa_reports_*.json` | Full QA findings |
+| `reports/qa_dashboard_*.html` | QA PASS/FAIL + backlog items at bottom |
+| `state/qa_reports_*.json` | Full QA findings (evidence for Open items) |
 | `state/qa_human_review_*.json` | Your confirmations (if submitted) |
+| `state/candidate_triage_*.json` | Fix code / fix agent / discard decisions |
 | `state/debate.json` | Chairman output + **`raw_verdicts`** (Round 2 vote SSOT) |
-| `state/board_verdicts.json` | Pass cooldown writes (after compliant deliver) |
-| `state/post_job_oversight_*.json` | API Optimization + Data Insight + Supervisor (Azure deliver step) |
-| `state/api_telemetry_*.json` | Scorecard + agent activity |
-| `reports/retrospective_*.md` | Auto-generated candidate action items (after deliver) |
-| `state/retrospective_*.json` | Idempotency marker (skip if already processed) |
+| `state/post_job_oversight_*.json` | API Optimization + Data Insight + Supervisor |
+
+**Manual backlog sync only:**
+
+```powershell
+.venv\Scripts\python.exe tools/sync_backlog.py --run-id YYYYMMDD_HHMMSS
+```
 
 ---
 
-## 3. Human QA review (if not done yet)
+## 3. Human QA review + backlog triage
 
-Open the **Review QA accuracy** button in the QA dashboard email.
+Open the QA dashboard email → **Review QA accuracy** and **Triage backlog items**.
 
 For each QA agent:
 
-- **Confirm** if the PASS/FAIL matches what you saw in the briefing/debate
-- **Reject** false positives (especially Prompt Engineer rubber-stamps)
-- Add **notes** for anything the QA stack missed
+- **Confirm** or **reject** the PASS/FAIL verdict
+- For each finding: **fix code**, **fix QA agent**, or **discard** (false positive)
 
-Stored in Azure: `qa_human_review_{run_id}.json` + `qa_human_reviews_ledger.json`.
-
----
-
-## 4. Review the retrospective (runs automatically after deliver)
-
-**Automatic:** `execute_retrospective()` runs at the end of every successful deliver. It is **idempotent** — the same `run_id` is never processed twice unless you pass `force`.
-
-**Azure artifacts:**
-- `boardroom-reports/retrospective_{run_id}.md` — candidate action items + backlog flags
-- `boardroom-state/retrospective_{run_id}.json` — completion marker
-- `boardroom-state/retrospectives_ledger.json` — rolling history (deduped by run_id)
-
-**Manual re-run** (e.g. after you submit human review later):
+Re-run sync after triage if you already fetched:
 
 ```powershell
-.venv\Scripts\python.exe tools/run_retrospective.py --run-id YYYYMMDD_HHMMSS --force
-```
-
-Or HTTP: `GET /api/retrospective?run_id=…&force=true` (function key required).
-
-**Local optional:**
-
-```powershell
-.venv\Scripts\python.exe tools/ecosystem_state.py show data_insights --last 3
+.venv\Scripts\python.exe tools/sync_backlog.py --run-id YYYYMMDD_HHMMSS
 ```
 
 ---
 
-## 5. Validate before promoting (QA-of-QA)
-
-Do **not** paste every CRITICAL finding into the backlog blindly.
+## 4. Validate before closing items
 
 | Check | How |
 |-------|-----|
-| Did it actually happen? | Read `raw_debate_log_*.md`, `debate.json` chairman output, or **`raw_verdicts`** for vote math |
-| Verdict memory written? | `board_verdicts.json` has Pass rows dated `run_id[:8]` when debate was approved |
-| Chairman bypass? | Scratchpad contains `VOTE ENGINE BYPASS` when Pro was skipped; else `VOTE DIGEST` reference |
-| Is it already fixed? | Compare to recent commits + golden tests |
-| Is it a false positive? | Mark in human review; skip backlog |
-| Is it code-enforceable? | Prefer Python validator + test over prompt tweak |
+| Did it actually happen? | Read `raw_debate_log_*.md`, `debate.json`, or **`raw_verdicts`** |
+| False positive? | Mark **discard** in triage; sync sets `Status=discarded` |
+| QA agent wrong? | Mark **fix agent**; tune prompt or deterministic gate |
+| Real bug? | Mark **fix code**; ship Python validator + test |
+| Already tracked? | Sync dedupes — one row per distinct problem |
 
 **Authoritative layers:** deterministic Python (🟢) > human review > LLM QA (🟡).
 
 ---
 
-## 6. Update the backlog
+## 5. Work the backlog
 
-Edit `docs/action_tracker.md` → **Session Handoff → Open items**:
+All open work lives in **`docs/action_tracker.md` → Open items** — no separate “items to consider” file.
 
-```markdown
-| **P1** | Short title — one-line fix scope. evidence: qa_reports_{run_id}.json |
-```
+When shipping a fix:
 
-Rules (full hygiene: [`doc_hygiene.md`](doc_hygiene.md)):
+1. Mark item done (remove row or set `Status=done`)
+2. One line in **Done (now prod)** if user-facing
+3. Add regression test when fixing code-enforced behavior
 
-- **Replace** the single Session Handoff block — do not add a second handoff section
-- One item per distinct problem (dedupe the retrospective list)
-- Mark shipped work in **Recently shipped** (one line); remove from Open items
-- **Do not** add Phase-style implementation specs or duplicate the doc index
-- Gotchas → [`engineering_playbook.md`](engineering_playbook.md); old handoffs → [`archive/`](archive/)
-- Add `regression_test:` or `fixture:` note when a golden test covers it
+Rules: [`doc_hygiene.md`](doc_hygiene.md).
 
 ---
 
-## 7. Regression guard (don't re-break)
+## 6. Regression guard
 
-When closing an item that was a **code fix**:
+When closing a **code fix**:
 
-1. Add or extend a unit/golden test (`tests/test_*.py`, `tests/fixtures/`)
-2. Reference the test path in the DONE line in action_tracker
-3. On future retrospectives, a **possible_regression** flag fires if the same theme reappears
-
----
-
-## 8. Post-job agents (automated)
-
-After a successful run, activate the dev-plane audit trail with one command:
-
-```powershell
-.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id RUN_ID --post-job
-```
-
-Or wait for completion and sync in one step:
-
-```powershell
-.venv\Scripts\python.exe scripts\wait_for_run.py --run-id RUN_ID --post-job
-```
-
-This writes to `.cursor/agent_state/ecosystem_state.json` (mirrors Azure `post_job_oversight_{run_id}.json`):
-
-| Bucket | Agent | What it captures |
-|--------|-------|------------------|
-| `api_audit` | API Optimization | Idle agents, token spend ranking |
-| `data_insights` | Data Insight | QA CRITICAL/WARNING counts |
-| `supervisor_summaries` | Supervisor | PASS / PASS_WITH_WARNINGS / BLOCKED + human actions |
-| `qa_scorecards` | (from Azure) | Deliver QA scorecard mirror |
-
-Inspect results:
-
-```powershell
-.venv\Scripts\python.exe tools\ecosystem_state.py show --last 3
-```
-
-These replace the former **manual-only** Cursor post-job steps. Cursor rules remain for ad-hoc deep dives.
+1. Add or extend a unit/golden test
+2. Reference test path in the DONE line
+3. Future syncs flag **possible_regression** if the same theme reappears
 
 ---
 
-## Quick reference (copy-paste)
-
-Replace `RUN_ID`:
+## Quick reference
 
 ```powershell
-.venv\Scripts\python.exe scripts\wait_for_run.py --run-id RUN_ID
-.venv\Scripts\python.exe tools\fetch_azure_reports.py --run-id RUN_ID --post-job
-# Retrospective already ran in deliver — read reports/retrospective_RUN_ID.md
+.venv\Scripts\python.exe scripts/wait_for_run.py --run-id RUN_ID
+.venv\Scripts\python.exe tools/fetch_azure_reports.py --run-id RUN_ID --post-job
+# QA review + triage in browser → sync_backlog again if needed
 ```
 
-Then: human review → validate findings → update `action_tracker.md`.
+Then: validate → fix code or fix agent → update Open items status.

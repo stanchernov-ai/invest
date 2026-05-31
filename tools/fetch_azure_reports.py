@@ -114,11 +114,17 @@ def main():
     parser.add_argument(
         "--post-job",
         action="store_true",
-        help="After fetch, run full post-job sync (implies --sync-ecosystem + post_job_sync.py)",
+        help="After fetch, run full post-job sync (implies --sync-ecosystem + post_job_sync.py + sync_backlog)",
+    )
+    parser.add_argument(
+        "--sync-backlog",
+        action="store_true",
+        help="After fetch, merge QA findings into docs/action_tracker.md",
     )
     args = parser.parse_args()
     if args.post_job:
         args.sync_ecosystem = True
+        args.sync_backlog = True
 
     client = get_blob_service_client()
     if not client:
@@ -224,6 +230,18 @@ def main():
             f"api_audit + data_insights + supervisor_summaries "
             f"({summary['qa_critical_count']} QA CRITICAL, ~{summary['total_tokens']:,} tokens)."
         )
+
+    if resolved_run_id and args.sync_backlog:
+        from src.qa.backlog_sync import merge_run_into_backlog
+
+        try:
+            bl = merge_run_into_backlog(resolved_run_id, cache_dir=out_dir)
+            print(
+                f"Backlog sync ({resolved_run_id}): +{bl['added']} new · "
+                f"{bl['updated']} updated · {bl['skipped']} skipped."
+            )
+        except Exception as exc:
+            print(f"WARNING: sync_backlog failed: {exc}", file=sys.stderr)
 
     return 0
 

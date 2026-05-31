@@ -66,14 +66,14 @@ class TestHumanReviewHandler(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn("Post Mortem QA Auditor", body)
         self.assertIn("Save review &amp; triage", body)
-        self.assertIn("Candidate Action Items", body)
+        self.assertIn("QA Backlog", body)
 
 
 class TestHumanReviewPersist(unittest.TestCase):
     @patch("src.qa.human_review._load_full_review_context")
     @patch("src.qa.candidate_triage.save_candidate_triage")
     @patch("src.qa.candidate_triage.parse_triage_from_form")
-    @patch("src.qa.candidate_triage.format_promoted_markdown")
+    @patch("src.qa.candidate_triage.format_sync_hint")
     @patch("src.qa.human_review._refresh_retrospective_after_review")
     @patch("src.qa.human_review._persist_local_ecosystem")
     @patch("src.qa.human_review._update_ledger")
@@ -83,13 +83,13 @@ class TestHumanReviewPersist(unittest.TestCase):
         mock_promoted_md, mock_parse_triage, mock_save_triage, mock_load_ctx,
     ):
         mock_parse_triage.return_value = []
-        mock_promoted_md.return_value = ""
+        mock_promoted_md.return_value = "sync hint"
         mock_load_ctx.return_value = {
             "run_id": "20260529_120000",
             "agents": [],
             "triage": {"run_id": "20260529_120000", "candidates": []},
         }
-        mock_save_triage.return_value = {"summary": "0 promoted · 0 discarded · 0 pending"}
+        mock_save_triage.return_value = {"summary": "1 fix code · 0 fix agent · 0 discarded · 0 pending"}
         record = save_human_review("20260529_120000", [
             {"agent_key": "post_mortem_qa", "agent_role": "Post Mortem QA Auditor",
              "human_confirmed": True, "human_notes": "Correct call."},

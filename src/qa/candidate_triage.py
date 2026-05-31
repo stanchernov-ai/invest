@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 RUN_ID_PATTERN = re.compile(r"^\d{8}_\d{6}$")
 LEDGER_BLOB = "candidate_triages_ledger.json"
 LEDGER_MAX = 50
-VALID_DISPOSITIONS = frozenset({"promote", "discard", "pending"})
+VALID_DISPOSITIONS = frozenset({"code", "agent", "discard", "pending", "promote"})
 
 
 def _utc_now() -> str:
@@ -103,10 +103,11 @@ def load_triage_context(run_id: str) -> dict[str, Any]:
 
 
 def _summarize_items(items: list[dict]) -> str:
-    promoted = sum(1 for i in items if i.get("disposition") == "promote")
+    fix_code = sum(1 for i in items if i.get("disposition") in ("code", "promote"))
+    fix_agent = sum(1 for i in items if i.get("disposition") == "agent")
     discarded = sum(1 for i in items if i.get("disposition") == "discard")
-    pending = sum(1 for i in items if i.get("disposition") not in ("promote", "discard"))
-    return f"{promoted} promoted · {discarded} discarded · {pending} pending"
+    pending = sum(1 for i in items if i.get("disposition") not in ("code", "agent", "discard", "promote"))
+    return f"{fix_code} fix code · {fix_agent} fix agent · {discarded} discarded · {pending} pending"
 
 
 def save_candidate_triage(run_id: str, items: list[dict], *, reviewer: str = "stan") -> dict:
@@ -139,7 +140,7 @@ def save_candidate_triage(run_id: str, items: list[dict], *, reviewer: str = "st
         "reviewer": reviewer,
         "items": cleaned,
         "summary": _summarize_items(cleaned),
-        "promoted_count": sum(1 for i in cleaned if i.get("disposition") == "promote"),
+        "promoted_count": sum(1 for i in cleaned if i.get("disposition") in ("code", "promote", "agent")),
         "discarded_count": sum(1 for i in cleaned if i.get("disposition") == "discard"),
         "evidence_ref": f"candidate_triage_{run_id}.json",
     }
@@ -192,19 +193,12 @@ def parse_triage_from_form(form: dict[str, str]) -> list[dict]:
     return items
 
 
-def format_promoted_markdown(run_id: str, items: list[dict]) -> str:
-    """Markdown table rows ready to paste into action_tracker Open items."""
-    promoted = [i for i in items if i.get("disposition") == "promote"]
-    if not promoted:
-        return ""
-    lines = ["", "### Promoted from candidate triage (paste into Open items)", ""]
-    for item in promoted:
-        pri = item.get("suggested_priority") or "P2"
-        desc = (item.get("description") or "").strip()
-        notes = (item.get("notes") or "").strip()
-        text = desc if not notes else f"{desc} — {notes}"
-        lines.append(f"| **{pri}** | {text} | evidence: qa_reports_{run_id}.json |")
-    return "\n".join(lines)
+def format_sync_hint(run_id: str) -> str:
+    """Reminder to sync triage into action_tracker.md."""
+    return (
+        f"Run locally to update the backlog:\n"
+        f"  .venv\\Scripts\\python.exe tools/sync_backlog.py --run-id {run_id}"
+    )
 
 
 def render_triage_section_html(context: dict[str, Any]) -> str:
@@ -214,7 +208,7 @@ def render_triage_section_html(context: dict[str, Any]) -> str:
     if not candidates:
         return f"""
         <section id="candidates" class="candidate-section">
-          <h2>Candidate Action Items</h2>
+          <h2>QA Backlog Triage</h2>
           <p class="meta">No CRITICAL/WARNING findings to triage for this run.</p>
         </section>"""
 
@@ -229,9 +223,10 @@ def render_triage_section_html(context: dict[str, Any]) -> str:
         rec = html.escape(str(cand.get("recommendation") or ""))
         notes = html.escape(str(cand.get("triage_notes") or ""))
         disp = cand.get("disposition") or "pending"
-        checked_promote = "checked" if disp == "promote" else ""
+        checked_code = "checked" if disp in ("code", "promote") else ""
+        checked_agent = "checked" if disp == "agent" else ""
         checked_discard = "checked" if disp == "discard" else ""
-        checked_pending = "checked" if disp not in ("promote", "discard") else ""
+        checked_pending = "checked" if disp not in ("code", "agent", "discard", "promote") else ""
 
         rec_html = f'<p class="rec"><em>{rec}</em></p>' if rec else ""
         rows.append(f"""
@@ -251,9 +246,10 @@ def render_triage_section_html(context: dict[str, Any]) -> str:
           <input type="hidden" name="candidate_severity_{idx}" value="{sev}">
           <input type="hidden" name="candidate_source_{idx}" value="{source}">
           <div class="choice">
-            <label><input type="radio" name="disposition_{idx}" value="promote" {checked_promote}> ✅ Add to backlog</label>
-            <label><input type="radio" name="disposition_{idx}" value="discard" {checked_discard}> 🗑 Discard (false positive / won't fix)</label>
-            <label><input type="radio" name="disposition_{idx}" value="pending" {checked_pending}> ⏸ Leave pending</label>
+            <label><input type="radio" name="disposition_{idx}" value="code" {checked_code}> 🔧 Fix the problem (code / product)</label>
+            <label><input type="radio" name="disposition_{idx}" value="agent" {checked_agent}> 🤖 Fix the QA agent (prompt / scope)</label>
+            <label><input type="radio" name="disposition_{idx}" value="discard" {checked_discard}> 🗑 Discard (false positive)</label>
+            <label><input type="radio" name="disposition_{idx}" value="pending" {checked_pending}> ⏸ Pending triage</label>
           </div>
           <label class="notes-label">Notes (optional)
             <textarea name="triage_notes_{idx}" rows="2" placeholder="Why promote or discard?">{notes}</textarea>
@@ -267,8 +263,8 @@ def render_triage_section_html(context: dict[str, Any]) -> str:
 
     return f"""
     <section id="candidates" class="candidate-section">
-      <h2>Candidate Action Items</h2>
-      <p class="subtitle">Run <strong>{html.escape(run_id)}</strong> — select items to add to the backlog or discard.</p>
+      <h2>QA Backlog Triage</h2>
+      <p class="subtitle">Run <strong>{html.escape(run_id)}</strong> — every finding is logged to <code>action_tracker.md</code>. Mark fix target or discard false positives.</p>
       {prior_note}
       <input type="hidden" name="candidate_count" value="{len(candidates)}">
       {''.join(rows)}
@@ -319,14 +315,14 @@ def render_dashboard_candidates_html(
     if triage_url:
         triage_link = f"""
                 <p style="margin: 16px 0;">
-                    <a href="{html.escape(triage_url)}" class="review-btn">Triage candidates (add / discard)</a>
+                    <a href="{html.escape(triage_url)}" class="review-btn">Triage backlog items</a>
                 </p>
-                <p style="font-size: 0.85em;">Select which items to promote to the backlog and which to discard (2–5 min).</p>"""
+                <p style="font-size: 0.85em;">Mark each finding: fix code, fix QA agent, or discard. Then run <code>tools/sync_backlog.py</code> locally.</p>"""
 
     return f"""
             <div class="candidate-preview">
-                <h2>Candidate Action Items</h2>
-                <p class="candidate-intro">Post-deliver retrospective findings — triage before adding to Open items.</p>
+                <h2>QA Backlog Items</h2>
+                <p class="candidate-intro">Logged to <code>action_tracker.md</code> via sync — triage fix target (code vs agent) or discard.</p>
                 {body}
                 {triage_link}
             </div>"""

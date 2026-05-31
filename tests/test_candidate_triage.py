@@ -5,7 +5,6 @@ from unittest.mock import patch
 
 from src.qa.candidate_triage import (
     candidate_key,
-    format_promoted_markdown,
     load_triage_context,
     parse_triage_from_form,
     render_dashboard_candidates_html,
@@ -39,26 +38,24 @@ class TestCandidateTriagePersist(unittest.TestCase):
     def test_save_promote_and_discard(self, mock_save, mock_ledger, mock_local):
         key = candidate_key(SAMPLE_CAND)
         record = save_candidate_triage("20260529_120000", [
-            {**SAMPLE_CAND, "candidate_key": key, "disposition": "promote", "notes": "Valid issue."},
+            {**SAMPLE_CAND, "candidate_key": key, "disposition": "code", "notes": "Valid issue."},
             {
                 "candidate_key": "abc123",
-                "disposition": "discard",
-                "notes": "False positive.",
+                "disposition": "agent",
+                "notes": "QA scope wrong.",
                 "description": "Other finding",
             },
         ])
-        self.assertEqual(record["promoted_count"], 1)
-        self.assertEqual(record["discarded_count"], 1)
-        self.assertIn("1 promoted", record["summary"])
+        self.assertEqual(record["promoted_count"], 2)
         mock_save.assert_called_once()
 
 
 class TestCandidateTriageRender(unittest.TestCase):
     def test_dashboard_section_lists_candidates(self):
         html = render_dashboard_candidates_html([SAMPLE_CAND], triage_url="https://x/api/qa-review#candidates")
-        self.assertIn("Candidate Action Items", html)
+        self.assertIn("QA Backlog Items", html)
         self.assertIn("Watchlist Pass spam", html)
-        self.assertIn("Triage candidates", html)
+        self.assertIn("Triage backlog items", html)
 
     def test_triage_form_has_disposition_radios(self):
         ctx = {
@@ -66,17 +63,16 @@ class TestCandidateTriageRender(unittest.TestCase):
             "candidates": [{**SAMPLE_CAND, "candidate_key": candidate_key(SAMPLE_CAND), "disposition": "pending"}],
         }
         html = render_triage_section_html(ctx)
-        self.assertIn("Add to backlog", html)
-        self.assertIn("Discard", html)
+        self.assertIn("Fix the problem", html)
+        self.assertIn("Fix the QA agent", html)
         self.assertIn('name="disposition_0"', html)
 
-    def test_format_promoted_markdown(self):
-        key = candidate_key(SAMPLE_CAND)
-        md = format_promoted_markdown("20260529_120000", [
-            {**SAMPLE_CAND, "candidate_key": key, "disposition": "promote"},
-        ])
-        self.assertIn("**P1**", md)
-        self.assertIn("qa_reports_20260529_120000.json", md)
+    def test_format_sync_hint(self):
+        from src.qa.candidate_triage import format_sync_hint
+
+        hint = format_sync_hint("20260529_120000")
+        self.assertIn("sync_backlog.py", hint)
+        self.assertIn("20260529_120000", hint)
 
 
 class TestCandidateTriageParse(unittest.TestCase):
@@ -85,7 +81,7 @@ class TestCandidateTriageParse(unittest.TestCase):
         form = {
             "candidate_count": "1",
             "candidate_key_0": key,
-            "disposition_0": "promote",
+            "disposition_0": "code",
             "triage_notes_0": "Add this week",
             "candidate_description_0": SAMPLE_CAND["description"],
             "candidate_priority_0": "P1",
@@ -95,7 +91,7 @@ class TestCandidateTriageParse(unittest.TestCase):
         }
         items = parse_triage_from_form(form)
         self.assertEqual(len(items), 1)
-        self.assertEqual(items[0]["disposition"], "promote")
+        self.assertEqual(items[0]["disposition"], "code")
 
 
 class TestCandidateTriageLoad(unittest.TestCase):
@@ -127,7 +123,7 @@ class TestQaDashboardWithCandidates(unittest.TestCase):
             candidates=[SAMPLE_CAND],
             triage_url="https://example.com/api/qa-review#candidates",
         )
-        self.assertIn("Candidate Action Items", html)
+        self.assertIn("QA Backlog Items", html)
         self.assertIn("Watchlist Pass spam", html)
 
 
