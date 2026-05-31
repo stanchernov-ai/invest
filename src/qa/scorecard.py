@@ -18,6 +18,7 @@ QA_SCORECARD_KEYS = (
     "system_architect",
     "prompt_engineer",
     "graphics_designer_qa",
+    "legal_counsel_qa",
     "qa_integrity_auditor",
 )
 
@@ -32,6 +33,10 @@ def _role_to_key(agent_role: str) -> str | None:
             return key
     if "deterministic" in norm and "visual" in norm:
         return "graphics_designer_qa"
+    if "deterministic" in norm and "legal" in norm:
+        return "legal_counsel_qa"
+    if "legal counsel" in norm:
+        return "legal_counsel_qa"
     if "deterministic" in norm and "integrity" in norm:
         return "qa_integrity_auditor"
     if "integrity" in norm:

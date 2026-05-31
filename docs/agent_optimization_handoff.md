@@ -1,7 +1,7 @@
 # Agent Optimization Handoff — Production Pipeline
 
 **Status:** Active handoff for developers  
-**Last updated:** May 30, 2026 (EOD — Tier 1 + B1 shipped; architect gated)  
+**Last updated:** May 30, 2026 (deploy batch staged — Legal Counsel QA local)  
 **Owner:** Stan  
 **SSOT for:** May 2026 agent audit, telemetry baseline, allocation/funding rules (shipped), and **remaining** runtime optimizations.
 
@@ -214,9 +214,19 @@ Confirm on telemetry from `20260529_220253`+ runs.
 | **Rationale** | Often FAIL on JSON bloat; overlaps post_mortem + integrity (~23k/run) |
 | **Product call** | Stan to approve full removal vs current gated behavior |
 
-#### Ticket B4 — Deploy local bundle — **DONE**
+#### Ticket B4 — Deploy local bundle — **PARTIAL**
 
-Funding sell, briefing enrichment, Phase C, liquidation cap, Tier 1, post-job sync — all on `main`. Canonical validation: `20260529_225159`.
+Funding sell, briefing enrichment, Phase C, liquidation cap, Tier 1, post-job sync — on `main` through `a17792b`. **May 30 deploy batch** (Legal Counsel, INT-1, briefing UX) — **staged, not committed**. See [`action_tracker.md`](action_tracker.md).
+
+#### Ticket B5 — Legal Counsel QA — **DONE locally (staged)**
+
+| | |
+|---|---|
+| **Agents** | `legal_counsel_qa` (per deliver briefing scan), `legal_counsel_code` (daily repo scan) |
+| **Files** | `src/qa/legal_audit.py`, `legal_policy.py`, `legal_delivery.py`, `src/jobs/legal_code_audit.py`, `function_app.py` (8 AM timer) |
+| **Delivery** | Blob `legal_counsel_briefing_{run_id}.json` + daily `legal_code_audit_YYYYMMDD.json`; email via `notifier.send_legal_counsel_report()` |
+| **Policy SSOT** | `LEGAL_COUNSEL_SAAS_POLICY` in `legal_policy.py` — endorsement trap, fake quotes, fair use |
+| **Validate** | First prod run after deploy — confirm Legal Counsel email + no false positives on policy text |
 
 ---
 

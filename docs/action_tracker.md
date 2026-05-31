@@ -1,7 +1,7 @@
 # SC Invest Boardroom — Action Tracker
 
 **Status:** Active  
-**Last Updated:** May 30, 2026 (late night — Hypatia roster + Stealth Wealth email sprint)
+**Last Updated:** May 30, 2026 (deploy batch staged — commit/deploy blocked)
 
 **Purpose:** Current session pickup and prioritized backlog. Historical handoffs and Phase 0–6 specs live in [`archive/implementation_log_2026-05.md`](archive/implementation_log_2026-05.md). Maintenance rules: [`doc_hygiene.md`](doc_hygiene.md). Doc map: [`DOCUMENTATION.md`](DOCUMENTATION.md).
 
@@ -9,74 +9,104 @@
 
 ---
 
-## Session Handoff — May 30, 2026 late night (**pick up here**)
+## Session Handoff — May 30, 2026 deploy batch (**pick up here**)
 
-**Theme:** Focus-group **persona roster finalization** (Hypatia value anchor), **Stealth Wealth** visual SSOT (avatars + palette + native dark charts), and **Gmail-safe inline email styling** — deployed and validated on prod.
+**Theme:** Large **deliver + compliance + briefing UX** batch is **fully staged** but **not committed**. Prior agent hung on `git commit` (pre-commit runs full `unittest discover`). **Prod unchanged** at `a17792b`.
 
-| Canonical run | Pipeline | Use for |
-|---------------|----------|---------|
-| **`20260530_010432`** | **SUCCESS** | **Stealth Wealth inline email** — dark `#121212` wrapper in Gmail; Hypatia roster live |
-| `20260530_004535` | SUCCESS | First Hypatia prod run (pre-inline-styles — white inbox wrapper) |
-| `20260529_225159` | SUCCESS | Action Plan three-layer baseline (pre-roster overhaul) |
+| State | Detail |
+|-------|--------|
+| **Prod HEAD** | `a17792b` — vote digest SSOT, Action Plan context, email delivery logging |
+| **Last validated run** | `20260530_190325` (~3m46s, QA PASS, email ok) — pre–Legal Counsel / UNICORN-1 |
+| **Local git** | **33 files staged** (~1,591 lines); **not committed, not pushed** |
+| **Deploy** | Blocked — push `main` triggers GitHub Actions → `app-boardroom-prod` |
+| **Next run** | After deploy: `GET /api/prepare?code=<function-key>` on regional hostname below |
 
-**Kickoff:** `GET /api/prepare?code=<function-key>` — hostname: `app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewebsites.net` ([`engineering_playbook.md`](engineering_playbook.md)).
+**Kickoff:** `GET /api/prepare?code=<function-key>` — hostname: `app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewebsites.net` ([`engineering_playbook.md`](engineering_playbook.md)). Function key: `az functionapp keys list -g rg-boardroom-prod -n app-boardroom-prod --query functionKeys.default -o tsv`.
 
-### Shipped to prod (`main`)
+### First steps (successor — do in order)
 
-| Area | Commit(s) | Note |
-|------|-----------|------|
-| SoTU Round 1 quotes + chart typography | `2bcbd04` | Portfolio-level SoTU; legible chart labels |
-| Franklin roster (interim) | `cd155a5` | Superseded by Hypatia |
-| **Hypatia roster + avatar SSOT** | `d970f20` | `hypatia`, `davinci`, `suntzu`, `tesla`, `aurelius`; legacy key map; [`briefing_avatars.md`](briefing_avatars.md) |
-| **Stealth Wealth inline email** | `58a94ab` | `executive_briefing_inline_styles()`; table wrapper + inline hex; pies on `#121212` (no CSS filter) |
-
-**Panel SSOT:** `src/core/board_roster.py` (keys, avatars) · `src/core/agents.py` (`board_members` prompts)  
-**Visual SSOT:** `src/output/briefing_style.py` · [`briefing_style.md`](briefing_style.md) · [`briefing_avatars.md`](briefing_avatars.md)
-
-### Validate after deploy
+1. **Commit staged batch only** (PowerShell — no bash heredoc):
 
 ```powershell
-.venv\Scripts\python.exe scripts/wait_for_run.py --run-id YYYYMMDD_HHMMSS --timeout 2700 --post-job
-.venv\Scripts\python.exe tools/fetch_azure_reports.py --run-id YYYYMMDD_HHMMSS --post-job
-.venv\Scripts\python.exe -m pytest tests/test_briefing_style.py tests/test_reporting_briefing.py -v
+cd c:\Projects\sc-invest-boardroom
+@'
+Add Legal Counsel QA, briefing UX fixes, and investor voice.
+
+Legal counsel scans briefing HTML and codebase daily; catalyst fallback, per-stock debate, QA review footer, hide Unicorn when no actionable unanimous trades.
+'@ | Set-Content -Encoding utf8 _commitmsg.txt
+git commit -F _commitmsg.txt
+Remove-Item _commitmsg.txt
 ```
 
-Deliver-only re-render: `GET /api/deliver?run_id=<run_id>&code=<function-key>`.
+Pre-commit hook runs **full** `unittest discover` — expect **2–10 min**; do not interrupt. If hook fails, fix and **new commit** (do not amend unless hook auto-fixed files).
 
-### Prod QA snapshot — run `20260530_010432`
+2. **Push:** `$env:GIT_TERMINAL_PROMPT=0; git push origin main`
+3. **Watch deploy:** `gh run watch --exit-status` (latest “Deploy to Azure Functions” workflow)
+4. **Kick off run** (note local `run_id` = timestamp at trigger):
 
-| Agent | Verdict | Top issue |
-|-------|---------|-----------|
-| Post Mortem | FAIL | AVGO + ASML majority **Trim** → chairman **HOLD** |
-| Graphics | FAIL | White logos on dark bg; similar green pie slices; SoTU before Action Plan |
-| Prompt Engineer | PASS | Hypatia roster behaving |
-| Systems Architect | PASS | Deterministic gate |
-| QA Integrity | FAIL | JSON parse error (agent execution) |
+```powershell
+$key = az functionapp keys list -g rg-boardroom-prod -n app-boardroom-prod --query functionKeys.default -o tsv
+Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewebsites.net/api/prepare?code=$key" -UseBasicParsing
+```
 
-**Investor email:** sent despite QA FAIL (by design). Supervisor verdict: **PASS_WITH_WARNINGS**.
+5. **Poll:** `.venv\Scripts\python.exe scripts\wait_for_run.py --run-id YYYYMMDD_HHMMSS --timeout 2700 --post-job`
+6. **Human QA (Gmail):** section order, per-stock debate, catalysts, Legal Counsel email, QA review footer link, Unicorn hidden when no 5/5 Buy/Reduce
+
+### Staged batch (ready to ship)
+
+| Area | Key paths | What |
+|------|-----------|------|
+| **Legal Counsel QA** | `src/qa/legal_audit.py`, `legal_policy.py`, `legal_delivery.py`, `src/jobs/legal_code_audit.py`, `function_app.py` | Briefing HTML scan at deliver; daily 8 AM code audit timer + `GET /api/legal-code-audit`; findings blob + email Stan |
+| **Investor voice** | `src/core/investor_voice.py`, `agents.py` | Panelists cite named investors + industry terms; SaaS-safe attribution mandate |
+| **Briefing UX** | `reporting.py`, `briefing_style.py` | GFX-4 order (Charts → SoTU → Alpha → Debate → Unicorn → Action Plan); QA review footer CTA; catalyst fallback; **UNICORN-1** hide when empty |
+| **Debate** | `boardroom_brawl.py`, `engine.py` | Per-stock Round 1 positions (not SoTU duplicate) |
+| **Catalysts** | `catalysts.py`, `deliver.py` | `ensure_chairman_catalysts` when chairman `upcoming_events` empty |
+| **INT-1** | `integrity_audit.py`, `qa_pipeline.py`, fixtures | Vote digest in integrity prompt; Post Mortem cross-check; `count_equity_buys` cap fix |
+| **Tests** | `test_legal_*`, `test_catalysts`, `test_unicorn_protocol`, `test_boardroom_brawl`, etc. | 52+ tests pass on touched modules (run full suite before push) |
+
+**Pre-push sanity:**
+
+```powershell
+.venv\Scripts\python.exe -m pytest tests/test_unicorn_protocol.py tests/test_legal_audit.py tests/test_legal_delivery.py tests/test_catalysts.py tests/test_boardroom_brawl.py tests/test_vote_engine.py -q
+```
+
+### Not in staged batch (separate WIP — do not mix into first commit)
+
+| Path | Status |
+|------|--------|
+| `src/data/review_universe.py`, `tests/test_review_universe.py` | **Untracked** — Mag7 + Yahoo watchlist merge at prepare |
+| `src/jobs/prepare.py`, `src/scout.py` | **Unstaged** — wires `build_review_universe()`; needs its own commit + test |
+| `docs/saas_technical_solution.md` | Unstaged edits |
+| `docs/saas_data_schema.md`, `docs/saas_postgres_rollout.md` | Untracked SaaS design (SAAS-0 docs only) |
 
 ### Open items (prioritized)
 
 | Pri | ID | Effort | Item | Notes |
 |-----|-----|--------|------|-------|
-| **P1** | AV-2 | S | SoTU avatar ring alignment | Gold ring baked into 1024² PNG (~18px off center on `davinci`); CSS clip cannot fix reliably in Gmail. **Rejected:** split grey avatar cell — Stan prefers full stance-colored row. **Fix:** re-export 128×128 transparent circular PNGs with ring centered, or accept minor halo until AV-2. |
-| **P1** | GFX-2 | S | Logo contrast on `#27272a` | **Partial** — light chip shipped locally; verify in Gmail |
-| **P2** | GFX-QA | S | Remove `.qa-box` from investor CSS | **Done locally** — strip from `executive_briefing_css()` |
-| **P1** | GFX-3 | M | Pie categorical palette | Too many similar greens on dark canvas — distinct ramp per slice |
-| **P1** | AP-1 | S | Flash Strategic Context quality | **Done locally** — synthetic fallback uses vote math + camp labels (no quote paste); overlap guard rejects Flash/champion duplicates |
-| **P1** | INT-1 | M | Integrity auditor R2 ground truth + JSON parse hardening | **In progress locally** — vote digest injected into integrity prompt; deterministic Post Mortem/persona cross-check; sanitize false max-3 target_tickers findings; `count_equity_buys` for cap. Validated on `181651` (0 prose drift, Post Mortem PASS). |
-| **P2** | GFX-4 | S | Section order | Graphics WARNING: move SoTU after Action Plan |
+| **P0** | DEPLOY-1 | S | Commit + push staged batch + prod run | **Blocked this session** — pre-commit hang |
+| **P1** | AV-2 | S | SoTU avatar ring alignment | Re-export 128×128 centered PNGs |
+| **P1** | GFX-2 | S | Logo contrast on `#27272a` | Partial locally — verify Gmail post-deploy |
+| **P1** | GFX-3 | M | Pie categorical palette | Too many similar greens |
+| **P1** | CHAIR-1 | S | Post Mortem Trim→Hold mandate | AVGO/ASML on `010432` |
+| **P1** | AP-2 | S | “Today’s actions” summary box | Not started |
+| **P1** | REVIEW-1 | M | Watchlist universe refactor | `review_universe.py` WIP — untracked |
 | **P2** | B2 | S | Skip `prompt_engineer` LLM on deterministic FAIL | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) §B2 |
 | **P2** | R2-1 | M | Round 2 verbatim R1 copy | Prompt Engineer recurring |
-| **P3** | — | — | Persona tuning | Stan to review Hypatia run prose after inbox check; freeze roster when stable |
+| **P3** | MKT-QA-1 | M | Marketing QA agent | After private beta — see below |
 
-**QA note:** Supervisor **PASS_WITH_WARNINGS** — pipeline SUCCESS; Graphics/Post Mortem CRITICALs are advisory for email.
+**Done locally (in staged batch, not prod):** AP-1, GFX-4, GFX-QA, INT-1, UNICORN-1, Legal Counsel QA, catalysts, per-stock debate, QA review footer, investor voice.
 
-### First steps (successor)
+---
 
-1. Confirm Gmail inbox for `20260530_010432` — dark canvas `#121212`, sage headers `#95b8a2`, readable body `#a1a1aa`.
-2. Upload avatar assets (AV-1) before next Graphics pass flags 404 busts.
-3. Pick **CHAIR-1** (mandate alignment) or **GFX-2/3** (visual polish) based on Stan's priority after inbox review.
+## Session Handoff — May 30, 2026 late night (archived)
+
+**Theme:** Hypatia roster + Stealth Wealth inline email — **superseded by deploy batch above.**
+
+| Canonical run | Note |
+|---------------|------|
+| `20260530_010432` | Stealth Wealth Gmail validation; Graphics/Post Mortem advisory FAILs |
+
+*Detail:* [`archive/implementation_log_2026-05.md`](archive/implementation_log_2026-05.md#may-30-2026--late-night-handoff-archived).
 
 ---
 
@@ -104,6 +134,18 @@ Deliver-only re-render: `GET /api/deliver?run_id=<run_id>&code=<function-key>`.
 | — | SAAS-0 | — | Design SSOT — [`saas_technical_solution.md`](saas_technical_solution.md) + [`saas_data_schema.md`](saas_data_schema.md) + [`saas_postgres_rollout.md`](saas_postgres_rollout.md) | **DONE** (May 30) |
 | **P2** | SAAS-1 | L | Phase 1–2: `PortfolioSource` + Azure Postgres + admin-provision beta | **Blocked on:** stable QA pass rate + core flow simplification |
 | **P3** | SAAS-2 | M | Phase 4: Entra External ID self-service | After Phase 2b beta validated |
+
+---
+
+## Go-to-market QA (**after private beta — before public launch**)
+
+**Not now.** Schedule only after tester users are running the product on real portfolio data (private beta). Must complete **before** public engagement, paid acquisition, or press outreach.
+
+| Pri | ID | Effort | Item | Gate |
+|-----|-----|--------|------|------|
+| **P2** | MKT-QA-1 | M | **Marketing QA agent** — LLM + deterministic review of landing page copy, onboarding emails, social/announcement snippets, and any forwardable marketing HTML for: implied investor endorsement, securities/marketing language, brand/tone vs Stealth Wealth SSOT, consistency with Legal Counsel SaaS policy ([`legal_policy.py`](../src/qa/legal_policy.py)), and CTA/disclaimer hygiene | **After:** private beta live (tester cohort on prod). **Before:** public launch. **Blocked on:** SAAS-1 beta provisioning + stable deliver/QA path for testers |
+
+**Scope sketch (implementation later):** separate from per-run `legal_counsel_qa` (briefing artifact) and daily `legal_counsel_code` (repo prompts). Marketing QA targets **growth surfaces** — website, waitlist, beta invite emails, App Store / Product Hunt copy — not the daily executive briefing. Findings → dedicated blob + email (mirror Legal Counsel delivery pattern).
 
 ---
 

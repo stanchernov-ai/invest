@@ -13,6 +13,7 @@ from src.core.board_roster import (
 )
 
 _OVERVIEW_MARKERS = ("**Portfolio Overview**", "**Rebuttal Summary**")
+_TICKER_LINE = re.compile(r"^\*\s*\*\*(.+?)\*\*:\s*(.+)$", re.M)
 _ROUND1 = re.compile(r"\*\*\[ROUND 1\]", re.I)
 _ROUND2 = re.compile(r"\*\*\[ROUND 2", re.I)
 _HEADER = re.compile(r"^\*\*\[(ROUND\s+\d+[^\]]*)\]\s*(.+?)\*\*:?\s*$", re.I | re.M)
@@ -63,7 +64,7 @@ def split_debate_paragraphs(brawl_text: str) -> list[str]:
 
 
 def _extract_debate_excerpt(content: str) -> str:
-    """Portfolio Overview (R1) or Rebuttal Summary (R2) — one digestible turn per message."""
+    """Portfolio Overview (R1) or Rebuttal Summary (R2) — clerk/fallback only."""
     for line in content.split("\n"):
         stripped = line.strip()
         for marker in _OVERVIEW_MARKERS:
@@ -73,6 +74,38 @@ def _extract_debate_excerpt(content: str) -> str:
                     return text
     return ""
 
+
+def _extract_ticker_debate_lines(content: str) -> list[str]:
+    """Per-symbol verdict lines from a board message — excludes portfolio-level summaries."""
+    lines: list[str] = []
+    for raw in (content or "").split("\n"):
+        stripped = raw.strip()
+        if not stripped or any(marker in stripped for marker in _OVERVIEW_MARKERS):
+            continue
+        match = _TICKER_LINE.match(stripped)
+        if not match:
+            continue
+        symbol = match.group(1).strip()
+        detail = match.group(2).strip()
+        if symbol and detail:
+            lines.append(f"{symbol} — {detail}")
+    return lines
+
+
+def _format_ticker_debate_excerpt(lines: list[str], *, max_chars: int = 1800) -> str:
+    """Join ticker debate lines for investor-facing chat bubbles."""
+    if not lines:
+        return ""
+    parts: list[str] = []
+    total = 0
+    for line in lines:
+        extra = len(line) + (1 if parts else 0)
+        if total + extra > max_chars:
+            parts.append("… (additional symbols in full debate log)")
+            break
+        parts.append(line)
+        total += extra
+    return "\n".join(parts)
 
 def _parse_debate_message(content: str) -> tuple[str, str, str] | None:
     """Return (round_label, panelist_key, speaker_name) from a board message."""
@@ -92,21 +125,22 @@ def debate_turn_heading(round_label: str) -> str:
     """Investor-facing debate phase — never show raw Round 1 / Round 2 labels."""
     label = (round_label or "").upper()
     if label.startswith("ROUND 1"):
-        return "Portfolio Overview"
+        return "Initial Positions"
     if "ROUND 2" in label:
         return "Rebuttal"
     return ""
 
 
 def build_debate_dialogue_turns(messages: list[dict]) -> list[dict]:
-    """Structured chat turns from raw board messages — portfolio overview + rebuttal only."""
+    """Structured chat turns from raw board messages — per-ticker verdicts, not portfolio SoTU."""
     turns: list[dict] = []
     for msg in messages or []:
         content = (msg.get("content") or "").strip()
         if not content:
             continue
         parsed = _parse_debate_message(content)
-        excerpt = _extract_debate_excerpt(content)
+        ticker_lines = _extract_ticker_debate_lines(content)
+        excerpt = _format_ticker_debate_excerpt(ticker_lines)
         if not parsed or not excerpt:
             continue
         round_label, panelist_key, speaker = parsed

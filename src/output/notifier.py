@@ -150,6 +150,35 @@ def send_qa_digest(html_content: str):
         logger.error(f"Failed to send QA Digest: {e}")
         return False
 
+
+def send_legal_counsel_report(html_content: str, *, subject: str) -> bool:
+    """Dedicated Legal Counsel findings email (briefing per-run or daily code audit)."""
+    sender_email = os.getenv("SENDER_EMAIL")
+    sender_password = os.getenv("SENDER_PASSWORD")
+    recipient_email = os.getenv("STAN_PERSONAL_EMAIL")
+
+    if not all([sender_email, sender_password, recipient_email]):
+        logger.error("FATAL: Missing email credentials — cannot send Legal Counsel report.")
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"Invest AI: {subject}"
+    msg["From"] = f"Investment Boardroom Legal Counsel <{sender_email}>"
+    msg["To"] = recipient_email
+    msg.attach(MIMEText(html_content, "html"))
+
+    try:
+        logger.info("Sending Legal Counsel report to %s …", recipient_email)
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+        logger.info("Legal Counsel report delivered.")
+        return True
+    except Exception as e:
+        logger.error("Failed to send Legal Counsel report: %s", e)
+        return False
+
+
 def send_finance_oversight(html_content: str):
     sender_email = os.getenv("SENDER_EMAIL")
     sender_password = os.getenv("SENDER_PASSWORD")

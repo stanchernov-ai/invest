@@ -18,7 +18,7 @@ RUN_ID_RE = re.compile(r"^\d{8}_\d{6}$")
 EXPECTED_ACTIVE_KEYS = frozenset({
     "hypatia", "davinci", "suntzu", "tesla", "aurelius", "clerk", "red_teamer",
     "post_mortem_qa", "system_architect", "prompt_engineer", "graphics_designer_qa",
-    "qa_integrity_auditor",
+    "legal_counsel_qa", "qa_integrity_auditor",
 })
 
 OPTIONAL_KEYS = frozenset({"chairman", "compliance"})

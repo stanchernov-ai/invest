@@ -22,5 +22,11 @@
     "is_compliant": true,
     "summary": "All charts OK.",
     "findings": []
+  },
+  {
+    "agent_role": "Legal Counsel QA",
+    "is_compliant": true,
+    "summary": "No legal surface issues flagged.",
+    "findings": []
   }
 ]

@@ -1,7 +1,7 @@
 # Briefing Charts & Layout — Session Handoff
 
 **Status:** Active  
-**Last updated:** May 30, 2026 (EOD — layout + three-layer Action Plan)  
+**Last updated:** May 30, 2026 (deploy batch staged — GFX-4 / UNICORN-1 local)  
 **SSOT for:** QuickChart configuration, briefing section order, gain/loss color rules, and validation runs for executive briefing visuals.
 
 **Code:** `src/output/reporting.py` (chart builders) · **`src/output/briefing_style.py`** (HTML palette SSOT)  
@@ -130,11 +130,11 @@ After metric box and charts:
 
 1. Performance + bar charts (side by side)
 2. Pie charts (side by side)
-3. **The State of the Union** (analyst quotes)
-4. The Alpha Pick (if displayable)
-5. **The Action Plan** — per symbol: Strategic Context → Champion → Dissent (no summary table)
-6. The Debate (hidden if `boardroom_brawl` incomplete)
-7. Unicorn Protocol (if any)
+3. **The State of the Union** (Round 1 portfolio-level quotes)
+4. **The Alpha Pick** (if displayable)
+5. **The Debate** (hidden if `boardroom_brawl` incomplete)
+6. **Unicorn Protocol** (only if 5/5 Buy or 5/5 Reduce — **UNICORN-1:** unanimous Hold omitted; section hidden when empty)
+7. **The Action Plan** — per symbol: Strategic Context → Champion → Dissent (no summary table)
 8. Chairman's Closing Thoughts
 9. Upcoming Catalysts
 
@@ -159,14 +159,17 @@ Add golden HTML fixtures under `tests/fixtures/visual_qa/` when a run is accepte
 
 | Priority | Item | Source |
 |----------|------|--------|
+| **P0** | Ship staged deploy batch | [`action_tracker.md`](action_tracker.md) — commit blocked this session |
 | **P1** | Bar chart Y-axis / legend / contrast | Recurring Graphics CRITICAL |
-| **P1** | Flash Strategic Context duplicates Champion text | Action Plan polish — run `225159` |
-| **P1** | Integrity auditor — R2 JSON ground truth for vote digest | TSM false positive `214609` |
+| **P1** | Logo contrast on dark chip (`GFX-2`) | Partial locally |
+| **P1** | Pie categorical palette (`GFX-3`) | Too many similar greens |
 | **P2** | Round 2 rebuttal prompts — stop verbatim R1 copy | Prompt Engineer CRITICAL |
 | **P2** | Split `reporting.py` | Backlog |
 | **P3** | Verdict memory META dedupe | `144833` |
 
-**Done:** Post-mortem vote verification (`bf17114`); section order SoTU before Action Plan (`e044bde`); TWR table removed (`04af83d`).
+**Done locally (staged, not prod):** GFX-4 section order; AP-1 Strategic Context; GFX-QA `.qa-box` strip; UNICORN-1 empty hide; catalyst fallback; QA review footer in investor email.
+
+**Done (prod):** Post-mortem vote verification (`bf17114`); section order SoTU before Action Plan (`e044bde`); TWR table removed (`04af83d`); three-layer Action Plan (`cfe55fd`).
 
 ---
 

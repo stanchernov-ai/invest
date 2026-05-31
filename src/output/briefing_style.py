@@ -7,7 +7,7 @@ Graphics Designer QA, and deterministic visual audit. Charts render natively on
 
 from __future__ import annotations
 
-# --- Core backgrounds ---
+import html
 BG_CANVAS = "#121212"
 BG_CONTAINER = "#1e1e1e"
 BG_SURFACE = "#27272a"
@@ -410,7 +410,7 @@ def executive_briefing_inline_styles() -> dict[str, str]:
         "debate_speaker": (
             f"color:{BRAND_SAGE};font-size:0.82em;font-weight:600;margin:0 0 6px 0;{font}"
         ),
-        "debate_text": f"margin:0;color:{TEXT_PRIMARY};line-height:1.55;{font}",
+        "debate_text": f"margin:0;color:{TEXT_PRIMARY};line-height:1.55;white-space:pre-line;{font}",
         "debate_round_label": (
             f"color:{BRAND_SAGE};font-size:0.75em;font-weight:600;letter-spacing:0.08em;"
             f"text-transform:uppercase;margin:0 0 8px 0;{font}"
@@ -635,6 +635,19 @@ def qa_summary_box_html(qa_summary_text: str) -> str:
         f"Internal QA Ledger</div>\n"
         f"                {qa_summary_text}\n"
         "            </div>"
+    )
+
+
+def qa_review_link_html(review_url: str) -> str:
+    """Email-safe footer CTA — human QA review form (same link as QA dashboard email)."""
+    safe_url = html.escape(review_url, quote=True)
+    return (
+        f'<p style="margin:18px 0 8px 0;">'
+        f'<a href="{safe_url}" style="display:inline-block;background:{BRAND_SAGE};'
+        f"color:{BG_CANVAS};padding:12px 20px;border-radius:6px;text-decoration:none;"
+        f'font-weight:600;">Review QA &amp; provide feedback</a></p>'
+        f'<p style="margin:0;font-size:0.85em;color:{TEXT_PRIMARY};">'
+        f"Confirm or reject each QA agent&apos;s verdict for this run (2–5 min).</p>"
     )
 
 

@@ -13,6 +13,7 @@ EXPECTED_QA_ROLES = (
     "Systems Architect QA",
     "Prompt Engineer QA",
     "Graphics Designer Visual SME",
+    "Legal Counsel QA",
 )
 
 

@@ -311,6 +311,37 @@ def qa_review_daily_run(qaTimer: func.TimerRequest) -> None:
         logging.error(f"FATAL. QA Review execution failed. {e}")
 
 
+# 8:00 AM daily — Legal Counsel codebase audit (SaaS/commercial prompt & copy review).
+@app.timer_trigger(schedule="0 0 8 * * *", arg_name="legalCodeTimer", run_on_startup=False, use_monitor=False)
+def boardroom_legal_code_audit_daily(legalCodeTimer: func.TimerRequest) -> None:
+    logging.info("Legal Counsel daily codebase audit starting.")
+    try:
+        from src.jobs.legal_code_audit import run_daily_legal_code_audit
+        asyncio.run(run_daily_legal_code_audit())
+    except Exception as e:
+        logging.error(f"FATAL. Legal code audit failed. {e}")
+
+
+@app.route(route="legal-code-audit", auth_level=func.AuthLevel.FUNCTION)
+def boardroom_legal_code_audit_http(req: func.HttpRequest) -> func.HttpResponse:
+    """Manual Legal Counsel code audit (function key required)."""
+    try:
+        from src.jobs.legal_code_audit import run_daily_legal_code_audit
+        payload = asyncio.run(run_daily_legal_code_audit())
+        report = payload.get("report") or {}
+        body = json.dumps({
+            "ok": bool(report.get("is_compliant")),
+            "summary": report.get("summary"),
+            "findings_count": len(report.get("findings") or []),
+            "files_scanned": report.get("files_scanned") or [],
+        })
+        status = 200 if report.get("is_compliant") else 422
+        return func.HttpResponse(body, status_code=status, mimetype="application/json")
+    except Exception as exc:
+        logging.error(f"Legal code audit HTTP failed: {exc}")
+        return func.HttpResponse(str(exc), status_code=500)
+
+
 # --------------------------------------------------------------------------- #
 # Human-confirmed QA review (after QA dashboard email).                        #
 # --------------------------------------------------------------------------- #

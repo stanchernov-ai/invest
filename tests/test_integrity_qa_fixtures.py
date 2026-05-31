@@ -139,7 +139,7 @@ class TestQAScorecard(unittest.TestCase):
         }
         card = build_qa_scorecard("20260529_120000", case["qa_reports"], activity)
         self.assertEqual(card["run_id"], "20260529_120000")
-        self.assertEqual(len(card["agents"]), 4)
+        self.assertEqual(len(card["agents"]), 5)
         self.assertIn("PASS", card["summary"])
         pm = next(a for a in card["agents"] if a.get("agent_key") == "post_mortem_qa")
         self.assertEqual(pm["invocations"], 1)

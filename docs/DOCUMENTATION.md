@@ -1,7 +1,7 @@
 # Documentation Index
 
 **Status:** Active  
-**Last updated:** May 30, 2026 (EOD — briefing sprint handoff)  
+**Last updated:** May 30, 2026 (deploy batch handoff)  
 **SSOT for:** which document to read or update — agents should start here when unsure where something lives.
 
 **Do not duplicate** content from the docs below into this file. Link only.
@@ -31,6 +31,8 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | Understand **which QA module** does what | [`qa_layers.md`](qa_layers.md) |
 | Understand pipeline phases, deploy, data layer, **vote_engine** | [`technical_solution.md`](technical_solution.md) |
 | Plan SaaS / multi-tenant (blocked on stabilization) | [`saas_technical_solution.md`](saas_technical_solution.md) |
+| Postgres schema for multi-user | [`saas_data_schema.md`](saas_data_schema.md) |
+| Deploy Azure Postgres + admin-provision beta users | [`saas_postgres_rollout.md`](saas_postgres_rollout.md) |
 | Edit briefing HTML palette / dark theme | [`briefing_style.md`](briefing_style.md) + `src/output/briefing_style.py` |
 | Edit briefing charts / QuickChart / section order | [`briefing_charts_handoff.md`](briefing_charts_handoff.md) + `src/output/reporting.py` |
 | Debug chairman retries / vote alignment | [`qa_layers.md`](qa_layers.md) § Debate-phase audit + `src/core/vote_engine.py` |
@@ -68,7 +70,9 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | [`qa_layers.md`](qa_layers.md) | **Which QA file runs when** — deliver vs weekly vs dev |
 | [`briefing_charts_handoff.md`](briefing_charts_handoff.md) | QuickChart, palettes, briefing layout |
 | [`technical_solution.md`](technical_solution.md) | End-to-end flow, repo layout, env vars, blob containers, vote_engine |
-| [`saas_technical_solution.md`](saas_technical_solution.md) | **Planning** — multi-user data model, shared market cache, tenancy (blocked on stabilization) |
+| [`saas_technical_solution.md`](saas_technical_solution.md) | **Planning** — multi-user architecture, Entra External ID, tenancy phases |
+| [`saas_data_schema.md`](saas_data_schema.md) | **Planning** — Postgres tables, indexes, `profile_json`, migration SQL |
+| [`saas_postgres_rollout.md`](saas_postgres_rollout.md) | **Planning** — Azure Postgres provisioning + admin-provision beta playbook |
 | [`agent_guardrails.md`](agent_guardrails.md) | **Pointer only** → `.cursorrules` |
 
 ---

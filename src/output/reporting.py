@@ -15,6 +15,7 @@ from src.output.briefing_style import (
     executive_briefing_inline_styles,
     qa_dashboard_css,
     qa_summary_box_html,
+    qa_review_link_html,
     portrait_clip_styles,
     sotu_quote_style,
     verdict_pill_styles,
@@ -80,6 +81,7 @@ logger = logging.getLogger(__name__)
 
 # Insertion point for post-render QA summary (deliver injects after integrity audit).
 QA_SUMMARY_ANCHOR = "<!-- QA_SUMMARY_ANCHOR -->"
+QA_REVIEW_LINK_ANCHOR = "<!-- QA_REVIEW_LINK_ANCHOR -->"
 _CHART_PARALLEL_WORKERS = 4
 
 def get_quickchart_short_url(chart_config, width=600, height=300, background_color="white"):
@@ -251,6 +253,12 @@ def fetch_briefing_visual_assets(
             logger.warning(f"Could not fetch briefing image {src[:120]}: {e}")
     return assets
 
+
+_UNICORN_ACTIONABLE_VERDICTS = frozenset({
+    "STRONG BUY", "BUY", "TRIM", "SELL", "STRONG SELL",
+})
+
+
 def build_unicorn_protocol_items(unicorn_trades, chairman_data, advanced_data=None, red_team_data=None):
     """Enrich unanimous panel trades with chairman narrative + Red Team rebuttals."""
     advanced_data = advanced_data or {}
@@ -274,7 +282,7 @@ def build_unicorn_protocol_items(unicorn_trades, chairman_data, advanced_data=No
     for u in unicorn_trades or []:
         sym = u.get("symbol")
         panel_verdict = (u.get("verdict") or "").upper()
-        if not sym or panel_verdict == "PASS":
+        if not sym or panel_verdict == "PASS" or panel_verdict not in _UNICORN_ACTIONABLE_VERDICTS:
             continue
         unicorn_symbols.add(sym)
         pos = pos_by_symbol.get(sym, {})
@@ -293,6 +301,14 @@ def build_unicorn_protocol_items(unicorn_trades, chairman_data, advanced_data=No
 
     items.sort(key=lambda x: (verdict_rank.get(x["verdict"], 99), x["symbol"]))
     return items, unicorn_symbols
+
+
+def show_unicorn_protocol_section(items: list[dict]) -> bool:
+    """True when at least one actionable unanimous trade should render in the briefing."""
+    return bool(items) and any(
+        (item.get("verdict") or "").upper() in _UNICORN_ACTIONABLE_VERDICTS
+        for item in items
+    )
 
 
 def fmt_dol(val):
@@ -797,6 +813,7 @@ def _alpha_pick_displayable(alpha_pick: dict) -> bool:
 
 
 from src.core.boardroom_brawl import build_debate_display_blocks, is_boardroom_brawl_complete
+from src.core.catalysts import build_upcoming_events_from_advanced_data, catalyst_symbol_universe
 
 
 def _debate_has_content(brawl_text: str) -> bool:
@@ -986,6 +1003,16 @@ def inject_qa_summary_into_briefing(html: str, qa_summary_text: str) -> str:
     return html.replace("</body>", f"{box}\n    </body>", 1)
 
 
+def inject_qa_review_link_into_briefing(html: str, review_url: str | None) -> str:
+    """Append the human QA review CTA to the executive briefing footer."""
+    if not review_url:
+        return html.replace(QA_REVIEW_LINK_ANCHOR, "")
+    block = qa_review_link_html(review_url)
+    if QA_REVIEW_LINK_ANCHOR in html:
+        return html.replace(QA_REVIEW_LINK_ANCHOR, block)
+    return html.replace("</body>", f"{block}\n    </body>", 1)
+
+
 def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, chairman_data, cos_data, matrix_md, unicorn_trades, sorted_ledger, red_team_data=None, history_data=None, qa_summary_text="", account_holdings=None, account_returns=None, advanced_data=None, chart_urls=None, raw_verdicts=None, portfolio_symbols=None, raw_board_messages=None):
 
     if raw_verdicts:
@@ -1105,6 +1132,23 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             </table>
             {% endif %}
 
+            {% if sotu_quotes %}
+            <h2 style="{{ email_styles.h2 }}">The State of the Union</h2>
+            <p style="{{ email_styles.muted_p }}">Each panelist&rsquo;s Round 1 portfolio-level view &mdash; concentration, regime fit, and mandate &mdash; not per-ticker rebuttals.</p>
+            {% for quote in sotu_quotes %}
+                <table width="100%" cellpadding="0" cellspacing="0" class="sotu-row" style="margin: 12px 0; border-left: 4px solid {{ quote.sotu_border }}; background-color: {{ quote.sotu_bg }}; border-radius: 8px; {{ quote.sotu_glow }}">
+                    <tr>
+                        <td width="{{ sotu_avatar_col_width }}" align="center" valign="middle" class="sotu-avatar-col" style="{{ email_styles.sotu_avatar_cell }}">
+                            <img src="{{ quote.avatar_url }}" width="{{ quote.avatar_img_size }}" height="{{ quote.avatar_img_size }}" style="{{ quote.avatar_img_style }}" alt="{{ quote.board_member }} avatar">
+                        </td>
+                        <td valign="middle" class="sotu-quote-col" style="{{ email_styles.sotu_quote }}">
+                            <strong style="{{ email_styles.strong }}">{{ quote.board_member }}:</strong> "{{ quote.quote }}"
+                        </td>
+                    </tr>
+                </table>
+            {% endfor %}
+            {% endif %}
+
             {% if show_alpha_pick %}
             <h2 style="{{ email_styles.h2 }}">The Alpha Pick</h2>
             <div style="{{ email_styles.metric_box }}">
@@ -1130,82 +1174,9 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             </div>
             {% endif %}
 
-            <h2 style="{{ email_styles.h2 }}">The Action Plan</h2>
-
-            {% if hedge_action %}
-            <div style="{{ email_styles.hedge_box }}">
-                <strong style="{{ email_styles.strong }}">Risk Management Mandate:</strong> {{ hedge_action }}
-            </div>
-            {% endif %}
-
-            {% set action_categories = ['STRONG BUY', 'BUY', 'HOLD', 'TRIM', 'SELL', 'STRONG SELL'] %}
-            {% for category in action_categories %}
-                {% if grouped_actions[category] %}
-                    {% for pos in grouped_actions[category] %}
-                        <div style="{{ email_styles.section_divider }}">
-                            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
-                                <tr>
-                                    {% if pos.image %}
-                                    <td valign="middle" style="padding-right: 12px;">
-                                        <img src="{{ pos.image }}" alt="{{ pos.symbol }} logo" style="{{ email_styles.ticker_logo_sm }}">
-                                    </td>
-                                    {% endif %}
-                                    <td valign="middle">
-                                        <span style="{{ pill_styles[category] }} display:inline-block; padding:6px 14px; border-radius:6px; font-weight:bold; font-size:13px;">{{ category }} : {{ pos.symbol }}</span>
-                                    </td>
-                                </tr>
-                            </table>
-                            <p style="{{ email_styles.p }}"><strong style="{{ email_styles.strong }}">Strategic Context:</strong> {{ pos.strategic_context or pos.synthesis }}</p>
-                            {% if pos.narrative and pos.narrative.champion_quote %}
-                                <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:10px;">
-                                    <tr>
-                                        {% if pos.narrative.champion_avatar_url %}
-                                        <td valign="top" align="center" style="padding-right:10px;width:{{ action_plan_avatar_size }}px;">
-                                            <img src="{{ pos.narrative.champion_avatar_url }}" width="{{ pos.narrative.champion_avatar_img_size }}" height="{{ pos.narrative.champion_avatar_img_size }}" style="{{ pos.narrative.champion_avatar_img_style }}" alt="{{ pos.narrative.champion }} avatar">
-                                        </td>
-                                        {% endif %}
-                                        <td valign="top">
-                                            <p style="{{ email_styles.p }};margin-top:0;"><span style="{{ email_styles.champion }}">The Champion ({{ pos.narrative.champion }}):</span> "{{ pos.narrative.champion_quote }}"</p>
-                                        </td>
-                                    </tr>
-                                </table>
-                                <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
-                                    <tr>
-                                        {% if pos.narrative.dissenter_avatar_url %}
-                                        <td valign="top" align="center" style="padding-right:10px;width:{{ action_plan_avatar_size }}px;">
-                                            <img src="{{ pos.narrative.dissenter_avatar_url }}" width="{{ pos.narrative.dissenter_avatar_img_size }}" height="{{ pos.narrative.dissenter_avatar_img_size }}" style="{{ pos.narrative.dissenter_avatar_img_style }}" alt="{{ pos.narrative.dissenter }} avatar">
-                                        </td>
-                                        {% endif %}
-                                        <td valign="top">
-                                            <p style="{{ email_styles.p }};margin-top:0;"><span style="{{ email_styles.dissenter }}">The Dissent ({{ pos.narrative.dissenter or 'None' }}):</span> "{{ pos.narrative.dissenter_quote or 'N/A' }}"</p>
-                                        </td>
-                                    </tr>
-                                </table>
-                            {% endif %}
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endfor %}
-
-            {% if sotu_quotes %}
-            <h2 style="{{ email_styles.h2 }}">The State of the Union</h2>
-            <p style="{{ email_styles.muted_p }}">Each panelist&rsquo;s Round 1 portfolio-level view &mdash; concentration, regime fit, and mandate &mdash; not per-ticker rebuttals.</p>
-            {% for quote in sotu_quotes %}
-                <table width="100%" cellpadding="0" cellspacing="0" class="sotu-row" style="margin: 12px 0; border-left: 4px solid {{ quote.sotu_border }}; background-color: {{ quote.sotu_bg }}; border-radius: 8px; {{ quote.sotu_glow }}">
-                    <tr>
-                        <td width="{{ sotu_avatar_col_width }}" align="center" valign="middle" class="sotu-avatar-col" style="{{ email_styles.sotu_avatar_cell }}">
-                            <img src="{{ quote.avatar_url }}" width="{{ quote.avatar_img_size }}" height="{{ quote.avatar_img_size }}" style="{{ quote.avatar_img_style }}" alt="{{ quote.board_member }} avatar">
-                        </td>
-                        <td valign="middle" class="sotu-quote-col" style="{{ email_styles.sotu_quote }}">
-                            <strong style="{{ email_styles.strong }}">{{ quote.board_member }}:</strong> "{{ quote.quote }}"
-                        </td>
-                    </tr>
-                </table>
-            {% endfor %}
-            {% endif %}
-
             {% if show_debate %}
             <h2 style="{{ email_styles.h2 }}">The Debate</h2>
+            <p style="{{ email_styles.muted_p }}">Per-stock verdicts and rebuttals from each panelist &mdash; portfolio-level views are in State of the Union above.</p>
             {% for block in debate_bubbles %}
                 {% if block.kind == 'turn' %}
                 <table width="100%" cellpadding="0" cellspacing="0" class="debate-turn" style="margin: 14px 0;">
@@ -1280,7 +1251,64 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 </div>
             {% endfor %}
             {% endif %}
-            
+
+            <h2 style="{{ email_styles.h2 }}">The Action Plan</h2>
+
+            {% if hedge_action %}
+            <div style="{{ email_styles.hedge_box }}">
+                <strong style="{{ email_styles.strong }}">Risk Management Mandate:</strong> {{ hedge_action }}
+            </div>
+            {% endif %}
+
+            {% set action_categories = ['STRONG BUY', 'BUY', 'HOLD', 'TRIM', 'SELL', 'STRONG SELL'] %}
+            {% for category in action_categories %}
+                {% if grouped_actions[category] %}
+                    {% for pos in grouped_actions[category] %}
+                        <div style="{{ email_styles.section_divider }}">
+                            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
+                                <tr>
+                                    {% if pos.image %}
+                                    <td valign="middle" style="padding-right: 12px;">
+                                        <img src="{{ pos.image }}" alt="{{ pos.symbol }} logo" style="{{ email_styles.ticker_logo_sm }}">
+                                    </td>
+                                    {% endif %}
+                                    <td valign="middle">
+                                        <span style="{{ pill_styles[category] }} display:inline-block; padding:6px 14px; border-radius:6px; font-weight:bold; font-size:13px;">{{ category }} : {{ pos.symbol }}</span>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="{{ email_styles.p }}"><strong style="{{ email_styles.strong }}">Strategic Context:</strong> {{ pos.strategic_context or pos.synthesis }}</p>
+                            {% if pos.narrative and pos.narrative.champion_quote %}
+                                <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:10px;">
+                                    <tr>
+                                        {% if pos.narrative.champion_avatar_url %}
+                                        <td valign="top" align="center" style="padding-right:10px;width:{{ action_plan_avatar_size }}px;">
+                                            <img src="{{ pos.narrative.champion_avatar_url }}" width="{{ pos.narrative.champion_avatar_img_size }}" height="{{ pos.narrative.champion_avatar_img_size }}" style="{{ pos.narrative.champion_avatar_img_style }}" alt="{{ pos.narrative.champion }} avatar">
+                                        </td>
+                                        {% endif %}
+                                        <td valign="top">
+                                            <p style="{{ email_styles.p }};margin-top:0;"><span style="{{ email_styles.champion }}">The Champion ({{ pos.narrative.champion }}):</span> "{{ pos.narrative.champion_quote }}"</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                                <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                                    <tr>
+                                        {% if pos.narrative.dissenter_avatar_url %}
+                                        <td valign="top" align="center" style="padding-right:10px;width:{{ action_plan_avatar_size }}px;">
+                                            <img src="{{ pos.narrative.dissenter_avatar_url }}" width="{{ pos.narrative.dissenter_avatar_img_size }}" height="{{ pos.narrative.dissenter_avatar_img_size }}" style="{{ pos.narrative.dissenter_avatar_img_style }}" alt="{{ pos.narrative.dissenter }} avatar">
+                                        </td>
+                                        {% endif %}
+                                        <td valign="top">
+                                            <p style="{{ email_styles.p }};margin-top:0;"><span style="{{ email_styles.dissenter }}">The Dissent ({{ pos.narrative.dissenter or 'None' }}):</span> "{{ pos.narrative.dissenter_quote or 'N/A' }}"</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endfor %}
+
             {% if chairman_remarks %}
             <h2 style="{{ email_styles.h2 }}">Chairman's Closing Thoughts</h2>
             <div style="{{ email_styles.chairman_box }}">
@@ -1300,6 +1328,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             <div style="{{ email_styles.footer }}">
                 Invest AI Daily Briefing<br>
                 Data provided by Financial Modeling Prep and brokerage activity logs.
+                <!-- QA_REVIEW_LINK_ANCHOR -->
             </div>
             
             {% if qa_summary_text %}
@@ -1324,6 +1353,9 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     unicorn_protocol_items, unicorn_symbols = build_unicorn_protocol_items(
         unicorn_trades, chairman_data, advanced_data, red_team_data
     )
+    if not show_unicorn_protocol_section(unicorn_protocol_items):
+        unicorn_protocol_items = []
+        unicorn_symbols = set()
 
     all_positions = chairman_data.get('portfolio_positions', []) + chairman_data.get('watchlist_positions', [])
     
@@ -1349,6 +1381,11 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     show_alpha_pick = _alpha_pick_displayable(alpha_pick)
         
     events = chairman_data.get('upcoming_events', [])
+    if not events and advanced_data:
+        events = build_upcoming_events_from_advanced_data(
+            advanced_data,
+            catalyst_symbol_universe(chairman_data, portfolio_symbols),
+        )
     red_team_case = _sanitize_briefing_text(red_team_data.get('bear_case_narrative', ''))
     chairman_remarks = _sanitize_briefing_text(chairman_data.get('chairman_closing_remarks', ''))
     show_debate = _debate_has_content(brawl_text)

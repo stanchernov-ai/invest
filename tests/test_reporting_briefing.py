@@ -123,7 +123,37 @@ class BriefingCopyTests(unittest.TestCase):
     def test_alpha_pick_hidden_for_none_symbol(self):
         self.assertFalse(reporting._alpha_pick_displayable({"symbol": "NONE", "champion_quote": "wait"}))
 
-    def test_debate_hidden_for_empty_content(self):
+    def test_upcoming_catalysts_from_advanced_data_when_chairman_empty(self):
+        advanced = {
+            "NVDA": {
+                "next_earnings": "2026-06-05",
+                "fcs_score": 3,
+                "fcs_rationale": "Imminent Earnings Catalyst (+1)",
+                "eps_estimated": 1.25,
+            },
+        }
+        html = reporting.generate_html_briefing(
+            total_val=100_000,
+            qqq_trend=1.0,
+            portfolio_3m_trend=1.0,
+            mandate="Test mandate.",
+            chairman_data={
+                "portfolio_positions": [{"symbol": "NVDA", "final_verdict": "HOLD"}],
+                "watchlist_positions": [],
+                "upcoming_events": [],
+            },
+            cos_data={"state_of_the_union_quotes": [], "boardroom_brawl": ""},
+            matrix_md="",
+            unicorn_trades=[],
+            sorted_ledger=[],
+            chart_urls={},
+            advanced_data=advanced,
+        )
+        self.assertIn("Upcoming Catalysts", html)
+        self.assertIn("NVDA", html)
+        self.assertIn("2026-06-05", html)
+        self.assertNotIn("No major immediate catalysts flagged", html)
+
         self.assertFalse(reporting._debate_has_content("Short."))
 
     def test_debate_hidden_for_truncated_mid_sentence(self):
@@ -138,12 +168,14 @@ class BriefingCopyTests(unittest.TestCase):
                 "content": (
                     f"**[ROUND 1] {hypatia}**:\n"
                     "* **Portfolio Overview**: Moats matter more than momentum.\n"
+                    "* **NVDA**: Sell (6/10). Premium multiple with no FCF support.\n"
                 ),
             },
             {
                 "content": (
                     f"**[ROUND 2 REBUTTAL] {suntzu}**:\n"
                     "* **Rebuttal Summary**: hypatia ignores the tape.\n"
+                    "* **NVDA**: Strong Buy (9/10). Relative strength confirms leadership.\n"
                 ),
             },
         ]
@@ -167,8 +199,10 @@ class BriefingCopyTests(unittest.TestCase):
         )
         debate_start = html.index("The Debate")
         debate_section = html[debate_start:debate_start + 4000]
-        self.assertIn("Portfolio Overview", debate_section)
+        self.assertIn("Initial Positions", debate_section)
         self.assertIn("Rebuttal", debate_section)
+        self.assertIn("NVDA", debate_section)
+        self.assertNotIn("Moats matter more than momentum", debate_section)
         self.assertNotRegex(debate_section, r"ROUND\s+[12]", re.I)
         self.assertIn("border-radius:50%", debate_section.replace(" ", ""))
         self.assertNotIn("overflow:hidden", debate_section)
@@ -448,7 +482,12 @@ class BriefingHtmlTests(unittest.TestCase):
                 "state_of_the_union_quotes": [
                     {"board_member": PANELIST_ROLES["hypatia"], "quote": "Markets remain rational long term."},
                 ],
-                "boardroom_brawl": "x" * 100,
+                "boardroom_brawl": (
+                    "Hypatia challenged the growth camp on concentration risk across the portfolio mandate. "
+                    "Leonardo countered that tape weakness is a buying opportunity for platform leaders.\n\n"
+                    "Sun Tzu pressed for discipline while Nikola argued the AI cycle still has runway. "
+                    "Marcus closed by quantifying the expected value of today's trim mandates."
+                ),
             },
             matrix_md="",
             unicorn_trades=[],
@@ -466,10 +505,12 @@ class BriefingHtmlTests(unittest.TestCase):
         perf_pos = html.find("Performance vs. Benchmark")
         pie_pos = html.find("Unrealized Gains")
         sotu_pos = html.find("The State of the Union")
+        debate_pos = html.find("The Debate")
         action_pos = html.find("The Action Plan")
         self.assertLess(perf_pos, pie_pos)
-        self.assertLess(pie_pos, action_pos)
-        self.assertLess(action_pos, sotu_pos)
+        self.assertLess(pie_pos, sotu_pos)
+        self.assertLess(sotu_pos, debate_pos)
+        self.assertLess(debate_pos, action_pos)
         self.assertNotIn("Time-Weighted Returns", html)
         self.assertIn("NVDA", html)
         self.assertIn("Invest AI Daily Briefing", html)
@@ -493,6 +534,40 @@ class BriefingHtmlTests(unittest.TestCase):
         stripped = reporting.inject_qa_summary_into_briefing(html, "")
         self.assertNotIn("Internal QA Ledger", stripped)
         self.assertNotIn(reporting.QA_SUMMARY_ANCHOR, stripped)
+
+    def test_inject_qa_review_link_adds_footer_cta(self):
+        html = reporting.generate_html_briefing(
+            total_val=150_000,
+            qqq_trend=5.0,
+            portfolio_3m_trend=3.0,
+            mandate="Test mandate",
+            chairman_data={"portfolio_positions": [], "watchlist_positions": [], "upcoming_events": []},
+            cos_data={"state_of_the_union_quotes": []},
+            matrix_md="",
+            unicorn_trades=[],
+            sorted_ledger=[],
+        )
+        url = "https://example.azurewebsites.net/api/qa-review?run_id=20260529_120000&token=abc"
+        out = reporting.inject_qa_review_link_into_briefing(html, url)
+        self.assertIn("Review QA &amp; provide feedback", out)
+        self.assertIn("api/qa-review?run_id=20260529_120000&amp;token=abc", out)
+        self.assertNotIn(reporting.QA_REVIEW_LINK_ANCHOR, out)
+
+    def test_inject_qa_review_link_omits_when_no_url(self):
+        html = reporting.generate_html_briefing(
+            total_val=150_000,
+            qqq_trend=5.0,
+            portfolio_3m_trend=3.0,
+            mandate="Test mandate",
+            chairman_data={"portfolio_positions": [], "watchlist_positions": [], "upcoming_events": []},
+            cos_data={"state_of_the_union_quotes": []},
+            matrix_md="",
+            unicorn_trades=[],
+            sorted_ledger=[],
+        )
+        out = reporting.inject_qa_review_link_into_briefing(html, None)
+        self.assertNotIn("Review QA", out)
+        self.assertNotIn(reporting.QA_REVIEW_LINK_ANCHOR, out)
 
 
 class DeliverPerformanceTests(unittest.TestCase):

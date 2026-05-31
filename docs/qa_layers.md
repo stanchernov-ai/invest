@@ -1,6 +1,6 @@
 # QA Layers — Quick Map
 
-**Status:** Active · **Last updated:** May 30, 2026 (planned optimizations pointer)  
+**Status:** Active · **Last updated:** May 30, 2026 (Legal Counsel layer — staged)  
 **SSOT for:** which QA module does what — **not** full layer diagrams (see [`agent_architecture.md`](agent_architecture.md) §6).
 
 **Planned runtime wins (not yet implemented):** [`agent_optimization_handoff.md`](agent_optimization_handoff.md) §5 (Tickets A1–A4).
@@ -15,6 +15,7 @@
 | `src/qa/` | **Deterministic Python QA** — chart/HTML/integrity checks without trusting LLM self-grades |
 | `src/qa_review.py` | **Separate daily digest** (~7 AM) — reviews latest Azure artifacts, not part of deliver |
 | `src/qa/human_review.py` | **You** confirm QA accuracy via email link → Azure `/api/qa-review` |
+| `src/qa/legal_audit.py` | **Legal Counsel** — deterministic briefing HTML + codebase scans for IP/endorsement/fair-use risk |
 | `.cursor/rules/qa_validation_agent.mdc` | **Dev-time** — runs tests on commit, not production pipeline |
 
 ---
@@ -30,8 +31,9 @@ flowchart LR
         QAP --> EMAIL[briefing + QA email]
     end
 
-    subgraph later [Same morning — separate timer]
+    subgraph later [Same morning — separate timers]
         QAR[qa_review.py digest]
+        LEG[legal_code_audit daily]
     end
 
     subgraph human [On demand]
@@ -46,6 +48,8 @@ flowchart LR
 |------|------|-------------|
 | Every **deliver** | Post-flight LLM trio + graphics + integrity | `src/jobs/deliver.py` → `qa_pipeline` + `src/qa/*` |
 | **~7 AM daily** (after pipeline window) | Standing QA + HR cost digest | `function_app.qa_review_daily_run` → `qa_review.py` |
+| **~8 AM daily** | Legal Counsel codebase scan | `function_app.boardroom_legal_code_audit_daily` → `src/jobs/legal_code_audit.py` |
+| **Every deliver** | Legal Counsel briefing scan | `deliver.py` → `qa_pipeline.run_legal_counsel_qa()` |
 | **After QA email** | Human review form | `/api/qa-review` → `human_review.py` |
 | **Git commit** | Unit tests + guardrail checks | `scripts/pre_commit_check.py` |
 
@@ -62,7 +66,8 @@ Order inside `deliver.py`:
 | 3 | `qa_pipeline.run_graphics_designer_qa` | 🟢 + 🟡 LLM | Final briefing HTML + images |
 | 4 | `qa/scorecard.build_qa_scorecard` | 🟢 Python | Per-agent findings → telemetry |
 | 5 | `qa_pipeline.run_qa_integrity_audit` | 🟢 + 🟡 LLM | QA-of-the-QA vs debate log + dashboard |
-| 6 | Email | — | Briefing + QA dashboard |
+| 6 | `qa_pipeline.run_legal_counsel_qa` | 🟢 Python | Briefing HTML vs `legal_policy.py` patterns |
+| 7 | Email | — | Briefing + QA dashboard (+ Legal Counsel report to Stan) |
 
 Deterministic helpers live in **`src/qa/`**:
 
@@ -72,6 +77,9 @@ Deterministic helpers live in **`src/qa/`**:
 | `integrity_audit.py` | Dashboard matches JSON reports; self-contradiction |
 | `scorecard.py` | `QA_SCORECARD` in telemetry |
 | `human_review.py` | Human-confirmed accuracy → blob + ledger |
+| `legal_audit.py` | Briefing + codebase legal/compliance pattern scan |
+| `legal_policy.py` | SaaS legal boundaries SSOT (endorsement, quotes, fair use) |
+| `legal_delivery.py` | Persist findings + trigger Legal Counsel email |
 | `retrospective.py` | Post-deliver candidate backlog items (optional) |
 
 **Rule:** `reconcile_compliance()` in `qa_pipeline.py` forces FAIL if any CRITICAL finding — do not trust LLM `is_compliant` alone.

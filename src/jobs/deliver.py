@@ -16,6 +16,7 @@ from src import storage_client
 from src.output import reporting
 from src.output import briefing_enrichment
 from src.output import notifier
+from src.core.catalysts import ensure_chairman_catalysts
 from src.core import agent_activity
 from src.config.settings import now_local
 from src.logging_setup import configure_logging
@@ -96,6 +97,7 @@ async def run_deliver(run_id: str) -> dict:
         unicorn_trades = debate["unicorn_trades"]
 
         portfolio_symbols = set(prep.get("portfolio_holdings") or {})
+        c_data = ensure_chairman_catalysts(c_data, advanced_data, portfolio_symbols)
         c_data = await briefing_enrichment.enrich_chairman_for_briefing(
             c_data,
             raw_verdicts,
@@ -139,6 +141,11 @@ async def run_deliver(run_id: str) -> dict:
         )
         graphics_report = await qa_pipeline.run_graphics_designer_qa(briefing_html, chart_health)
         qa_reports.append(graphics_report)
+        legal_report = await qa_pipeline.run_legal_counsel_qa(briefing_html)
+        qa_reports.append(legal_report)
+
+        from src.qa.legal_delivery import persist_and_notify_briefing_legal
+        legal_delivery = persist_and_notify_briefing_legal(run_id, legal_report)
 
         from src.qa.scorecard import build_qa_scorecard, persist_scorecard
         from src.qa.human_review import build_review_url
@@ -162,7 +169,10 @@ async def run_deliver(run_id: str) -> dict:
         storage_client.save_report(f"qa_reports_{run_id}.json", json.dumps(qa_reports, indent=2, default=str))
 
         # GFX-6: investor email is briefing-only; QA lives on the separate dashboard email.
-        investor_briefing_html = reporting.inject_qa_summary_into_briefing(briefing_html, "")
+        investor_briefing_html = reporting.inject_qa_review_link_into_briefing(
+            reporting.inject_qa_summary_into_briefing(briefing_html, ""),
+            review_url,
+        )
         qa_dashboard_html = reporting.generate_qa_dashboard_html(
             qa_reports, run_id, review_url=review_url
         )
@@ -178,6 +188,11 @@ async def run_deliver(run_id: str) -> dict:
         email_delivery = {
             "briefing": {"ok": briefing_ok, "sent_at": briefing_sent_at},
             "qa_dashboard": {"ok": qa_ok, "sent_at": qa_sent_at},
+            "legal_counsel": {
+                "ok": legal_delivery.get("email_ok"),
+                "blob": legal_delivery.get("blob"),
+                "sent_at": now_local().isoformat(),
+            },
         }
         if briefing_ok:
             logger.info(

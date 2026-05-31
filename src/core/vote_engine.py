@@ -182,9 +182,10 @@ def board_majority_buy_counts(raw_verdicts: dict[str, dict] | None) -> dict[str,
 
 
 def detect_unicorn_trades(summaries: dict[str, SymbolVoteSummary]) -> list[dict]:
+    """Unanimous 5/5 Buy-side or Reduce-side mandates only — not unanimous Hold/Pass."""
     trades: list[dict] = []
     for sym, summary in summaries.items():
-        if not summary.is_unanimous():
+        if not summary.is_actionable_unanimous():
             continue
         verdict = next(iter(summary.votes.values()))[0]
         if verdict_bucket(verdict) == "pass":

@@ -41,6 +41,7 @@
 - **QuickChart `outlabeledPie` legend:** `"plugins": { "legend": false }` must be a **boolean** — `{ "display": false }` is ignored and the top ticker row still renders. Same for bar charts. SSOT: `docs/briefing_charts_handoff.md`. (2026-05-29)
 - **Stealth Wealth email palette requires inline hex** — Gmail/Outlook strip ``<head>`` CSS and CSS variables. Wrapper tables need inline ``background-color`` + ``bgcolor`` on body, canvas, and container; see `executive_briefing_inline_styles()` in `briefing_style.py`. (2026-05-30)
 - **`wait_for_run.py` false timeout after deploy** — ~10 min queue delay before debate starts can consume the 660s budget. Use `--timeout 900` or poll from debate phase. (2026-05-29)
+- **`git commit` can appear hung for several minutes** — `.githooks/pre-commit` runs full `unittest discover` on every commit (~2–10 min). Do not interrupt; use `git commit -F _commitmsg.txt` on PowerShell (no bash heredoc). If the hook fails, fix and create a **new** commit. (2026-05-30)
 
 ## 3. Data & APIs
 

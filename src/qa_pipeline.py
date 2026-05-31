@@ -23,8 +23,12 @@ logger = logging.getLogger(__name__)
 # WARNING report rather than killing the run or false-failing the QA.
 QA_INTEGRITY_TIMEOUT_SECONDS = 90
 GRAPHICS_QA_TIMEOUT_SECONDS = 120
+LEGAL_COUNSEL_QA_TIMEOUT_SECONDS = 90
+LEGAL_CODE_AUDIT_TIMEOUT_SECONDS = 120
 # Cap HTML passed to the Graphics Designer — the artifact is the saved blob, not templates.
 GRAPHICS_BRIEFING_HTML_CHAR_LIMIT = 45000
+LEGAL_BRIEFING_HTML_CHAR_LIMIT = 45000
+LEGAL_CODE_CORPUS_CHAR_LIMIT = 45000
 INTEGRITY_BRIEFING_HTML_CHAR_LIMIT = 8000
 # Dashboard excerpt for LLM context only — section/finding presence is deterministic ground truth.
 INTEGRITY_DASHBOARD_HTML_CHAR_LIMIT = 12000
@@ -452,6 +456,167 @@ async def run_graphics_designer_qa(
             "category": "Visual QA Error",
             "description": f"Visual review agent failed: {e}",
             "recommendation": "Check Gemini logs; deterministic chart health still applied.",
+        }]
+        return deterministic
+
+
+async def run_legal_counsel_qa(
+    final_briefing_html: str,
+    *,
+    model_override: str = None,
+    timeout_seconds: int = LEGAL_COUNSEL_QA_TIMEOUT_SECONDS,
+) -> dict:
+    """Review the final executive briefing HTML for copyright, IP, and distribution-risk language."""
+    from src.qa.legal_audit import (
+        build_deterministic_legal_report,
+        merge_legal_reports,
+    )
+
+    deterministic = build_deterministic_legal_report(final_briefing_html)
+    html_excerpt = (final_briefing_html or "")[:LEGAL_BRIEFING_HTML_CHAR_LIMIT]
+    det_summary = deterministic.get("summary") or ""
+    det_findings = json.dumps(deterministic.get("findings") or [], default=str)
+
+    intro = (
+        "You are reviewing the FINAL Executive Briefing artifact — the exact HTML document "
+        "saved to Azure and emailed to the investor. This is NOT pipeline code or the QA dashboard.\n\n"
+        f"DETERMINISTIC LEGAL SURFACE SCAN (ground truth — do not contradict CRITICAL items):\n"
+        f"{det_summary}\n{det_findings}\n\n"
+        f"FINAL EXECUTIVE BRIEFING HTML:\n{html_excerpt}"
+    )
+
+    contents = [types.Content(role="user", parts=[types.Part.from_text(text=intro)])]
+    info = agent_config["board_members"]["legal_counsel_qa"]
+    model = model_override or FAST_MODEL
+    config_params = {
+        "system_instruction": info["system_instruction"],
+        "temperature": 0.1,
+        "response_mime_type": "application/json",
+        "response_schema": QAAgentReport,
+    }
+    if model == FAST_MODEL:
+        config_params["max_output_tokens"] = FLASH_TOKEN_LIMIT
+
+    try:
+        res = await asyncio.wait_for(
+            call_gemini_async(
+                model,
+                contents,
+                types.GenerateContentConfig(**config_params),
+                agent_name="legal_counsel_qa",
+            ),
+            timeout=timeout_seconds,
+        )
+        parsed = json.loads(res.text)
+        parsed["agent_role"] = info["role"]
+        merged = merge_legal_reports(deterministic, reconcile_compliance(parsed))
+        return reconcile_compliance(merged)
+    except asyncio.TimeoutError:
+        logger.warning(f"Legal Counsel QA timed out after {timeout_seconds}s; using deterministic report only.")
+        deterministic["findings"] = list(deterministic.get("findings") or []) + [{
+            "severity": "WARNING",
+            "category": "QA Timeout",
+            "description": f"Legal review did not finish within {timeout_seconds}s.",
+            "recommendation": "Re-run deliver or inspect the saved executive_briefing HTML manually.",
+        }]
+        return deterministic
+    except Exception as e:
+        logger.error(f"Legal Counsel QA failed: {e}")
+        deterministic["findings"] = list(deterministic.get("findings") or []) + [{
+            "severity": "WARNING",
+            "category": "Legal QA Error",
+            "description": f"Legal review agent failed: {e}",
+            "recommendation": "Check Gemini logs; deterministic legal surface scan still applied.",
+        }]
+        return deterministic
+
+
+def _format_code_corpus_excerpt(corpus: dict[str, str], max_chars: int) -> str:
+    parts: list[str] = []
+    total = 0
+    for rel in sorted(corpus.keys()):
+        header = f"\n\n=== FILE: {rel} ===\n"
+        body = (corpus.get(rel) or "")[: max(0, max_chars // max(len(corpus), 1))]
+        chunk = header + body
+        if total + len(chunk) > max_chars:
+            parts.append("\n\n[… corpus truncated …]")
+            break
+        parts.append(chunk)
+        total += len(chunk)
+    return "".join(parts).strip()
+
+
+async def run_legal_code_audit(
+    *,
+    model_override: str = None,
+    timeout_seconds: int = LEGAL_CODE_AUDIT_TIMEOUT_SECONDS,
+    repo_root=None,
+) -> dict:
+    """Daily Legal Counsel review of agent prompts, templates, and product copy."""
+    from src.qa.legal_audit import (
+        build_deterministic_code_legal_report,
+        collect_code_audit_corpus,
+        merge_legal_reports,
+    )
+
+    corpus = collect_code_audit_corpus(repo_root)
+    deterministic = build_deterministic_code_legal_report(corpus)
+    excerpt = _format_code_corpus_excerpt(corpus, LEGAL_CODE_CORPUS_CHAR_LIMIT)
+    det_summary = deterministic.get("summary") or ""
+    det_findings = json.dumps(deterministic.get("findings") or [], default=str)
+    files = ", ".join(deterministic.get("files_scanned") or [])
+
+    intro = (
+        "Daily LEGAL CODEBASE AUDIT for Invest AI (SaaS readiness).\n\n"
+        f"FILES SCANNED: {files}\n\n"
+        f"DETERMINISTIC CODE PRE-CHECK (ground truth — do not contradict CRITICAL items):\n"
+        f"{det_summary}\n{det_findings}\n\n"
+        f"SOURCE EXCERPTS:\n{excerpt or '[empty corpus]'}"
+    )
+
+    contents = [types.Content(role="user", parts=[types.Part.from_text(text=intro)])]
+    info = agent_config["board_members"]["legal_counsel_code"]
+    model = model_override or FAST_MODEL
+    config_params = {
+        "system_instruction": info["system_instruction"],
+        "temperature": 0.1,
+        "response_mime_type": "application/json",
+        "response_schema": QAAgentReport,
+    }
+    if model == FAST_MODEL:
+        config_params["max_output_tokens"] = FLASH_TOKEN_LIMIT
+
+    try:
+        res = await asyncio.wait_for(
+            call_gemini_async(
+                model,
+                contents,
+                types.GenerateContentConfig(**config_params),
+                agent_name="legal_counsel_code",
+            ),
+            timeout=timeout_seconds,
+        )
+        parsed = json.loads(res.text)
+        parsed["agent_role"] = info["role"]
+        merged = merge_legal_reports(deterministic, reconcile_compliance(parsed))
+        merged["files_scanned"] = deterministic.get("files_scanned") or []
+        return reconcile_compliance(merged)
+    except asyncio.TimeoutError:
+        logger.warning(f"Legal code audit timed out after {timeout_seconds}s; using deterministic report only.")
+        deterministic["findings"] = list(deterministic.get("findings") or []) + [{
+            "severity": "WARNING",
+            "category": "QA Timeout",
+            "description": f"Code legal review did not finish within {timeout_seconds}s.",
+            "recommendation": "Re-run legal code audit or inspect agents.py / reporting templates manually.",
+        }]
+        return deterministic
+    except Exception as e:
+        logger.error(f"Legal code audit failed: {e}")
+        deterministic["findings"] = list(deterministic.get("findings") or []) + [{
+            "severity": "WARNING",
+            "category": "Legal QA Error",
+            "description": f"Code legal review agent failed: {e}",
+            "recommendation": "Check Gemini logs; deterministic code scan still applied.",
         }]
         return deterministic
 

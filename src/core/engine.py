@@ -197,7 +197,13 @@ class StateMachineOrchestrator:
 
     async def execute_parallel_board(self) -> None:
         agents = list(PANELIST_KEYS)
-        tasks = [self._run_agent(a, "Provide initial asset analysis.", schema=PanelistPortfolioVerdict) for a in agents]
+        round1_prompt = (
+            "Provide initial per-ticker analysis and verdicts for EVERY portfolio and watchlist symbol. "
+            "Write distinct 2-sentence rationales per symbol — this is the stock debate. "
+            "Reserve overall_portfolio_critique for portfolio-level State of the Union only; "
+            "it must NOT repeat your per-ticker arguments."
+        )
+        tasks = [self._run_agent(a, round1_prompt, schema=PanelistPortfolioVerdict) for a in agents]
         results = await asyncio.gather(*tasks)
         
         for agent_key, res in zip(agents, results):
@@ -209,12 +215,24 @@ class StateMachineOrchestrator:
             msg = f"**[ROUND 1] {role_name}**:\n"
             if res and res.get("overall_portfolio_critique"):
                 msg += f"* **Portfolio Overview**: {res['overall_portfolio_critique']}\n"
-            if res and res.get('portfolio_verdicts'):
-                for v in res['portfolio_verdicts']:
-                    v_sym = v.get("symbol", "Unknown")
-                    v_erd = v.get("verdict", "Hold")
-                    v_ans = v.get("analysis", "")
-                    msg += f"* **{v_sym}**: {v_erd}. Analysis: {v_ans}\n"
+            for v in (res or {}).get("portfolio_verdicts") or []:
+                v_sym = v.get("symbol", "Unknown")
+                v_erd = v.get("verdict", "Hold")
+                v_sc = v.get("conviction_score", 5)
+                v_ans = (v.get("analysis") or "").strip()
+                if v_ans:
+                    msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10). {v_ans}\n"
+                else:
+                    msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10).\n"
+            for v in (res or {}).get("watchlist_verdicts") or []:
+                v_sym = v.get("symbol", "Unknown")
+                v_erd = v.get("verdict", "Pass")
+                v_sc = v.get("conviction_score", 5)
+                v_ans = (v.get("analysis") or "").strip()
+                if v_ans:
+                    msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10). {v_ans}\n"
+                else:
+                    msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10).\n"
             self.state.messages.append({"role": "assistant", "content": msg})
 
     async def execute_rebuttal_round(self) -> None:

@@ -23,7 +23,12 @@ class WatchlistAssetVerdict(BaseModel):
     conviction_score: int = Field(description="Confidence level from 1 to 10.")
 
 class PanelistPortfolioVerdict(BaseModel):
-    overall_portfolio_critique: str = Field(description="A brutal, 2-sentence critique of Stan's overall portfolio allocation, sector concentration, and likelihood of maintaining outperformance. Speak in your exact persona.")
+    overall_portfolio_critique: str = Field(
+        description=(
+            "ROUND 1 ONLY — 2-sentence portfolio-level view for State of the Union (concentration, "
+            "regime fit, mandate). MUST NOT repeat or summarize your per-ticker analyses."
+        )
+    )
     portfolio_verdicts: list[OwnedAssetVerdict] = Field(description="Verdicts for EVERY ticker provided in the CURRENT PORTFOLIO list.")
     watchlist_verdicts: list[WatchlistAssetVerdict] = Field(description="Verdicts for EVERY ticker provided in the APPROVED WATCHLIST TARGETS list.")
 

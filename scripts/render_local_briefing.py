@@ -50,7 +50,10 @@ def main() -> None:
         portfolio_symbols=set(prep.get("portfolio_holdings") or {}),
         raw_board_messages=debate.get("raw_board_messages"),
     )
-    investor_html = reporting.inject_qa_summary_into_briefing(html, "")
+    investor_html = reporting.inject_qa_review_link_into_briefing(
+        reporting.inject_qa_summary_into_briefing(html, ""),
+        None,
+    )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(investor_html, encoding="utf-8")
     print(args.out.resolve().as_uri())

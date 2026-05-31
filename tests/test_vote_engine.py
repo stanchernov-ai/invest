@@ -213,6 +213,12 @@ class TestVoteEnginePhaseC(unittest.TestCase):
         unicorns = detect_unicorn_trades(summaries)
         self.assertEqual(len(unicorns), 1)
 
+    def test_unanimous_hold_not_unicorn(self):
+        raw = _raw_watchlist_symbol("GOOGL", [("Hold", 5)] * 5)
+        summaries = build_vote_summaries(raw, ["GOOGL"])
+        self.assertFalse(any(s.is_actionable_unanimous() for s in summaries.values()))
+        self.assertEqual(detect_unicorn_trades(summaries), [])
+
     def test_build_matrix_from_json(self):
         raw = _majority_buy_raw("META")
         matrix = build_matrix_from_raw_verdicts(raw, ["META"])

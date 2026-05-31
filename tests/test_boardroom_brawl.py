@@ -81,26 +81,29 @@ class SplitDebateParagraphTests(unittest.TestCase):
                 "content": (
                     f"**[ROUND 1] {hypatia}**:\n"
                     "* **Portfolio Overview**: Moats matter more than momentum.\n"
-                    "* **NVDA**: Sell.\n"
+                    "* **NVDA**: Sell (7/10). Valuation leaves no margin of safety.\n"
                 ),
             },
             {
                 "content": (
                     f"**[ROUND 2 REBUTTAL] {suntzu}**:\n"
                     "* **Rebuttal Summary**: hypatia ignores the tape.\n"
-                    "* **NVDA**: Strong Buy.\n"
+                    "* **NVDA**: Strong Buy (9/10). Momentum confirms the trend.\n"
                 ),
             },
         ]
         turns = build_debate_dialogue_turns(messages)
         self.assertEqual(len(turns), 2)
         self.assertEqual(turns[0]["speaker"], hypatia)
-        self.assertEqual(turns[0]["turn_heading"], "Portfolio Overview")
+        self.assertEqual(turns[0]["turn_heading"], "Initial Positions")
         self.assertEqual(turns[1]["turn_heading"], "Rebuttal")
         self.assertNotIn("round_label", turns[0])
         self.assertEqual(turns[0]["align"], "left")
         self.assertEqual(turns[1]["align"], "right")
-        self.assertIn("Moats matter", turns[0]["text"])
+        self.assertIn("NVDA", turns[0]["text"])
+        self.assertNotIn("Moats matter", turns[0]["text"])
+        self.assertIn("NVDA", turns[1]["text"])
+        self.assertNotIn("hypatia ignores the tape", turns[1]["text"])
 
         blocks = build_debate_display_blocks("", raw_board_messages=messages)
         self.assertEqual(blocks[0]["kind"], "turn")
@@ -109,7 +112,7 @@ class SplitDebateParagraphTests(unittest.TestCase):
 
 class DebateTurnHeadingTests(unittest.TestCase):
     def test_maps_round_tags_to_phase_names(self):
-        self.assertEqual(debate_turn_heading("ROUND 1"), "Portfolio Overview")
+        self.assertEqual(debate_turn_heading("ROUND 1"), "Initial Positions")
         self.assertEqual(debate_turn_heading("ROUND 2 REBUTTAL"), "Rebuttal")
         self.assertEqual(debate_turn_heading(""), "")
 
@@ -136,13 +139,14 @@ class ShortPeerNameTests(unittest.TestCase):
                 "content": (
                     f"**[ROUND 2 REBUTTAL] {hypatia}**:\n"
                     f"* **Rebuttal Summary**: {davinci} describes NVIDIA as a masterwork.\n"
+                    "* **NVDA**: Buy (8/10). Leonardo overstates the moat.\n"
                 ),
             },
         ]
         turns = build_debate_dialogue_turns(messages)
         self.assertEqual(turns[0]["speaker"], hypatia)
-        self.assertIn("Leonardo describes", turns[0]["text"])
-        self.assertNotIn("da Vinci", turns[0]["text"])
+        self.assertIn("Leonardo overstates", turns[0]["text"])
+        self.assertNotIn("Leonardo describes", turns[0]["text"])
 
 
 class FallbackBrawlTests(unittest.TestCase):

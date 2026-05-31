@@ -623,6 +623,37 @@ Baseline comparison run: `20260529_152151`.
 
 Open items from this handoff that **carried forward** to May 30 EOD tracker: Round 2 rebuttal quality, Run Review UI, DOC-1, chairman narrator-only (Tier 3), roster freeze.
 
+### May 30 late night — Hypatia + Stealth Wealth (archived)
+
+**Theme:** Focus-group persona roster (Hypatia value anchor), Stealth Wealth visual SSOT, Gmail inline dark palette.
+
+| Shipped | Commit | Note |
+|---------|--------|------|
+| Hypatia roster + avatars | `d970f20` | `hypatia`, `davinci`, `suntzu`, `tesla`, `aurelius` |
+| Stealth Wealth inline email | `58a94ab` | `executive_briefing_inline_styles()`; table wrapper `#121212` |
+| Vote digest + deliver hardening | `a17792b` | INT-1 partial; email delivery logging |
+
+| Canonical run | Note |
+|---------------|------|
+| `20260530_010432` | Stealth Wealth Gmail; Graphics/Post Mortem advisory FAILs |
+| `20260530_190325` | Pre–deploy-batch validation (~3m46s, QA PASS) |
+
+**Superseded by:** May 30 deploy batch handoff in [`action_tracker.md`](../action_tracker.md) (Legal Counsel, UNICORN-1, catalysts, per-stock debate — staged, not committed).
+
+### May 30 deploy batch — session end (staged, not shipped)
+
+**Theme:** Legal Counsel QA, briefing UX sprint, investor voice — **33 files staged locally; commit interrupted on pre-commit hook.**
+
+| Area | Files | Status |
+|------|-------|--------|
+| Legal Counsel | `legal_audit.py`, `legal_policy.py`, `legal_delivery.py`, `legal_code_audit.py`, `function_app.py` | Staged |
+| Briefing UX | `reporting.py`, `catalysts.py`, `boardroom_brawl.py` | Staged — GFX-4, UNICORN-1, QA footer, catalysts |
+| Investor voice | `investor_voice.py`, `agents.py` | Staged |
+| INT-1 | `integrity_audit.py`, `qa_pipeline.py` | Staged |
+| Watchlist refactor | `review_universe.py`, `prepare.py`, `scout.py` | **Not staged** — separate ticket REVIEW-1 |
+
+**Successor:** See [`action_tracker.md`](../action_tracker.md) Session Handoff — commit → push → `gh run watch` → `/api/prepare`.
+
 ---
 
 ## Backlog (Deferred Items)
