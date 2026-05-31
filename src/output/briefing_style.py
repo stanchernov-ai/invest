@@ -201,6 +201,7 @@ SOTU_AVATAR_SIZE = 128
 SOTU_AVATAR_COLUMN_WIDTH = 152
 DEBATE_AVATAR_SIZE = 48
 ACTION_PLAN_AVATAR_SIZE = 40
+ALPHA_PICK_LOGO_SIZE = 72
 
 
 def _hex_to_rgba(hex_color: str, alpha: float) -> str:
@@ -381,6 +382,14 @@ def executive_briefing_inline_styles() -> dict[str, str]:
             f"color:{CRUCIBLE_HEADER};font-weight:700;font-size:0.95em;"
             f"letter-spacing:0.06em;text-transform:uppercase;margin:0 0 8px 0;{font}"
         ),
+        "board_box": (
+            f"background-color:{BG_SURFACE};padding:12px;border-left:4px solid {BRAND_SAGE};"
+            f"color:{TEXT_PRIMARY};line-height:1.55;{font}"
+        ),
+        "board_heading": (
+            f"color:{BRAND_SAGE};font-weight:700;font-size:0.95em;"
+            f"letter-spacing:0.06em;text-transform:uppercase;margin:0 0 8px 0;{font}"
+        ),
         "chairman_box": (
             f"background-color:{BG_SURFACE};padding:15px;border-left:4px solid {BRAND_SAGE};"
             f"font-style:italic;color:{TEXT_PRIMARY};{font}"
@@ -410,6 +419,7 @@ def executive_briefing_inline_styles() -> dict[str, str]:
         "li": f"color:{TEXT_PRIMARY};margin-bottom:6px;{font}",
         "ticker_logo_sm": ticker_logo_inline_style(size=28),
         "ticker_logo_md": ticker_logo_inline_style(size=48),
+        "ticker_logo_lg": ticker_logo_inline_style(size=ALPHA_PICK_LOGO_SIZE),
         "sotu_avatar_cell": (
             f"padding:12px;text-align:center;vertical-align:middle;"
             f"width:{SOTU_AVATAR_COLUMN_WIDTH}px;"

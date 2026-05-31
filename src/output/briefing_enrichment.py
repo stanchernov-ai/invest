@@ -577,8 +577,10 @@ def _enrich_narratives(
                     preferred = _agent_keys_for_names(pos.get("supporting_members") or [])
                     break
         champion_row = _pick_champion_row(rows, preferred_agents=preferred, final_verdict="Buy")
-        if champion_row and champion_row["analysis"]:
-            alpha["champion_quote"] = champion_row["analysis"]
+        if champion_row:
+            if champion_row["analysis"]:
+                alpha["champion_quote"] = champion_row["analysis"]
+            alpha["champion"] = champion_row["display_name"]
     out["alpha_pick"] = alpha
     return out
 

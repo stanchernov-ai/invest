@@ -68,8 +68,9 @@ class TestUnicornProtocol(unittest.TestCase):
         )
         self.assertEqual(symbols, {"NVDA"})
         self.assertEqual(len(items), 1)
-        self.assertEqual(items[0]["synthesis"], "Add on AI strength.")
-        self.assertIn("margin of safety", items[0]["red_team_rebuttal"])
+        self.assertEqual(items[0]["board_synthesis"], "Add on AI strength.")
+        self.assertIn("margin of safety", items[0]["crucible_text"])
+        self.assertEqual(items[0]["champion_quote"], "Platform moat widening.")
 
     def test_excludes_unanimous_hold(self):
         items, symbols = build_unicorn_protocol_items(
@@ -121,6 +122,7 @@ class TestUnicornProtocol(unittest.TestCase):
             },
         )
         self.assertIn("Unicorn Protocol", html)
+        self.assertIn("The Board", html)
         self.assertIn(CRUCIBLE_DISPLAY_NAME, html)
         self.assertIn(CRUCIBLE_AVATAR_URL, html)
         self.assertIn(briefing_style.CRUCIBLE_BG, html)

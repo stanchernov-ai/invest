@@ -380,7 +380,7 @@ def build_todays_actions_summary(
         _add(
             item.get("symbol", ""),
             item.get("verdict", ""),
-            item.get("synthesis") or item.get("strategic_context", ""),
+            item.get("board_synthesis") or item.get("synthesis") or item.get("strategic_context", ""),
             image=item.get("image", ""),
             unanimous=True,
             narrative=narrative_by_symbol.get(sym),
@@ -407,7 +407,7 @@ def build_todays_actions_summary(
 
 
 def build_unicorn_protocol_items(unicorn_trades, chairman_data, advanced_data=None, red_team_data=None):
-    """Enrich unanimous panel trades with chairman narrative + Crucible rebuttals."""
+    """Enrich unanimous panel trades with board synthesis, champion, and Crucible rebuttal."""
     advanced_data = advanced_data or {}
     red_team_data = red_team_data or {}
     rebuttal_map = {
@@ -415,12 +415,6 @@ def build_unicorn_protocol_items(unicorn_trades, chairman_data, advanced_data=No
         for r in red_team_data.get("unicorn_rebuttals", []) or []
         if r.get("symbol")
     }
-
-    pos_by_symbol = {}
-    for pos in (chairman_data or {}).get("portfolio_positions", []) + (chairman_data or {}).get("watchlist_positions", []):
-        sym = pos.get("symbol")
-        if sym:
-            pos_by_symbol[sym] = pos
 
     verdict_rank = {"STRONG BUY": 0, "BUY": 1, "HOLD": 2, "TRIM": 3, "SELL": 4, "STRONG SELL": 5, "PASS": 6}
     items = []
@@ -432,22 +426,113 @@ def build_unicorn_protocol_items(unicorn_trades, chairman_data, advanced_data=No
         if not sym or panel_verdict == "PASS" or panel_verdict not in _UNICORN_ACTIONABLE_VERDICTS:
             continue
         unicorn_symbols.add(sym)
-        pos = pos_by_symbol.get(sym, {})
-        narrative = pos.get("narrative") or {}
-        sanitized = _sanitize_position_for_briefing(pos)
-        sanitized_narrative = sanitized.get("narrative") or {}
-        items.append({
-            "symbol": sym,
-            "verdict": panel_verdict,
-            "synthesis": sanitized.get("synthesis", ""),
-            "champion": sanitized_narrative.get("champion", narrative.get("champion", "")),
-            "champion_quote": sanitized_narrative.get("champion_quote", ""),
-            "red_team_rebuttal": _sanitize_briefing_text(rebuttal_map.get(sym, "")),
-            "image": advanced_data.get(sym, {}).get("image", ""),
-        })
+        items.append(
+            build_trade_spotlight(
+                symbol=sym,
+                chairman_data=chairman_data,
+                advanced_data=advanced_data,
+                crucible_text=rebuttal_map.get(sym, ""),
+                verdict=panel_verdict,
+                unanimous=True,
+            )
+        )
 
     items.sort(key=lambda x: (verdict_rank.get(x["verdict"], 99), x["symbol"]))
     return items, unicorn_symbols
+
+
+def _position_for_symbol(chairman_data: dict, symbol: str) -> dict | None:
+    sym = (symbol or "").strip().upper()
+    if not sym:
+        return None
+    for section in ("portfolio_positions", "watchlist_positions"):
+        for pos in (chairman_data or {}).get(section) or []:
+            if (pos.get("symbol") or "").strip().upper() == sym:
+                return pos
+    return None
+
+
+def _format_board_sentiment(pos: dict, *, unanimous: bool = False) -> str:
+    verdict = (pos.get("final_verdict") or "").strip()
+    members = pos.get("supporting_members") or []
+    names = [_panelist_display_name(m) for m in members if m]
+    names = [n for n in names if n]
+    parts: list[str] = []
+    if verdict:
+        parts.append(f"Verdict: {verdict}")
+    if unanimous:
+        parts.append("Unanimous panel agreement")
+    elif names:
+        parts.append(f"Supported by {', '.join(names)}")
+    score = pos.get("aggregate_conviction_score")
+    if score:
+        parts.append(f"Conviction {score}")
+    return " · ".join(parts)
+
+
+def _attach_spotlight_champion(spotlight: dict) -> dict:
+    sp = dict(spotlight)
+    champion = (sp.get("champion") or "").strip()
+    if not champion:
+        return sp
+    panelist_key = resolve_panelist_key(champion)
+    if not panelist_key:
+        return sp
+    portrait = portrait_clip_styles(
+        panelist_key,
+        size=DEBATE_AVATAR_SIZE,
+        ring_background=BG_SURFACE,
+    )
+    sp["champion_avatar_url"] = PANELIST_AVATAR_URLS[panelist_key]
+    sp["champion_avatar_img_style"] = portrait["img"]
+    sp["champion_avatar_img_size"] = portrait["img_size"]
+    return sp
+
+
+def build_trade_spotlight(
+    *,
+    symbol: str,
+    chairman_data: dict,
+    advanced_data: dict | None = None,
+    champion_quote: str = "",
+    champion_name: str = "",
+    crucible_text: str = "",
+    verdict: str = "",
+    unanimous: bool = False,
+) -> dict:
+    """Three-tier trade spotlight: board synthesis → champion → Crucible."""
+    pos = _position_for_symbol(chairman_data, symbol)
+    sanitized = _sanitize_position_for_briefing(pos) if pos else {}
+    narrative = sanitized.get("narrative") or {}
+
+    board_synthesis = sanitized.get("strategic_context") or sanitized.get("synthesis") or ""
+    if not board_synthesis and pos:
+        board_synthesis = _sanitize_briefing_text(pos.get("synthesis") or pos.get("strategic_context") or "")
+
+    champ_name = (champion_name or narrative.get("champion") or "").strip()
+    if not champ_name or champ_name.upper() in {"NONE", "N/A", "BOARD"}:
+        champ_name = _resolve_alpha_pick_champion({"symbol": symbol, "champion": champ_name}, chairman_data)
+    else:
+        champ_name = _panelist_display_name(champ_name)
+
+    champ_quote = champion_quote or narrative.get("champion_quote") or ""
+    champ_quote = _sanitize_briefing_text(champ_quote)
+
+    spotlight = {
+        "symbol": symbol,
+        "verdict": (verdict or sanitized.get("final_verdict") or "").upper(),
+        "image": (advanced_data or {}).get(symbol, {}).get("image", ""),
+        "board_synthesis": board_synthesis,
+        "board_sentiment": _format_board_sentiment(sanitized, unanimous=unanimous) if sanitized else (
+            "Unanimous panel agreement" if unanimous else ""
+        ),
+        "champion": champ_name,
+        "champion_quote": champ_quote,
+        "crucible_text": _sanitize_briefing_text(crucible_text),
+        "unanimous": unanimous,
+        "show_verdict_pill": bool(verdict or unanimous),
+    }
+    return _attach_spotlight_champion(spotlight)
 
 
 def show_unicorn_protocol_section(items: list[dict]) -> bool:
@@ -725,6 +810,41 @@ def _bar_chart_scales() -> dict:
     scales = _dark_chart_scales(y_title="Unrealized Gain (%)", y_begin_at_zero=True)
     scales["y"]["grace"] = BAR_Y_SCALE_GRACE
     return scales
+
+
+def _panelist_display_name(name: str) -> str:
+    """Full roster display name for briefing sections (SoTU, Alpha Pick, debate)."""
+    name = (name or "").strip()
+    if not name or name.upper() in {"NONE", "N/A"}:
+        return ""
+    key = resolve_panelist_key(name)
+    if key:
+        return PANELIST_ROLES[key]
+    return name
+
+
+def _resolve_alpha_pick_champion(alpha_pick: dict, chairman_data: dict) -> str:
+    """Best-effort champion label for Alpha Pick — enrichment first, position fallback."""
+    champion_raw = (alpha_pick.get("champion") or "").strip()
+    if champion_raw and champion_raw.upper() not in {"NONE", "N/A", "BOARD"}:
+        return _panelist_display_name(champion_raw)
+
+    sym = (alpha_pick.get("symbol") or "").strip().upper()
+    if not sym:
+        return ""
+
+    for section in ("portfolio_positions", "watchlist_positions"):
+        for pos in chairman_data.get(section) or []:
+            if (pos.get("symbol") or "").strip().upper() != sym:
+                continue
+            narrative = pos.get("narrative") or {}
+            name = (narrative.get("champion") or "").strip()
+            if name and name.upper() not in {"NONE", "N/A"}:
+                return _panelist_display_name(name)
+            members = pos.get("supporting_members") or []
+            if members:
+                return _panelist_display_name(members[0])
+    return ""
 
 
 def _attach_narrative_portraits(narrative: dict) -> dict:
@@ -1296,35 +1416,76 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {% endfor %}
             {% endif %}
 
-            {% if show_alpha_pick %}
-            <h2 style="{{ email_styles.h2 }}">The Alpha Pick</h2>
-            <div style="{{ email_styles.metric_box }}">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px;">
+            {% macro trade_spotlight_header(sp) %}
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:14px;">
                     <tr>
-                        {% if alpha_pick.image %}
-                        <td valign="top" width="63" style="padding-right: 15px;">
-                            <img src="{{ alpha_pick.image }}" alt="{{ alpha_pick.symbol }} logo" style="{{ email_styles.ticker_logo_md }}">
+                        {% if sp.image %}
+                        <td valign="middle" width="84" style="padding-right:12px;">
+                            <img src="{{ sp.image }}" alt="{{ sp.symbol }} logo" style="{{ email_styles.ticker_logo_lg }}">
                         </td>
                         {% endif %}
-                        <td valign="top">
-                            <p style="margin-top: 0; font-size: 1.1em; color: {{ text_primary }};"><strong style="{{ email_styles.strong }}">{{ alpha_pick.symbol }}</strong>: "{{ alpha_pick.champion_quote }}"</p>
+                        <td valign="middle">
+                            {% if sp.show_verdict_pill and sp.verdict %}
+                            <span style="{{ pill_styles[sp.verdict] if sp.verdict in pill_styles else pill_styles['HOLD'] }} display:inline-block; padding:6px 14px; border-radius:6px; font-weight:bold; font-size:13px;">{{ sp.verdict }} : {{ sp.symbol }}</span>
+                            {% else %}
+                            <strong style="{{ email_styles.strong }};font-size:1.1em;">{{ sp.symbol }}</strong>
+                            {% endif %}
                         </td>
                     </tr>
                 </table>
-                
-                {% if red_team_case %}
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 20px;">
+            {% endmacro %}
+
+            {% macro trade_spotlight_block(sp) %}
+                {% if sp.board_synthesis %}
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+                    <tr>
+                        <td valign="top">
+                            <p style="{{ email_styles.board_heading }}">The Board</p>
+                            <div style="{{ email_styles.board_box }}">{{ sp.board_synthesis }}</div>
+                            {% if sp.board_sentiment %}
+                            <p style="{{ email_styles.muted_p }};margin:8px 0 0 0;font-size:0.88em;">{{ sp.board_sentiment }}</p>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+                {% endif %}
+                {% if sp.champion_quote %}
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+                    <tr>
+                        {% if sp.champion_avatar_url %}
+                        <td valign="top" align="center" style="padding-right:10px;width:{{ debate_avatar_size }}px;">
+                            <img src="{{ sp.champion_avatar_url }}" width="{{ sp.champion_avatar_img_size }}" height="{{ sp.champion_avatar_img_size }}" style="{{ sp.champion_avatar_img_style }}" alt="{{ sp.champion }} avatar">
+                        </td>
+                        {% endif %}
+                        <td valign="top">
+                            {% if sp.champion %}
+                            <p style="margin:0 0 6px 0;"><span style="{{ email_styles.champion }}">The Champion ({{ sp.champion }})</span></p>
+                            {% endif %}
+                            <p style="margin:0;font-size:1.05em;color:{{ text_primary }};line-height:1.55;">"{{ sp.champion_quote }}"</p>
+                        </td>
+                    </tr>
+                </table>
+                {% endif %}
+                {% if sp.crucible_text %}
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:4px;">
                     <tr>
                         <td valign="top" align="center" style="padding-right:10px;width:{{ crucible_avatar_size }}px;">
                             <img src="{{ crucible_avatar_url }}" width="{{ crucible_avatar_img_size }}" height="{{ crucible_avatar_img_size }}" style="{{ crucible_avatar_img_style }}" alt="{{ crucible_display_name }}">
                         </td>
                         <td valign="top">
                             <p style="{{ email_styles.crucible_heading }}">{{ crucible_display_name }}</p>
-                            <div style="{{ email_styles.crucible_box }}">{{ red_team_case }}</div>
+                            <div style="{{ email_styles.crucible_box }}">{{ sp.crucible_text }}</div>
                         </td>
                     </tr>
                 </table>
                 {% endif %}
+            {% endmacro %}
+
+            {% if show_alpha_pick and alpha_spotlight %}
+            <h2 style="{{ email_styles.h2 }}">The Alpha Pick</h2>
+            <div style="{{ email_styles.metric_box }}">
+                {{ trade_spotlight_header(alpha_spotlight) }}
+                {{ trade_spotlight_block(alpha_spotlight) }}
             </div>
             {% endif %}
 
@@ -1377,40 +1538,11 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             
             {% if unicorn_protocol_items %}
             <h2 style="{{ email_styles.h2 }}">Unicorn Protocol</h2>
-            <p style="{{ email_styles.muted_p }}">Unanimous board verdict — full context with {{ crucible_display_name }} rebuttal.</p>
+            <p style="{{ email_styles.muted_p }}">Unanimous board verdict &mdash; committee view, champion voice, and {{ crucible_display_name }} stress-test.</p>
             {% for item in unicorn_protocol_items %}
                 <div style="{{ email_styles.section_divider }}">
-                    <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">
-                        <tr>
-                            {% if item.image %}
-                            <td valign="middle" style="padding-right: 12px;">
-                                <img src="{{ item.image }}" alt="{{ item.symbol }} logo" style="{{ email_styles.ticker_logo_sm }}">
-                            </td>
-                            {% endif %}
-                            <td valign="middle">
-                                <span style="{{ pill_styles[item.verdict] if item.verdict in pill_styles else pill_styles['HOLD'] }} display:inline-block; padding:6px 14px; border-radius:6px; font-weight:bold; font-size:13px;">{{ item.verdict }} : {{ item.symbol }}</span>
-                            </td>
-                        </tr>
-                    </table>
-                    {% if item.synthesis %}
-                    <p style="{{ email_styles.p }}"><strong style="{{ email_styles.strong }}">Strategic Context:</strong> {{ item.synthesis }}</p>
-                    {% endif %}
-                    {% if item.champion_quote %}
-                    <p style="{{ email_styles.p }}"><span style="{{ email_styles.champion }}">The Champion ({{ item.champion }}):</span> "{{ item.champion_quote }}"</p>
-                    {% endif %}
-                    {% if item.red_team_rebuttal %}
-                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 12px;">
-                        <tr>
-                            <td valign="top" align="center" style="padding-right:10px;width:{{ crucible_avatar_size }}px;">
-                                <img src="{{ crucible_avatar_url }}" width="{{ crucible_avatar_img_size }}" height="{{ crucible_avatar_img_size }}" style="{{ crucible_avatar_img_style }}" alt="{{ crucible_display_name }}">
-                            </td>
-                            <td valign="top">
-                                <p style="{{ email_styles.crucible_heading }};margin-top:0;">{{ crucible_display_name }}</p>
-                                <div style="{{ email_styles.crucible_box }}">{{ item.red_team_rebuttal }}</div>
-                            </td>
-                        </tr>
-                    </table>
-                    {% endif %}
+                    {{ trade_spotlight_header(item) }}
+                    {{ trade_spotlight_block(item) }}
                 </div>
             {% endfor %}
             {% endif %}
@@ -1595,12 +1727,10 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         unicorn_protocol_items,
     )
 
-    alpha_pick = chairman_data.get('alpha_pick', {})
-    if alpha_pick and 'symbol' in alpha_pick:
-        alpha_pick['image'] = advanced_data.get(alpha_pick['symbol'], {}).get('image', '')
-        alpha_pick['champion_quote'] = _sanitize_briefing_text(alpha_pick.get('champion_quote', ''))
-    show_alpha_pick = _alpha_pick_displayable(alpha_pick)
-        
+    alpha_spotlight = None
+    alpha_pick_raw = dict(chairman_data.get('alpha_pick', {}) or {})
+    show_alpha_pick = _alpha_pick_displayable(alpha_pick_raw)
+
     events = chairman_data.get('upcoming_events', [])
     if not events and advanced_data:
         events = build_upcoming_events_from_advanced_data(
@@ -1608,6 +1738,15 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             catalyst_symbol_universe(chairman_data, portfolio_symbols),
         )
     red_team_case = _sanitize_briefing_text(red_team_data.get('bear_case_narrative', ''))
+    if show_alpha_pick:
+        alpha_spotlight = build_trade_spotlight(
+            symbol=alpha_pick_raw.get("symbol", ""),
+            chairman_data=chairman_data,
+            advanced_data=advanced_data,
+            champion_quote=alpha_pick_raw.get("champion_quote", ""),
+            champion_name=alpha_pick_raw.get("champion", ""),
+            crucible_text=red_team_case,
+        )
     chairman_remarks = _sanitize_briefing_text(chairman_data.get('chairman_closing_remarks', ''))
     show_debate = _debate_has_content(brawl_text)
     debate_bubbles = build_debate_display_blocks(
@@ -1671,7 +1810,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         grouped_actions=grouped_actions,
         todays_actions=todays_actions,
         todays_actions_overflow=todays_actions_overflow,
-        alpha_pick=alpha_pick,
+        alpha_spotlight=alpha_spotlight,
         show_alpha_pick=show_alpha_pick,
         show_debate=show_debate,
         briefing_date=briefing_date,

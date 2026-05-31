@@ -123,6 +123,51 @@ class BriefingCopyTests(unittest.TestCase):
     def test_alpha_pick_hidden_for_none_symbol(self):
         self.assertFalse(reporting._alpha_pick_displayable({"symbol": "NONE", "champion_quote": "wait"}))
 
+    def test_alpha_pick_shows_three_tier_spotlight(self):
+        html = reporting.generate_html_briefing(
+            total_val=150_000,
+            qqq_trend=5.0,
+            portfolio_3m_trend=3.0,
+            mandate="Test mandate.",
+            chairman_data={
+                "portfolio_positions": [],
+                "watchlist_positions": [{
+                    "symbol": "VRT",
+                    "final_verdict": "Buy",
+                    "synthesis": "The board sees AI infrastructure as the cycle winner.",
+                    "supporting_members": [PANELIST_ROLES["tesla"]],
+                    "narrative": {
+                        "champion": PANELIST_ROLES["tesla"],
+                        "champion_quote": "Critical infrastructure with explosive EPS growth.",
+                        "dissenter": "None",
+                        "dissenter_quote": "N/A",
+                    },
+                }],
+                "alpha_pick": {
+                    "symbol": "VRT",
+                    "champion": PANELIST_ROLES["tesla"],
+                    "champion_quote": "Critical infrastructure with explosive EPS growth.",
+                },
+                "upcoming_events": [],
+            },
+            cos_data={"state_of_the_union_quotes": [], "boardroom_brawl": ""},
+            matrix_md="",
+            unicorn_trades=[],
+            sorted_ledger=[],
+            chart_urls={},
+            advanced_data={"VRT": {"image": "https://example.com/vrt.png"}},
+            red_team_data={"bear_case_narrative": "Valuation stretched."},
+        )
+        self.assertIn("The Alpha Pick", html)
+        self.assertIn("The Board", html)
+        self.assertIn("AI infrastructure", html)
+        self.assertIn("The Champion (Nikola Tesla)", html)
+        self.assertIn(PANELIST_AVATAR_URLS["tesla"], html)
+        self.assertIn("width:72px", html)
+        self.assertIn("https://example.com/vrt.png", html)
+        self.assertIn("The Crucible", html)
+        self.assertIn("Valuation stretched", html)
+
     def test_upcoming_catalysts_from_advanced_data_when_chairman_empty(self):
         advanced = {
             "NVDA": {

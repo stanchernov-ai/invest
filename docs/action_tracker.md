@@ -1,7 +1,7 @@
 # SC Invest Boardroom — Action Tracker
 
 **Status:** Active  
-**Last Updated:** May 30, 2026 (deploy batch shipped; **HR / Prompt Engineer / Legal** review logged below; prod `20260530_205821`)
+**Last Updated:** May 31, 2026 (prod `b6984fa`; validated run **`20260531_014121`** — Crucible palette, QA triage, backlog sync)
 
 **Purpose:** Current session pickup and prioritized backlog (**single file** for QA findings + engineering work). Every QA CRITICAL/WARNING is logged to **Open items** via `tools/sync_backlog.py`. Historical handoffs and Phase 0–6 specs live in [`archive/implementation_log_2026-05.md`](archive/implementation_log_2026-05.md). Maintenance rules: [`doc_hygiene.md`](doc_hygiene.md). Doc map: [`DOCUMENTATION.md`](DOCUMENTATION.md).
 
@@ -9,16 +9,16 @@
 
 ---
 
-## Session Handoff — May 30, 2026 deploy + review universe (**pick up here**)
+## Session Handoff — May 31, 2026 Crucible + QA backlog (**pick up here**)
 
-**Theme:** **Deploy batch and REVIEW-1 are on prod.** Prior stream handoff (staged / not committed) is **superseded** — this session committed, pushed, deployed, and validated.
+**Theme:** **May 31 deploy batch on prod.** First validated run with cold-iron Crucible styling, QA dashboard backlog triage, and unified `action_tracker` sync.
 
 | State | Detail |
 |-------|--------|
-| **Prod HEAD** | `9f26173` — Legal Counsel + briefing UX (`83ecdca`) + review universe / Yahoo cache / FMP stable screener (`9f26173`) |
-| **Last validated run** | **`20260530_205821`** (~4 min, pipeline SUCCESS, email ok) — first post–Legal Counsel / UNICORN-1 / Mag7 run |
-| **Local git** | `main` synced with `origin/main`; **uncommitted WIP** in working tree (HR/QA roster, SaaS docs — see below) |
-| **Deploy** | GitHub Actions on push to `main` → `app-boardroom-prod` (no `gh` CLI on Stan's Windows box — poll Azure or GitHub web) |
+| **Prod HEAD** | **`b6984fa`** — unified backlog sync · **`760ebb6`** Crucible palette · **`52613b2`** QA triage UI · **`6de1d69`** Today's Actions layout |
+| **Last validated run** | **`20260531_014121`** (~4.5 min, pipeline SUCCESS, all emails ok) |
+| **Local git** | `main` synced with `origin/main`; minor uncommitted fix in `fetch_azure_reports.py` (Path for sync_backlog) |
+| **Deploy** | GitHub Actions [run #92](https://github.com/stanchernov-ai/invest/actions/runs/26707882120) — success |
 
 **Kickoff (manual run):** `GET /api/prepare?code=<function-key>` — hostname: `app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewebsites.net`. Function key: `az functionapp keys list -g rg-boardroom-prod -n app-boardroom-prod --query functionKeys.default -o tsv`. **Note:** `/api/prepare` is **synchronous** — waits for prepare phase (~8–60s) before returning 202; do not interrupt.
 
@@ -28,42 +28,46 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 .venv\Scripts\python.exe scripts\wait_for_run.py --run-id YYYYMMDD_HHMMSS --timeout 2700 --post-job
 ```
 
-### Shipped in `83ecdca` + `9f26173`
+### Shipped May 31 (`52613b2` → `b6984fa`)
 
 | Area | Key paths | What |
 |------|-----------|------|
-| **Legal Counsel QA** | `src/qa/legal_*.py`, `src/jobs/legal_code_audit.py`, `function_app.py` | Briefing HTML scan at deliver; daily 8 AM code audit; findings blob + email |
-| **Investor voice** | `src/core/investor_voice.py`, `agents.py` | Panelists cite named investors; SaaS-safe attribution |
-| **Briefing UX** | `reporting.py`, `briefing_style.py` | GFX-4 order; QA review footer; catalyst fallback; **UNICORN-1** hide when empty |
-| **Debate** | `boardroom_brawl.py`, `engine.py` | Per-stock Round 1 positions |
-| **Catalysts** | `catalysts.py`, `deliver.py` | `ensure_chairman_catalysts` fallback |
-| **INT-1** | `integrity_audit.py`, `qa_pipeline.py` | Vote digest in integrity prompt; cap fix |
-| **REVIEW-1** | `src/data/review_universe.py`, `prepare.py`, `scout.py` | Mag7 + manual + **daily-cached** Yahoo; FMP `/stable/company-screener` fallback |
-| **Scout validation** | `scripts/validate_scout_sources.py` | Live probe before prod scout changes — run and PASS before deploy |
+| **The Crucible** | `briefing_style.py`, `reporting.py`, `board_roster.py`, `agents.py` | Void charcoal `#09090b`, steel border, icy text, silver header; avatar + rebuttal layout (Alpha Pick + Unicorn) |
+| **QA triage** | `candidate_triage.py`, `human_review.py`, `deliver.py` | Backlog items at bottom of QA dashboard; fix code / fix agent / discard via `/api/qa-review#candidates` |
+| **Backlog sync** | `backlog_sync.py`, `tools/sync_backlog.py`, `fetch_azure_reports.py --post-job` | Auto-log QA CRITICAL/WARNING into Open items (deduped) |
+| **Today's Actions** | `reporting.py` (`c4189f1`, `6de1d69`) | Scannable summary after Unicorn; champion/dissent columns; 3× chart DPR |
 
-### Run `20260530_205821` — post-deploy QA notes
+### Run `20260531_014121` — post-deploy QA notes
 
 | Phase | Duration | Status |
 |-------|----------|--------|
-| Prepare | 8s | success |
-| Debate | 106s | success |
-| Deliver | 97s | success |
+| Prepare | 9s | success |
+| Debate | 108s | success |
+| Deliver | 128s | success |
 
 **Email:** briefing + QA dashboard + Legal Counsel — all sent.
 
-**QA advisory (non-blocking):** see Open items below (synced from QA runs).
+**Validated on prod briefing (artifact check):**
+- **The Crucible** — `#09090b` vault, `#a8b0ba` border, `#e4e4e7` body, `#c0c8d0` header + avatar (Alpha Pick + Unicorn)
+- **Today's Actions** section present
+- **Legal Counsel** — 0 CRITICAL; INFO disclaimer note only
+- **Charts** — 4/4 deterministic health OK
 
-**Human QA still open (Gmail):** section order (GFX-4), per-stock debate, catalysts, Legal Counsel email, QA review footer, Unicorn hidden when no 5/5 trades.
+**QA FAIL (see Open items — synced):**
+- **Systems Architect** — watchlist Pass spam persists (192 mentions / 27 symbols) → overlaps PASS-SPAM-1
+- **Prompt Engineer** — 3× persona drift CRITICAL (forbidden vocab in Round 2 rebuttals) → **PE-PERSONA-1** (fix **agent**)
+- **Graphics Designer** — LLM visual review parse error (WARNING); deterministic chart audit PASS
 
-**Artifacts cached:** `.cache/reports/executive_briefing_20260530_205821.html`, `qa_dashboard_*.html`, `state/legal_counsel_briefing_*.json`
+**Post-job:** 5 QA CRITICAL · ~295k tokens · `QA_EXECUTION` + `QA_SCORECARD` on prod telemetry.
 
-### Uncommitted WIP (do not assume prod)
+**Human QA still open (Gmail):** Crucible look/feel, Today's Actions scan, QA dashboard backlog table + triage link, Unicorn Crucible rebuttal.
 
-| Path | Status |
-|------|--------|
-| `docs/saas_data_schema.md`, `docs/saas_postgres_rollout.md`, `docs/saas_technical_solution.md` | Untracked / unstaged — SAAS-0 design only |
-| `docs/hr_qa_roster_handoff.md`, `src/hr_review.py`, `src/finance_oversight.py`, `tests/test_hr_review.py` | HR/QA roster stream — separate commit |
-| `src/qa_pipeline.py`, `src/qa/architect_audit.py`, `src/qa/persona_audit.py`, etc. | Unstaged local edits — verify before next deploy |
+**Artifacts cached:** `.cache/reports/executive_briefing_20260531_014121.html`, `qa_dashboard_20260531_014121.html`, `state/qa_reports_20260531_014121.json`
+
+```powershell
+.venv\Scripts\python.exe tools/fetch_azure_reports.py --run-id 20260531_014121 --post-job
+.venv\Scripts\python.exe tools/sync_backlog.py --run-id YYYYMMDD_HHMMSS   # if triage submitted after fetch
+```
 
 ### Open items (prioritized)
 
@@ -71,27 +75,26 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 
 | Pri | ID | Status | Source | Fix | Item | Evidence |
 |-----|-----|--------|--------|-----|------|----------|
-| **P0** | QA-HUMAN-1 | open | manual | code | Gmail review of `20260530_205821` — GFX-4, Legal Counsel, UNICORN-1, debate | |
-| **P1** | HR-1 | open | manual | code | Commit + deploy HR/QA_EXECUTION batch | [`hr_qa_roster_handoff.md`](hr_qa_roster_handoff.md) |
-| **P1** | HR-TELEM-1 | open | HR | code | HR Efficiency review on prod telemetry — `fetch_azure_reports` → `hr_review`; `QA_EXECUTION` on prod | |
-| **P1** | H1 | open | manual | code | Post-deploy HR check with `QA_EXECUTION` | partial on `205821` |
-| **P1** | PASS-SPAM-1 | open | Systems Architect | code | Reduce watchlist Pass spam in debate log (27-symbol Mag7+Yahoo universe) | qa_reports_20260530_205821.json |
+| **P0** | QA-HUMAN-1 | open | manual | code | Gmail review of `20260531_014121` — Crucible palette, Today's Actions, QA backlog triage, debate | |
+| **P1** | PASS-SPAM-1 | open | Systems Architect | code | Reduce watchlist Pass spam in debate log (86/100 Pass rows; 192 mentions / 27 symbols) | qa_reports_20260531_014121.json |
+| **P1** | PE-PERSONA-1 | open | Prompt Engineer | agent | Round 2 persona drift — forbidden vocab (`margin of safety`, `relative strength`, `the tape`) across panelists | qa_reports_20260531_014121.json |
+| **P1** | R2-1 | open | Prompt Engineer | agent | Round 2 `overall_portfolio_critique` verbatim copy of Round 1 | qa_reports_20260530_205821.json |
+| **P1** | HR-TELEM-1 | open | HR | code | HR Efficiency review on prod telemetry — `hr_review` on `20260531_014121` (`QA_EXECUTION` now on prod) | api_telemetry_20260531_014121.json |
 | **P1** | GFX-2 | open | Graphics Designer | code | Logo contrast on `#27272a` — MSFT Alpha Pick | qa_reports_20260530_205821.json |
 | **P1** | GFX-SOTU-1 | open | Graphics Designer | code | SoTU non-SSOT `box-shadow` / colors | qa_reports_20260530_205821.json |
-| **P1** | AV-2 | open | manual | code | SoTU avatar ring alignment — re-export 128×128 centered PNGs | |
-| **P1** | GFX-3 | open | manual | code | Pie categorical palette — too many similar greens | |
-| **P1** | CHAIR-1 | open | Post Mortem QA | code | Post Mortem Trim→Hold mandate — AVGO/ASML on `010432` | |
-| **P1** | AP-2 | open | manual | code | “Today’s actions” summary box | shipped locally — validate prod |
-| **P1** | R2-1 | open | Prompt Engineer | agent | Round 2 `overall_portfolio_critique` verbatim copy of Round 1 | qa_reports_20260530_205821.json |
+| **P1** | AV-2 | open | manual | code | SoTU avatar ring alignment — re-export 128×128 centered PNGs |  |
+| **P1** | GFX-3 | open | manual | code | Pie categorical palette — too many similar greens |  |
+| **P1** | CHAIR-1 | open | Post Mortem QA | code | Post Mortem Trim→Hold mandate — AVGO/ASML on `010432` |  |
+| **P1** | HR-1 | open | manual | code | Commit + deploy remaining HR/QA roster WIP | [`hr_qa_roster_handoff.md`](hr_qa_roster_handoff.md) |
+| **P2** | GFX-LLM-1 | open | Graphics Designer | agent | Visual review LLM parse error (deterministic chart audit still PASS) | qa_reports_20260531_014121.json |
 | **P2** | PE-SYCO-1 | open | Prompt Engineer | agent | Unanimous verdict buckets on most tickers (sycophancy collapse) | persona_audit threshold 60% |
-| **P2** | LEG-BRIEF-1 | open | Legal Counsel | code | Briefing Jinja wraps `champion_quote` in quotes — safe for panelist only | |
+| **P2** | LEG-BRIEF-1 | open | Legal Counsel | code | Briefing Jinja wraps `champion_quote` in quotes — safe for panelist only |  |
 | **P2** | HR-ROSTER-1 | open | HR | agent | Reduce deliver QA overlap / token sink | [`agent_architecture.md`](agent_architecture.md) §9 |
 | **P3** | LEG-MUNGER-1 | open | Legal Counsel | code | Rename `MUNGER_DOCTRINE` user-facing string for SaaS | debate injection only |
-| **P3** | MKT-QA-1 | open | manual | agent | Marketing QA agent | after private beta |
 
-**Done (now prod):** DEPLOY-1, REVIEW-1, AP-1, GFX-4, GFX-QA, INT-1, UNICORN-1, Legal Counsel QA, catalysts, per-stock debate, QA review footer, investor voice (initial), Yahoo daily cache, scout validation script, **PE-VOICE-1** (SaaS-safe attribution + fabricated-quote persona gate).
+**Done (now prod):** DEPLOY-1, REVIEW-1, AP-1, **AP-2**, GFX-4, GFX-QA, INT-1, UNICORN-1, Legal Counsel QA, catalysts, per-stock debate, QA review footer, investor voice, Yahoo cache, scout validation, **PE-VOICE-1**, **Crucible palette** (`760ebb6`), **QA triage UI** (`52613b2`), **backlog sync** (`b6984fa`), `qa_augmentation.py` (B2).
 
-**HR / roster (partial):** `qa_augmentation.py` on prod; full HR status + `QA_EXECUTION` telemetry — **WIP, not prod**. Pickup: [`hr_qa_roster_handoff.md`](hr_qa_roster_handoff.md) §9.
+**Dropped / merged:** H1 → HR-TELEM-1; MKT-QA-1 lives in GTM section only; auto-sync rows that duplicate PASS-SPAM-1 / PE-PERSONA-1 / GFX-LLM-1 — discard via triage.
 
 ---
 
@@ -156,13 +159,11 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 
 | Area | Commit(s) | Run / note |
 |------|-----------|------------|
-| **Deploy batch + review universe** | `83ecdca`, `9f26173` | Prod run **`20260530_205821`** — Legal Counsel, UNICORN-1, Mag7/Yahoo cache |
-| **Hypatia roster + Stealth Wealth** | `d970f20` | Focus-group personas; avatar SSOT; dark native pies |
-| **Gmail inline dark palette** | `58a94ab` | Validated `20260530_010432` |
-| SoTU + chart typography | `2bcbd04` | Round 1 portfolio quotes |
+| **Crucible palette + QA backlog** | `760ebb6`, `52613b2`, `b6984fa` | Prod run **`20260531_014121`** — void charcoal rebuttal, triage UI, sync_backlog |
+| **Today's Actions + chart DPR** | `c4189f1`, `6de1d69` | Validated on `014121` briefing |
+| **Deploy batch + review universe** | `83ecdca`, `9f26173` | Run `20260530_205821` |
+| **Hypatia roster + Stealth Wealth** | `d970f20` | Focus-group personas; avatar SSOT |
 | Three-layer Action Plan | `cfe55fd`, `380427f` | Canonical `225159` |
-| Briefing layout + charts sprint | `04af83d`–`b1707c7` | Dark palette, pie legend fix |
-| B1 + Tier 1 QA | `748ad6c`, `a64bcd9` | Flash red_teamer; Munger/QA skips |
 | Vote engine Phase B | `285d70a` | Deterministic 3/5 allocation |
 
 *Superseded Session Handoffs (May 30 AM, May 29):* [`archive/implementation_log_2026-05.md`](archive/implementation_log_2026-05.md#may-30-2026-session-handoffs-archived).

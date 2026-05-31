@@ -232,10 +232,11 @@ def main():
         )
 
     if resolved_run_id and args.sync_backlog:
+        from pathlib import Path
         from src.qa.backlog_sync import merge_run_into_backlog
 
         try:
-            bl = merge_run_into_backlog(resolved_run_id, cache_dir=out_dir)
+            bl = merge_run_into_backlog(resolved_run_id, cache_dir=Path(out_dir))
             print(
                 f"Backlog sync ({resolved_run_id}): +{bl['added']} new · "
                 f"{bl['updated']} updated · {bl['skipped']} skipped."
