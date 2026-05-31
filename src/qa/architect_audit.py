@@ -15,8 +15,8 @@ _SCRATCHPAD_CHAR_LIMIT = 25_000
 _PASS_MENTION_PER_SYMBOL = 6
 _MIN_SYMBOLS_FOR_PASS_SPAM = 12
 _MIN_PASS_MENTIONS = 72
-_WATCHLIST_PASS_RATE_THRESHOLD = 0.85
-_MIN_WATCHLIST_VERDICT_ROWS = 50
+_REPETITIVE_PASS_ANALYSIS_MIN_LEN = 20
+_REPETITIVE_PASS_ANALYSIS_MIN_COUNT = 8
 _REPETITIVE_SYNTHESIS_MIN_LEN = 40
 _REPETITIVE_SYNTHESIS_MIN_SYMBOLS = 4
 
@@ -128,24 +128,32 @@ def audit_debate_log_bloat(raw_log: str, *, all_symbols: list[str]) -> list[str]
 
 
 def audit_watchlist_pass_spam(raw_verdicts: dict | None) -> list[str]:
+    """Flag copy-pasted Pass rationales in watchlist JSON — not high Pass rates (expected on large watchlists)."""
     if not raw_verdicts:
         return []
 
-    total = 0
-    passes = 0
+    by_analysis: dict[str, list[str]] = {}
     for agent_key in AGENT_KEYS:
         for row in (raw_verdicts.get(agent_key) or {}).get("watchlist_verdicts") or []:
-            total += 1
             verdict = (row.get("verdict") or "").upper()
-            if "PASS" in verdict:
-                passes += 1
+            if "PASS" not in verdict:
+                continue
+            analysis = (row.get("analysis") or "").strip().lower()
+            if len(analysis) < _REPETITIVE_PASS_ANALYSIS_MIN_LEN:
+                continue
+            sym = (row.get("symbol") or "?").strip()
+            by_analysis.setdefault(analysis, []).append(f"{sym}/{agent_key}")
 
-    if total >= _MIN_WATCHLIST_VERDICT_ROWS and passes / total >= _WATCHLIST_PASS_RATE_THRESHOLD:
-        return [
-            f"DEBATE LOG BLOAT: {passes}/{total} watchlist verdict rows are Pass "
-            f"(>{_WATCHLIST_PASS_RATE_THRESHOLD:.0%}) — slim Round 2 output for watchlist Pass rows."
-        ]
-    return []
+    violations: list[str] = []
+    for text, refs in by_analysis.items():
+        if len(refs) < _REPETITIVE_PASS_ANALYSIS_MIN_COUNT:
+            continue
+        preview = text[:60] + ("…" if len(text) > 60 else "")
+        violations.append(
+            f"DEBATE LOG BLOAT: {len(refs)} watchlist Pass rows share identical analysis "
+            f"({preview!r})."
+        )
+    return violations
 
 
 def audit_system_architect_deterministic(
@@ -190,7 +198,7 @@ def merge_architect_reports(deterministic_violations: list[str], llm_report: dic
             "category": "Pipeline / JSON",
             "description": v,
             "recommendation": (
-                "Fix chairman JSON shape, deduplicate synthesis, or slim Round 2 watchlist Pass output."
+                "Fix chairman JSON shape, deduplicate synthesis, or reduce repetitive watchlist Pass prose."
             ),
         })
 

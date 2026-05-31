@@ -1,7 +1,7 @@
 # Documentation Index
 
 **Status:** Active  
-**Last updated:** May 30, 2026 (deploy batch handoff)  
+**Last updated:** May 31, 2026 (debate quality handoff)  
 **SSOT for:** which document to read or update — agents should start here when unsure where something lives.
 
 **Do not duplicate** content from the docs below into this file. Link only.
@@ -29,6 +29,7 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | **Agent audit, runtime optimizations, funding sell** | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) |
 | **Cursor agents, ecosystem_state, post-job sync** | [`cursor_dev_plane_handoff.md`](cursor_dev_plane_handoff.md) |
 | **HR roster review, QA token augmentation, agent KEEP/IMPROVE policy** | [`hr_qa_roster_handoff.md`](hr_qa_roster_handoff.md) |
+| **Debate quality fixes (PE-PERSONA-1, R2-1, PASS-SPAM-1) — Systems Architect context** | [`debate_qa_architect_handoff.md`](debate_qa_architect_handoff.md) |
 | Understand **which QA module** does what | [`qa_layers.md`](qa_layers.md) |
 | Understand pipeline phases, deploy, data layer, **vote_engine** | [`technical_solution.md`](technical_solution.md) |
 | Plan SaaS / multi-tenant (blocked on stabilization) | [`saas_technical_solution.md`](saas_technical_solution.md) |
@@ -71,6 +72,7 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) | **May 2026 audit**, telemetry baseline, funding sell, planned runtime tickets A1–B4 |
 | [`cursor_dev_plane_handoff.md`](cursor_dev_plane_handoff.md) | Cursor agents, ecosystem_state sync, standing QA digest tickets C1–C5 |
 | [`hr_qa_roster_handoff.md`](hr_qa_roster_handoff.md) | HR Efficiency Consultant, `QA_EXECUTION`, augmentation policy, Stan roster decisions |
+| [`debate_qa_architect_handoff.md`](debate_qa_architect_handoff.md) | May 31 debate QA session — persona drift, R2 copy, Pass spam; architect validation plan |
 | [`qa_layers.md`](qa_layers.md) | **Which QA file runs when** — deliver vs weekly vs dev |
 | [`briefing_charts_handoff.md`](briefing_charts_handoff.md) | QuickChart, palettes, briefing layout |
 | [`technical_solution.md`](technical_solution.md) | End-to-end flow, repo layout, env vars, blob containers, vote_engine |

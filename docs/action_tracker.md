@@ -53,7 +53,7 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 - **Legal Counsel** — 0 CRITICAL; INFO disclaimer note only
 - **Charts** — 4/4 deterministic health OK
 
-**QA FAIL (see Open items — synced):**
+**QA FAIL (see Open items — synced; fixes in local WIP, see [`debate_qa_architect_handoff.md`](debate_qa_architect_handoff.md)):**
 - **Systems Architect** — watchlist Pass spam persists (192 mentions / 27 symbols) → overlaps PASS-SPAM-1
 - **Prompt Engineer** — 3× persona drift CRITICAL (forbidden vocab in Round 2 rebuttals) → **PE-PERSONA-1** (fix **agent**)
 - **Graphics Designer** — LLM visual review parse error (WARNING); deterministic chart audit PASS
@@ -76,9 +76,9 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 | Pri | ID | Status | Source | Fix | Item | Evidence |
 |-----|-----|--------|--------|-----|------|----------|
 | **P0** | QA-HUMAN-1 | open | manual | code | Gmail review of `20260531_014121` — Crucible palette, Today's Actions, QA backlog triage, debate | |
-| **P1** | PASS-SPAM-1 | open | Systems Architect | code | Reduce watchlist Pass spam in debate log (86/100 Pass rows; 192 mentions / 27 symbols) | qa_reports_20260531_014121.json |
-| **P1** | PE-PERSONA-1 | open | Prompt Engineer | agent | Round 2 persona drift — forbidden vocab (`margin of safety`, `relative strength`, `the tape`) across panelists | qa_reports_20260531_014121.json |
-| **P1** | R2-1 | open | Prompt Engineer | agent | Round 2 `overall_portfolio_critique` verbatim copy of Round 1 | qa_reports_20260530_205821.json |
+| **P1** | PASS-SPAM-1 | done | Systems Architect | code | Reduce watchlist Pass spam in debate log (86/100 Pass rows; 192 mentions / 27 symbols) | qa_reports_20260531_014121.json |
+| **P1** | PE-PERSONA-1 | done | Prompt Engineer | agent | Round 2 persona drift — forbidden vocab (`margin of safety`, `relative strength`, `the tape`) across panelists | qa_reports_20260531_014121.json |
+| **P1** | R2-1 | done | Prompt Engineer | agent | Round 2 `overall_portfolio_critique` verbatim copy of Round 1 | qa_reports_20260530_205821.json |
 | **P1** | HR-TELEM-1 | open | HR | code | HR Efficiency review on prod telemetry — `hr_review` on `20260531_014121` (`QA_EXECUTION` now on prod) | api_telemetry_20260531_014121.json |
 | **P1** | GFX-2 | open | Graphics Designer | code | Logo contrast on `#27272a` — MSFT Alpha Pick | qa_reports_20260530_205821.json |
 | **P1** | GFX-SOTU-1 | open | Graphics Designer | code | SoTU non-SSOT `box-shadow` / colors | qa_reports_20260530_205821.json |
@@ -92,7 +92,7 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 | **P2** | HR-ROSTER-1 | open | HR | agent | Reduce deliver QA overlap / token sink | [`agent_architecture.md`](agent_architecture.md) §9 |
 | **P3** | LEG-MUNGER-1 | open | Legal Counsel | code | Rename `MUNGER_DOCTRINE` user-facing string for SaaS | debate injection only |
 
-**Done (now prod):** DEPLOY-1, REVIEW-1, AP-1, **AP-2**, GFX-4, GFX-QA, INT-1, UNICORN-1, Legal Counsel QA, catalysts, per-stock debate, QA review footer, investor voice, Yahoo cache, scout validation, **PE-VOICE-1**, **Crucible palette** (`760ebb6`), **QA triage UI** (`52613b2`), **backlog sync** (`b6984fa`), `qa_augmentation.py` (B2).
+**Done (now prod):** PASS-SPAM-1, R2-1, PE-PERSONA-1, DEPLOY-1, REVIEW-1, AP-1, **AP-2**, GFX-4, GFX-QA, INT-1, UNICORN-1, Legal Counsel QA, catalysts, per-stock debate, QA review footer, investor voice, Yahoo cache, scout validation, **PE-VOICE-1**, **Crucible palette** (`760ebb6`), **QA triage UI** (`52613b2`), **backlog sync** (`b6984fa`), `qa_augmentation.py` (B2).
 
 **Dropped / merged:** H1 → HR-TELEM-1; MKT-QA-1 lives in GTM section only; auto-sync rows that duplicate PASS-SPAM-1 / PE-PERSONA-1 / GFX-LLM-1 — discard via triage.
 

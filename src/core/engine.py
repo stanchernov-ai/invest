@@ -11,6 +11,10 @@ from src.core.schemas import (
     WATCHLIST_RULING, ROUND_2_REBUTTAL_DIRECTIVE,
 )
 from src.core.rebuttal import build_round2_user_prompt
+from src.core.debate_format import (
+    format_portfolio_verdict_markdown_lines,
+    format_watchlist_verdict_markdown_lines,
+)
 from src.core.data_oracle import validate_price_feed
 from src.core.guardrails import apply_chairman_guardrails
 from src.core.state_of_union import build_state_of_union_quotes
@@ -216,24 +220,10 @@ class StateMachineOrchestrator:
             msg = f"**[ROUND 1] {role_name}**:\n"
             if res and res.get("overall_portfolio_critique"):
                 msg += f"* **Portfolio Overview**: {res['overall_portfolio_critique']}\n"
-            for v in (res or {}).get("portfolio_verdicts") or []:
-                v_sym = v.get("symbol", "Unknown")
-                v_erd = v.get("verdict", "Hold")
-                v_sc = v.get("conviction_score", 5)
-                v_ans = (v.get("analysis") or "").strip()
-                if v_ans:
-                    msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10). {v_ans}\n"
-                else:
-                    msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10).\n"
-            for v in (res or {}).get("watchlist_verdicts") or []:
-                v_sym = v.get("symbol", "Unknown")
-                v_erd = v.get("verdict", "Pass")
-                v_sc = v.get("conviction_score", 5)
-                v_ans = (v.get("analysis") or "").strip()
-                if v_ans:
-                    msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10). {v_ans}\n"
-                else:
-                    msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10).\n"
+            for line in format_portfolio_verdict_markdown_lines((res or {}).get("portfolio_verdicts")):
+                msg += f"{line}\n"
+            for line in format_watchlist_verdict_markdown_lines((res or {}).get("watchlist_verdicts")):
+                msg += f"{line}\n"
             self.state.messages.append({"role": "assistant", "content": msg})
 
     async def execute_rebuttal_round(self) -> None:
@@ -256,24 +246,10 @@ class StateMachineOrchestrator:
             if res:
                 if res.get("overall_portfolio_critique"):
                     msg += f"* **Rebuttal Summary**: {res['overall_portfolio_critique']}\n"
-                for v in res.get('portfolio_verdicts', []):
-                    v_sym = v.get("symbol", "Unknown")
-                    v_erd = v.get("verdict", "Hold")
-                    v_sc = v.get("conviction_score", 5)
-                    v_ans = (v.get("analysis") or "").strip()
-                    if v_ans:
-                        msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10). {v_ans}\n"
-                    else:
-                        msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10).\n"
-                for v in res.get('watchlist_verdicts', []):
-                    v_sym = v.get("symbol", "Unknown")
-                    v_erd = v.get("verdict", "Pass")
-                    v_sc = v.get("conviction_score", 5)
-                    v_ans = (v.get("analysis") or "").strip()
-                    if v_ans:
-                        msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10). {v_ans}\n"
-                    else:
-                        msg += f"* **{v_sym}**: {v_erd} ({v_sc}/10).\n"
+                for line in format_portfolio_verdict_markdown_lines(res.get("portfolio_verdicts")):
+                    msg += f"{line}\n"
+                for line in format_watchlist_verdict_markdown_lines(res.get("watchlist_verdicts")):
+                    msg += f"{line}\n"
             self.state.messages.append({"role": "assistant", "content": msg})
 
         self.state.raw_verdicts = dict(self.raw_verdicts)

@@ -68,6 +68,8 @@ class TestRebuttalHelpers(unittest.TestCase):
         prompt = build_round2_user_prompt("hypatia", messages)
         self.assertIn(davinci, prompt)
         self.assertIn("do not copy", prompt.lower())
+        self.assertIn("first sentence", prompt.lower())
+        self.assertIn("50%", prompt)
         self.assertIn("Concentration risk", prompt)
         self.assertIn("Growth names", prompt)
 

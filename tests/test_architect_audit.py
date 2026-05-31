@@ -71,8 +71,21 @@ class TestArchitectAudit(unittest.TestCase):
         violations = audit_debate_log_bloat(log, all_symbols=symbols)
         self.assertTrue(any("Pass' mentions" in v for v in violations))
 
+    def test_slim_watchlist_summary_avoids_pass_spam(self):
+        symbols = [f"SYM{i}" for i in range(20)]
+        log = "\n".join(
+            f"**[ROUND 1] Hypatia**:\n* **Watchlist — no buy case (19 names)**: SYM1, SYM2 (structured JSON)."
+            for _ in range(5)
+        )
+        violations = audit_debate_log_bloat(log, all_symbols=symbols)
+        self.assertEqual(violations, [])
+
     def test_watchlist_pass_spam_detected(self):
-        watchlist = [{"symbol": f"W{i}", "verdict": "Pass", "analysis": "x"} for i in range(12)]
+        shared = "No actionable edge on valuation or catalyst timing today."
+        watchlist = [
+            {"symbol": f"W{i}", "verdict": "Pass", "conviction_score": 5, "analysis": shared}
+            for i in range(10)
+        ]
         raw = {
             agent: {
                 "portfolio_verdicts": [],
@@ -82,6 +95,15 @@ class TestArchitectAudit(unittest.TestCase):
         }
         violations = audit_watchlist_pass_spam(raw)
         self.assertEqual(len(violations), 1)
+        self.assertIn("identical analysis", violations[0])
+
+    def test_high_pass_rate_without_repetition_passes(self):
+        watchlist = [
+            {"symbol": f"W{i}", "verdict": "Pass", "conviction_score": 5, "analysis": f"Unique rationale {i}."}
+            for i in range(20)
+        ]
+        raw = {agent: {"portfolio_verdicts": [], "watchlist_verdicts": watchlist} for agent in AGENT_KEYS}
+        self.assertEqual(audit_watchlist_pass_spam(raw), [])
 
     def test_clean_run_passes_deterministic(self):
         violations = audit_system_architect_deterministic(

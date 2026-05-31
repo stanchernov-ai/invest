@@ -4,6 +4,11 @@ from __future__ import annotations
 import re
 
 from src.core.agents import agent_config
+from src.core.debate_format import (
+    filter_debate_ticker_lines,
+    format_ticker_debate_excerpt,
+    parse_ticker_debate_lines_from_message,
+)
 from src.core.board_roster import (
     PANELIST_KEYS,
     PANELIST_ROLES,
@@ -13,7 +18,6 @@ from src.core.board_roster import (
 )
 
 _OVERVIEW_MARKERS = ("**Portfolio Overview**", "**Rebuttal Summary**")
-_TICKER_LINE = re.compile(r"^\*\s*\*\*(.+?)\*\*:\s*(.+)$", re.M)
 _ROUND1 = re.compile(r"\*\*\[ROUND 1\]", re.I)
 _ROUND2 = re.compile(r"\*\*\[ROUND 2", re.I)
 _HEADER = re.compile(r"^\*\*\[(ROUND\s+\d+[^\]]*)\]\s*(.+?)\*\*:?\s*$", re.I | re.M)
@@ -75,23 +79,6 @@ def _extract_debate_excerpt(content: str) -> str:
     return ""
 
 
-def _extract_ticker_debate_lines(content: str) -> list[str]:
-    """Per-symbol verdict lines from a board message — excludes portfolio-level summaries."""
-    lines: list[str] = []
-    for raw in (content or "").split("\n"):
-        stripped = raw.strip()
-        if not stripped or any(marker in stripped for marker in _OVERVIEW_MARKERS):
-            continue
-        match = _TICKER_LINE.match(stripped)
-        if not match:
-            continue
-        symbol = match.group(1).strip()
-        detail = match.group(2).strip()
-        if symbol and detail:
-            lines.append(f"{symbol} — {detail}")
-    return lines
-
-
 def _extract_section_prose(content: str, marker: str) -> str:
     """Pull Portfolio Overview or Rebuttal Summary line body."""
     for raw in (content or "").split("\n"):
@@ -101,41 +88,6 @@ def _extract_section_prose(content: str, marker: str) -> str:
             if text:
                 return text
     return ""
-
-
-def _symbol_from_ticker_line(line: str) -> str:
-    head = (line.split(" — ", 1)[0] if " — " in line else line).strip()
-    return head.split()[0].upper() if head else ""
-
-
-def _filter_debate_ticker_lines(
-    lines: list[str],
-    *,
-    portfolio_symbols: set[str] | None,
-    is_rebuttal: bool,
-) -> tuple[list[str], list[str]]:
-    """Split portfolio vs watchlist; drop Pass spam from watchlist in investor-facing debate."""
-    portfolio = {s.upper() for s in (portfolio_symbols or set())}
-    portfolio_lines: list[str] = []
-    watchlist_lines: list[str] = []
-    for line in lines:
-        sym = _symbol_from_ticker_line(line)
-        if portfolio and sym in portfolio:
-            portfolio_lines.append(line)
-        elif portfolio:
-            detail = line.split(" — ", 1)[-1] if " — " in line else line
-            if re.search(r"\bPass\b", detail, re.I):
-                continue
-            watchlist_lines.append(line)
-        else:
-            portfolio_lines.append(line)
-    # Cap watchlist noise in Round 1; show actionable watchlist names only.
-    max_watch = 5 if not is_rebuttal else 8
-    if len(watchlist_lines) > max_watch:
-        extra = len(watchlist_lines) - max_watch
-        watchlist_lines = watchlist_lines[:max_watch]
-        watchlist_lines.append(f"… +{extra} more watchlist names (full log)")
-    return portfolio_lines, watchlist_lines
 
 
 def _compose_turn_text(
@@ -151,31 +103,15 @@ def _compose_turn_text(
         parts.append(shorten_panelist_references(overview))
     if portfolio_lines:
         label = "Where I land on holdings" if is_rebuttal else "Portfolio calls"
-        excerpt = _format_ticker_debate_excerpt(portfolio_lines, max_chars=1400)
+        excerpt = format_ticker_debate_excerpt(portfolio_lines, max_chars=1400)
         if excerpt:
             parts.append(f"{label}:\n{excerpt}")
     if watchlist_lines:
         label = "Watchlist moves" if is_rebuttal else "Watchlist highlights"
-        excerpt = _format_ticker_debate_excerpt(watchlist_lines, max_chars=900)
+        excerpt = format_ticker_debate_excerpt(watchlist_lines, max_chars=900)
         if excerpt:
             parts.append(f"{label}:\n{excerpt}")
     return "\n\n".join(parts)
-
-
-def _format_ticker_debate_excerpt(lines: list[str], *, max_chars: int = 1800) -> str:
-    """Join ticker debate lines for investor-facing chat bubbles."""
-    if not lines:
-        return ""
-    parts: list[str] = []
-    total = 0
-    for line in lines:
-        extra = len(line) + (1 if parts else 0)
-        if total + extra > max_chars:
-            parts.append("… (additional symbols in full debate log)")
-            break
-        parts.append(line)
-        total += extra
-    return "\n".join(parts)
 
 
 def _parse_debate_message(content: str) -> tuple[str, str, str] | None:
@@ -220,8 +156,8 @@ def build_debate_dialogue_turns(
         is_rebuttal = "ROUND 2" in round_label
         overview_marker = "Rebuttal Summary" if is_rebuttal else "Portfolio Overview"
         overview = _extract_section_prose(content, overview_marker)
-        ticker_lines = _extract_ticker_debate_lines(content)
-        portfolio_lines, watchlist_lines = _filter_debate_ticker_lines(
+        ticker_lines = parse_ticker_debate_lines_from_message(content, _OVERVIEW_MARKERS)
+        portfolio_lines, watchlist_lines = filter_debate_ticker_lines(
             ticker_lines,
             portfolio_symbols=portfolio_symbols,
             is_rebuttal=is_rebuttal,
