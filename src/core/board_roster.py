@@ -26,12 +26,16 @@ PANELIST_ARCHETYPES: dict[str, str] = {
 }
 
 # Stealth Wealth bust avatars — see docs/briefing_avatars.md for art direction.
+# AVATAR_VERSION cache-busts the blob URL: email clients (esp. Gmail's image
+# proxy) cache by full URL, so re-uploading the SAME filename leaves stale art in
+# inboxes. Bump this whenever the {key}.png blob content changes.
+AVATAR_VERSION = "20260530b"
 PANELIST_AVATAR_URLS: dict[str, str] = {
-    "hypatia": f"{ASSET_BASE}/hypatia.png",
-    "davinci": f"{ASSET_BASE}/davinci.png",
-    "suntzu": f"{ASSET_BASE}/suntzu.png",
-    "tesla": f"{ASSET_BASE}/tesla.png",
-    "aurelius": f"{ASSET_BASE}/aurelius.png",
+    "hypatia": f"{ASSET_BASE}/hypatia.png?v={AVATAR_VERSION}",
+    "davinci": f"{ASSET_BASE}/davinci.png?v={AVATAR_VERSION}",
+    "suntzu": f"{ASSET_BASE}/suntzu.png?v={AVATAR_VERSION}",
+    "tesla": f"{ASSET_BASE}/tesla.png?v={AVATAR_VERSION}",
+    "aurelius": f"{ASSET_BASE}/aurelius.png?v={AVATAR_VERSION}",
 }
 
 PANELIST_AVATAR_MATERIAL: dict[str, str] = {
