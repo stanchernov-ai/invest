@@ -92,6 +92,76 @@ def _extract_ticker_debate_lines(content: str) -> list[str]:
     return lines
 
 
+def _extract_section_prose(content: str, marker: str) -> str:
+    """Pull Portfolio Overview or Rebuttal Summary line body."""
+    for raw in (content or "").split("\n"):
+        stripped = raw.strip()
+        if marker in stripped and ":" in stripped:
+            text = stripped.split(":", 1)[-1].strip()
+            if text:
+                return text
+    return ""
+
+
+def _symbol_from_ticker_line(line: str) -> str:
+    head = (line.split(" — ", 1)[0] if " — " in line else line).strip()
+    return head.split()[0].upper() if head else ""
+
+
+def _filter_debate_ticker_lines(
+    lines: list[str],
+    *,
+    portfolio_symbols: set[str] | None,
+    is_rebuttal: bool,
+) -> tuple[list[str], list[str]]:
+    """Split portfolio vs watchlist; drop Pass spam from watchlist in investor-facing debate."""
+    portfolio = {s.upper() for s in (portfolio_symbols or set())}
+    portfolio_lines: list[str] = []
+    watchlist_lines: list[str] = []
+    for line in lines:
+        sym = _symbol_from_ticker_line(line)
+        if portfolio and sym in portfolio:
+            portfolio_lines.append(line)
+        elif portfolio:
+            detail = line.split(" — ", 1)[-1] if " — " in line else line
+            if re.search(r"\bPass\b", detail, re.I):
+                continue
+            watchlist_lines.append(line)
+        else:
+            portfolio_lines.append(line)
+    # Cap watchlist noise in Round 1; show actionable watchlist names only.
+    max_watch = 5 if not is_rebuttal else 8
+    if len(watchlist_lines) > max_watch:
+        extra = len(watchlist_lines) - max_watch
+        watchlist_lines = watchlist_lines[:max_watch]
+        watchlist_lines.append(f"… +{extra} more watchlist names (full log)")
+    return portfolio_lines, watchlist_lines
+
+
+def _compose_turn_text(
+    overview: str,
+    portfolio_lines: list[str],
+    watchlist_lines: list[str],
+    *,
+    is_rebuttal: bool,
+) -> str:
+    """Lead with conversational overview; attach compact position tables."""
+    parts: list[str] = []
+    if overview:
+        parts.append(shorten_panelist_references(overview))
+    if portfolio_lines:
+        label = "Where I land on holdings" if is_rebuttal else "Portfolio calls"
+        excerpt = _format_ticker_debate_excerpt(portfolio_lines, max_chars=1400)
+        if excerpt:
+            parts.append(f"{label}:\n{excerpt}")
+    if watchlist_lines:
+        label = "Watchlist moves" if is_rebuttal else "Watchlist highlights"
+        excerpt = _format_ticker_debate_excerpt(watchlist_lines, max_chars=900)
+        if excerpt:
+            parts.append(f"{label}:\n{excerpt}")
+    return "\n\n".join(parts)
+
+
 def _format_ticker_debate_excerpt(lines: list[str], *, max_chars: int = 1800) -> str:
     """Join ticker debate lines for investor-facing chat bubbles."""
     if not lines:
@@ -106,6 +176,7 @@ def _format_ticker_debate_excerpt(lines: list[str], *, max_chars: int = 1800) ->
         parts.append(line)
         total += extra
     return "\n".join(parts)
+
 
 def _parse_debate_message(content: str) -> tuple[str, str, str] | None:
     """Return (round_label, panelist_key, speaker_name) from a board message."""
@@ -131,24 +202,40 @@ def debate_turn_heading(round_label: str) -> str:
     return ""
 
 
-def build_debate_dialogue_turns(messages: list[dict]) -> list[dict]:
-    """Structured chat turns from raw board messages — per-ticker verdicts, not portfolio SoTU."""
+def build_debate_dialogue_turns(
+    messages: list[dict],
+    *,
+    portfolio_symbols: set[str] | None = None,
+) -> list[dict]:
+    """Structured chat turns — opening/rebuttal prose first, then compact position calls."""
     turns: list[dict] = []
     for msg in messages or []:
         content = (msg.get("content") or "").strip()
         if not content:
             continue
         parsed = _parse_debate_message(content)
-        ticker_lines = _extract_ticker_debate_lines(content)
-        excerpt = _format_ticker_debate_excerpt(ticker_lines)
-        if not parsed or not excerpt:
+        if not parsed:
             continue
         round_label, panelist_key, speaker = parsed
+        is_rebuttal = "ROUND 2" in round_label
+        overview_marker = "Rebuttal Summary" if is_rebuttal else "Portfolio Overview"
+        overview = _extract_section_prose(content, overview_marker)
+        ticker_lines = _extract_ticker_debate_lines(content)
+        portfolio_lines, watchlist_lines = _filter_debate_ticker_lines(
+            ticker_lines,
+            portfolio_symbols=portfolio_symbols,
+            is_rebuttal=is_rebuttal,
+        )
+        text = _compose_turn_text(
+            overview, portfolio_lines, watchlist_lines, is_rebuttal=is_rebuttal,
+        )
+        if not text:
+            continue
         turns.append({
             "speaker": speaker,
             "panelist_key": panelist_key,
             "turn_heading": debate_turn_heading(round_label),
-            "text": shorten_panelist_references(excerpt),
+            "text": text,
             "avatar_url": PANELIST_AVATAR_URLS[panelist_key],
             "align": "left",
         })
@@ -162,9 +249,13 @@ def build_debate_display_blocks(
     brawl_text: str,
     *,
     raw_board_messages: list[dict] | None = None,
+    portfolio_symbols: set[str] | None = None,
 ) -> list[dict]:
     """Chat-style debate turns; falls back to clerk narrative paragraphs when messages unavailable."""
-    turns = build_debate_dialogue_turns(raw_board_messages or [])
+    turns = build_debate_dialogue_turns(
+        raw_board_messages or [],
+        portfolio_symbols=portfolio_symbols,
+    )
     if turns:
         return [{"kind": "turn", **turn} for turn in turns]
 

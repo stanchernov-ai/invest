@@ -1134,7 +1134,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
 
             {% if sotu_quotes %}
             <h2 style="{{ email_styles.h2 }}">The State of the Union</h2>
-            <p style="{{ email_styles.muted_p }}">Each panelist&rsquo;s Round 1 portfolio-level view &mdash; concentration, regime fit, and mandate &mdash; not per-ticker rebuttals.</p>
+            <p style="{{ email_styles.muted_p }}">Each panelist&rsquo;s opening portfolio thesis in 1&ndash;2 sentences &mdash; concentration, regime, and mandate.</p>
             {% for quote in sotu_quotes %}
                 <table width="100%" cellpadding="0" cellspacing="0" class="sotu-row" style="margin: 12px 0; border-left: 4px solid {{ quote.sotu_border }}; background-color: {{ quote.sotu_bg }}; border-radius: 8px; {{ quote.sotu_glow }}">
                     <tr>
@@ -1166,7 +1166,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                 </table>
                 
                 {% if red_team_case %}
-                <h3 style="{{ email_styles.h3 }} {{ email_styles.bear_heading }}; margin-top: 20px; margin-bottom: 10px; border-bottom: none;">The Bear Case Rebuttal</h3>
+                <h3 style="{{ email_styles.h3 }} {{ email_styles.bear_heading }} margin-top: 20px; margin-bottom: 10px; border-bottom: none;">The Bear Case Rebuttal</h3>
                 <div style="{{ email_styles.red_team_box }}">
                     {{ red_team_case }}
                 </div>
@@ -1176,7 +1176,7 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
 
             {% if show_debate %}
             <h2 style="{{ email_styles.h2 }}">The Debate</h2>
-            <p style="{{ email_styles.muted_p }}">Per-stock verdicts and rebuttals from each panelist &mdash; portfolio-level views are in State of the Union above.</p>
+            <p style="{{ email_styles.muted_p }}">Opening statements and rebuttals between panelists — position calls below each turn; portfolio-level views also in State of the Union.</p>
             {% for block in debate_bubbles %}
                 {% if block.kind == 'turn' %}
                 <table width="100%" cellpadding="0" cellspacing="0" class="debate-turn" style="margin: 14px 0;">
@@ -1390,7 +1390,9 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
     chairman_remarks = _sanitize_briefing_text(chairman_data.get('chairman_closing_remarks', ''))
     show_debate = _debate_has_content(brawl_text)
     debate_bubbles = build_debate_display_blocks(
-        brawl_text, raw_board_messages=raw_board_messages,
+        brawl_text,
+        raw_board_messages=raw_board_messages,
+        portfolio_symbols=portfolio_symbols,
     )
     for block in debate_bubbles:
         if block.get("kind") != "turn":

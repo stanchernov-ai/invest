@@ -1,7 +1,7 @@
 import unittest
 
 from src.core.board_roster import PANELIST_ROLES
-from src.core.state_of_union import build_state_of_union_quotes, _stance_label
+from src.core.state_of_union import build_state_of_union_quotes, _stance_label, condense_sotu_quote
 
 
 class TestStateOfUnion(unittest.TestCase):
@@ -61,6 +61,10 @@ class TestStateOfUnion(unittest.TestCase):
         quotes = build_state_of_union_quotes(raw)
         hypatia = quotes[0]
         self.assertIn("peer rebuttal only", hypatia["quote"])
+
+    def test_condense_sotu_quote_max_two_sentences(self):
+        long = "First sentence here. Second one follows. Third should be dropped."
+        self.assertEqual(condense_sotu_quote(long), "First sentence here. Second one follows.")
 
     def test_fallback_when_critique_missing(self):
         quotes = build_state_of_union_quotes({"aurelius": {"portfolio_verdicts": []}})

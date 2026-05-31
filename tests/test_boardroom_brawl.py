@@ -92,7 +92,7 @@ class SplitDebateParagraphTests(unittest.TestCase):
                 ),
             },
         ]
-        turns = build_debate_dialogue_turns(messages)
+        turns = build_debate_dialogue_turns(messages, portfolio_symbols={"NVDA"})
         self.assertEqual(len(turns), 2)
         self.assertEqual(turns[0]["speaker"], hypatia)
         self.assertEqual(turns[0]["turn_heading"], "Initial Positions")
@@ -100,12 +100,12 @@ class SplitDebateParagraphTests(unittest.TestCase):
         self.assertNotIn("round_label", turns[0])
         self.assertEqual(turns[0]["align"], "left")
         self.assertEqual(turns[1]["align"], "right")
+        self.assertIn("Moats matter", turns[0]["text"])
         self.assertIn("NVDA", turns[0]["text"])
-        self.assertNotIn("Moats matter", turns[0]["text"])
+        self.assertIn("hypatia ignores the tape", turns[1]["text"])
         self.assertIn("NVDA", turns[1]["text"])
-        self.assertNotIn("hypatia ignores the tape", turns[1]["text"])
 
-        blocks = build_debate_display_blocks("", raw_board_messages=messages)
+        blocks = build_debate_display_blocks("", raw_board_messages=messages, portfolio_symbols={"NVDA"})
         self.assertEqual(blocks[0]["kind"], "turn")
         self.assertEqual(len(blocks), 2)
 
@@ -143,10 +143,29 @@ class ShortPeerNameTests(unittest.TestCase):
                 ),
             },
         ]
-        turns = build_debate_dialogue_turns(messages)
+        turns = build_debate_dialogue_turns(messages, portfolio_symbols={"NVDA"})
         self.assertEqual(turns[0]["speaker"], hypatia)
         self.assertIn("Leonardo overstates", turns[0]["text"])
-        self.assertNotIn("Leonardo describes", turns[0]["text"])
+        self.assertIn("Leonardo describes", turns[0]["text"])
+
+
+    def test_watchlist_pass_rows_omitted_from_debate(self):
+        hypatia = PANELIST_ROLES["hypatia"]
+        messages = [
+            {
+                "content": (
+                    f"**[ROUND 1] {hypatia}**:\n"
+                    "* **Portfolio Overview**: Quality over hype.\n"
+                    "* **NVDA**: Buy (8/10). Core holding.\n"
+                    "* **AAPL**: Pass (5/10). No edge.\n"
+                    "* **MSFT**: Pass (5/10). Fully priced.\n"
+                ),
+            },
+        ]
+        turns = build_debate_dialogue_turns(messages, portfolio_symbols={"NVDA"})
+        self.assertIn("Quality over hype", turns[0]["text"])
+        self.assertIn("NVDA", turns[0]["text"])
+        self.assertNotIn("AAPL", turns[0]["text"])
 
 
 class FallbackBrawlTests(unittest.TestCase):

@@ -72,6 +72,17 @@ def _pick_sotu_quote(
     return "No overall portfolio critique was recorded for this session."
 
 
+def condense_sotu_quote(text: str, *, max_sentences: int = 2) -> str:
+    """Trim SoTU quotes for executive scan (1-2 sentences)."""
+    text = (text or "").strip()
+    if not text:
+        return text
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+    if len(sentences) <= max_sentences:
+        return text
+    return " ".join(sentences[:max_sentences])
+
+
 def build_state_of_union_quotes(
     raw_verdicts: dict[str, dict],
     *,
@@ -86,6 +97,6 @@ def build_state_of_union_quotes(
         stance = _stance_label(data.get("portfolio_verdicts") or [])
         quotes.append({
             "board_member": f"{role} {stance}",
-            "quote": critique,
+            "quote": condense_sotu_quote(critique),
         })
     return quotes

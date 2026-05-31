@@ -6,7 +6,11 @@ from google import genai
 from google.genai import types
 
 from src.core import agent_activity
-from src.core.investor_voice import INVESTOR_ATTRIBUTION_MANDATE, PANELIST_INVESTOR_HERO
+from src.core.investor_voice import (
+    BOARDROOM_CONVERSATION_MANDATE,
+    INVESTOR_ATTRIBUTION_MANDATE,
+    PANELIST_INVESTOR_HERO,
+)
 from src.output.briefing_style import GRAPHICS_QA_STYLE_MANDATE
 from src.qa.legal_policy import LEGAL_COUNSEL_SAAS_POLICY
 
@@ -44,7 +48,10 @@ META_DIRECTIVE = (
 
 def _panelist_instruction(base: str, panelist_key: str) -> str:
     hero = PANELIST_INVESTOR_HERO.get(panelist_key, "")
-    return f"{base}\n\n{hero}\n\n{INVESTOR_ATTRIBUTION_MANDATE}\n\n{META_DIRECTIVE}"
+    return (
+        f"{base}\n\n{hero}\n\n{INVESTOR_ATTRIBUTION_MANDATE}\n\n"
+        f"{BOARDROOM_CONVERSATION_MANDATE}\n\n{META_DIRECTIVE}"
+    )
 
 agent_config = {
     "board_members": {

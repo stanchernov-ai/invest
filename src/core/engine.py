@@ -198,10 +198,11 @@ class StateMachineOrchestrator:
     async def execute_parallel_board(self) -> None:
         agents = list(PANELIST_KEYS)
         round1_prompt = (
-            "Provide initial per-ticker analysis and verdicts for EVERY portfolio and watchlist symbol. "
-            "Write distinct 2-sentence rationales per symbol — this is the stock debate. "
-            "Reserve overall_portfolio_critique for portfolio-level State of the Union only; "
-            "it must NOT repeat your per-ticker arguments."
+            "ROUND 1 — open the floor with your initial statement to the investment committee.\n"
+            "1. `overall_portfolio_critique`: 2 sentences TO THE ROOM (concentration, regime, mandate). "
+            "Standard institutional stock language. Do NOT list tickers here.\n"
+            "2. Then grade EVERY portfolio and watchlist symbol with verdict + conviction + 1-2 sentence rationale.\n"
+            "3. Speak as if five adversarial peers are listening — this is dialogue, not a spreadsheet export."
         )
         tasks = [self._run_agent(a, round1_prompt, schema=PanelistPortfolioVerdict) for a in agents]
         results = await asyncio.gather(*tasks)
@@ -286,8 +287,9 @@ class StateMachineOrchestrator:
         vote_digest = format_vote_digest(summaries, portfolio_symbols=self._portfolio_symbols())
         clerk_prompt = (
             f"{vote_digest}\n\n"
-            "Synthesize the board debate into boardroom_brawl JSON — exactly 3 paragraphs "
-            "separated by blank lines. Name panelists and describe Round 2 attacks.\n\n"
+            "Synthesize the board debate into boardroom_brawl JSON — exactly 3 flowing narrative paragraphs "
+            "separated by blank lines. Write it as a conversation: Round 1 opening statements, Round 2 named "
+            "rebuttals and attacks, then the unresolved tension the Chairman must resolve. Name panelists.\n\n"
             f"{debate_digest}"
         )
         cos_res = await self._run_agent(

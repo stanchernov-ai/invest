@@ -25,8 +25,8 @@ class WatchlistAssetVerdict(BaseModel):
 class PanelistPortfolioVerdict(BaseModel):
     overall_portfolio_critique: str = Field(
         description=(
-            "ROUND 1 ONLY — 2-sentence portfolio-level view for State of the Union (concentration, "
-            "regime fit, mandate). MUST NOT repeat or summarize your per-ticker analyses."
+            "ROUND 1 ONLY — 2-sentence OPENING STATEMENT to the committee (concentration, regime, mandate). "
+            "Speak TO the room in standard buy-side language. MUST NOT list or summarize individual tickers."
         )
     )
     portfolio_verdicts: list[OwnedAssetVerdict] = Field(description="Verdicts for EVERY ticker provided in the CURRENT PORTFOLIO list.")
@@ -36,10 +36,9 @@ class PanelistPortfolioVerdict(BaseModel):
 class PanelistRebuttalVerdict(BaseModel):
     overall_portfolio_critique: str = Field(
         description=(
-            "ROUND 2 REBUTTAL ONLY — 2-3 NEW sentences for the debate log (Rebuttal Summary). "
-            "Name at least one other panelist, respond to a specific Round 1 argument, and "
-            "explain any vote changes. NOT used for executive briefing State of the Union "
-            "(SoTU uses your Round 1 Portfolio Overview). FORBIDDEN: copying Round 1 verbatim."
+            "ROUND 2 REBUTTAL ONLY — 2-3 NEW sentences speaking TO the room. "
+            "Name at least one peer, respond to their Round 1 claim, explain vote changes. "
+            "Conversational rebuttal — NOT a ticker laundry list. FORBIDDEN: copying Round 1 verbatim."
         )
     )
     portfolio_verdicts: list[OwnedAssetVerdict] = Field(
