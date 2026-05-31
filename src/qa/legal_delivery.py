@@ -109,8 +109,13 @@ def render_legal_counsel_email_html(
     """
 
 
-def persist_and_notify_briefing_legal(run_id: str, report: dict) -> dict[str, Any]:
-    """Save per-run briefing legal report and email Stan."""
+def persist_and_notify_briefing_legal(
+    run_id: str,
+    report: dict,
+    *,
+    send_email: bool = True,
+) -> dict[str, Any]:
+    """Save per-run briefing legal report; email owner when send_email=True."""
     finished = now_local().isoformat()
     payload = {
         "audit_type": "briefing",
@@ -130,13 +135,16 @@ def persist_and_notify_briefing_legal(run_id: str, report: dict) -> dict[str, An
         subtitle=f"Run {run_id} · pre-distribution briefing audit",
         artifact_ref=blob,
     )
-    email_ok = notifier.send_legal_counsel_report(
-        email_html,
-        subject=f"Legal Counsel Briefing — {subject_tag} ({run_id})",
-    )
+    if send_email:
+        email_ok = notifier.send_legal_counsel_report(
+            email_html,
+            subject=f"Legal Counsel Briefing — {subject_tag} ({run_id})",
+        )
+    else:
+        email_ok = None
     logger.info(
-        "[LEGAL COUNSEL] Briefing audit saved %s compliant=%s findings=%d email_ok=%s",
-        blob, compliant, findings_n, email_ok,
+        "[LEGAL COUNSEL] Briefing audit saved %s compliant=%s findings=%d email_ok=%s send_email=%s",
+        blob, compliant, findings_n, email_ok, send_email,
     )
     return {"blob": blob, "email_ok": email_ok, "payload": payload}
 

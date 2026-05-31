@@ -33,7 +33,19 @@ async def main() -> int:
         for path in files:
             sql = path.read_text(encoding="utf-8")
             print(f"Applying {path.name} ...")
-            await conn.execute(sql)
+            try:
+                await conn.execute(sql)
+            except Exception as exc:
+                if "pgcrypto" in str(exc).lower() and "allow" in str(exc).lower():
+                    print(
+                        "\nAzure blocked extension pgcrypto. Allow-list it first:\n"
+                        "  Portal → psql-boardroom-prod → Server parameters → azure.extensions\n"
+                        "  Add PGCRYPTO → Save → wait ~1 min → re-run this script.\n"
+                        "  Or CLI:\n"
+                        "  az postgres flexible-server parameter set -g rg-boardroom-prod "
+                        "-n psql-boardroom-prod --name azure.extensions --value PGCRYPTO\n"
+                    )
+                raise
             print(f"  OK")
     finally:
         await conn.close()

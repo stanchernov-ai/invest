@@ -142,6 +142,9 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 | **P1** | QA-090637-01 | open | Graphics Designer Visual SME | code | The 'The Debate' section contains excessively long and dense paragraphs for each analyst's initial positions. This creates a 'wall of text' that is not scannable and violates the requirement for concise analyst quotes and a scannable action plan. | qa_reports_20260531_090637.json |
 | **P2** | QA-090637-02 | open | Graphics Designer Visual SME | code | The executive briefing is missing a footer. A professional investment committee briefing should include a footer for essential information such as disclaimers, copyright, or contact details. | qa_reports_20260531_090637.json |
 | **P1** | QA-090637-03 | open | Prompt Engineer QA | code | QA agent failed compliance (1 CRITICAL). | qa_reports_20260531_090637.json |
+| **P1** | SAAS-2b | done | manual | code | **Per-user briefing email + ops-only QA/legal** — `email_routing.py`; testers get briefing only; owner slug `stan` gets validation emails | deploy May 31 |
+| **P1** | SAAS-2a | done | manual | code | **Phase 2:** Admin-provision `stan` + `tester1` from `src/data/extracts` (4 accounts, 14 positions each) | `scripts/admin_provision_user.py` |
+| **P3** | ONBOARD-LLM-1 | open | product | code | **LLM conversational onboarding** — chat intake for `profile_json` + holdings vs forms-only; evaluate legal (Publisher's Exemption / no personalized advice), cost, and hallucination risk | **Gate:** private beta + Legal review; **not** before admin-provision path works |
 
 **Done (recent):**
 | **P1** | PASS-SPAM-1 | done | Systems Architect | code | Reduce watchlist Pass spam in debate log — **validated PASS on `20260531_090637`** | qa_reports_20260531_090637.json |

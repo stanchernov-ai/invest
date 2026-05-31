@@ -21,7 +21,7 @@ from src.output import reporting
 from src.output import notifier
 from src.data.news_client import fetch_ticker_news
 from src.data.fmp_client import get_fmp_advanced_metrics, get_fmp_macro, prefetch_eod_cache
-from src.core.schemas import generate_dynamic_mandate
+from src.core.portfolio_policy import resolve_policy
 from src.core.data_oracle import build_price_feed, validate_price_feed
 from src.core import agent_activity
 from src.config.settings import settings, DATA_DIR, now_local
@@ -246,7 +246,8 @@ async def run_prepare(run_id: str = None, user_id: str = "stan") -> dict:
 
         tradeable_tickers = [sym for sym in master_ledger.keys() if sym != "BRK_LINK" and not sym.startswith("922")]
         sorted_ledger = sorted(master_ledger.items(), key=lambda x: x[1]["Total"], reverse=True)
-        live_mandate = generate_dynamic_mandate(total_portfolio_value, portfolio_12m_twr)
+        policy = resolve_policy({})
+        live_mandate = policy.generate_dynamic_mandate(total_portfolio_value, portfolio_12m_twr)
 
         divisor = total_portfolio_value if total_portfolio_value > 0 else 1.0
         heavy_tickers = [sym for sym, data in sorted_ledger if (data["Total"] / divisor) * 100 > 33.0 and sym in tradeable_tickers]

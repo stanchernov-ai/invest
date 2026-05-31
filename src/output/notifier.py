@@ -5,13 +5,19 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from src.config.settings import now_local
+from src.output.email_routing import ops_recipient
 
 logger = logging.getLogger(__name__)
 
-def send_executive_briefing(html_content: str):
+
+def _to_address(explicit: str | None) -> str | None:
+    return explicit or ops_recipient()
+
+
+def send_executive_briefing(html_content: str, *, to_email: str | None = None):
     sender_email = os.getenv("SENDER_EMAIL")
     sender_password = os.getenv("SENDER_PASSWORD")
-    recipient_email = os.getenv("STAN_PERSONAL_EMAIL")
+    recipient_email = _to_address(to_email)
 
     if not all([sender_email, sender_password, recipient_email]):
         logger.error("FATAL: Missing email credentials in environment variables. Cannot send briefing.")
@@ -42,10 +48,10 @@ def send_executive_briefing(html_content: str):
         logger.error(f"Failed to send email briefing: {e}")
         return False
 
-def send_qa_dashboard(html_content: str):
+def send_qa_dashboard(html_content: str, *, to_email: str | None = None):
     sender_email = os.getenv("SENDER_EMAIL")
     sender_password = os.getenv("SENDER_PASSWORD")
-    recipient_email = os.getenv("STAN_PERSONAL_EMAIL")
+    recipient_email = _to_address(to_email)
 
     if not all([sender_email, sender_password, recipient_email]):
         logger.error("FATAL: Missing email credentials in environment variables. Cannot send QA Dashboard.")
@@ -74,10 +80,10 @@ def send_qa_dashboard(html_content: str):
         logger.error(f"Failed to send QA Dashboard: {e}")
         return False
 
-def send_error_alert(error_message: str):
+def send_error_alert(error_message: str, *, to_email: str | None = None):
     sender_email = os.getenv("SENDER_EMAIL")
     sender_password = os.getenv("SENDER_PASSWORD")
-    recipient_email = os.getenv("STAN_PERSONAL_EMAIL")
+    recipient_email = _to_address(to_email)
 
     if not all([sender_email, sender_password, recipient_email]):
         logger.error("FATAL: Missing email credentials in environment variables. Cannot send error alert.")
@@ -118,10 +124,10 @@ def send_error_alert(error_message: str):
         logger.error(f"Failed to send error alert: {e}")
         return False
 
-def send_qa_digest(html_content: str):
+def send_qa_digest(html_content: str, *, to_email: str | None = None):
     sender_email = os.getenv("SENDER_EMAIL")
     sender_password = os.getenv("SENDER_PASSWORD")
-    recipient_email = os.getenv("STAN_PERSONAL_EMAIL")
+    recipient_email = _to_address(to_email)
 
     if not all([sender_email, sender_password, recipient_email]):
         logger.error("FATAL: Missing email credentials in environment variables. Cannot send QA Digest.")
@@ -151,11 +157,11 @@ def send_qa_digest(html_content: str):
         return False
 
 
-def send_legal_counsel_report(html_content: str, *, subject: str) -> bool:
+def send_legal_counsel_report(html_content: str, *, subject: str, to_email: str | None = None) -> bool:
     """Dedicated Legal Counsel findings email (briefing per-run or daily code audit)."""
     sender_email = os.getenv("SENDER_EMAIL")
     sender_password = os.getenv("SENDER_PASSWORD")
-    recipient_email = os.getenv("STAN_PERSONAL_EMAIL")
+    recipient_email = _to_address(to_email)
 
     if not all([sender_email, sender_password, recipient_email]):
         logger.error("FATAL: Missing email credentials — cannot send Legal Counsel report.")
@@ -179,10 +185,10 @@ def send_legal_counsel_report(html_content: str, *, subject: str) -> bool:
         return False
 
 
-def send_finance_oversight(html_content: str):
+def send_finance_oversight(html_content: str, *, to_email: str | None = None):
     sender_email = os.getenv("SENDER_EMAIL")
     sender_password = os.getenv("SENDER_PASSWORD")
-    recipient_email = os.getenv("STAN_PERSONAL_EMAIL")
+    recipient_email = _to_address(to_email)
 
     if not all([sender_email, sender_password, recipient_email]):
         logger.error("FATAL: Missing email credentials. Cannot send Finance Oversight report.")

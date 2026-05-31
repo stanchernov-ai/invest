@@ -16,6 +16,7 @@ from src import storage_client
 from src.output import reporting
 from src.output import briefing_enrichment
 from src.output import notifier
+from src.output.email_routing import briefing_recipient, ops_recipient, resolve_delivery_context
 from src.core.catalysts import ensure_chairman_catalysts
 from src.core import agent_activity
 from src.config.settings import now_local
@@ -74,6 +75,13 @@ async def run_deliver(run_id: str, user_id: str = "stan") -> dict:
         return {"run_id": run_id, "status": "failed"}
 
     storage_client.mark_phase(run_id, "deliver", "running", started_at=started.isoformat(), user_id=user_id)
+    mail_ctx = await resolve_delivery_context(user_id)
+    logger.info(
+        "[DELIVER] slug=%s briefing_to=%s ops_email=%s",
+        mail_ctx.get("slug"),
+        briefing_recipient(mail_ctx),
+        mail_ctx.get("receives_ops_email"),
+    )
 
     try:
         # Unpack prepared + debate state.
@@ -145,7 +153,11 @@ async def run_deliver(run_id: str, user_id: str = "stan") -> dict:
         qa_reports.append(legal_report)
 
         from src.qa.legal_delivery import persist_and_notify_briefing_legal
-        legal_delivery = persist_and_notify_briefing_legal(run_id, legal_report)
+        legal_delivery = persist_and_notify_briefing_legal(
+            run_id,
+            legal_report,
+            send_email=bool(mail_ctx.get("receives_ops_email")),
+        )
 
         from src.qa.scorecard import build_qa_scorecard, persist_scorecard
         from src.qa.human_review import build_review_url
@@ -208,16 +220,31 @@ async def run_deliver(run_id: str, user_id: str = "stan") -> dict:
         storage_client.save_report(f"raw_debate_log_{run_id}.md", raw_log_combined, user_id=user_id)
 
         briefing_sent_at = now_local().isoformat()
-        briefing_ok = notifier.send_executive_briefing(investor_briefing_html)
+        briefing_ok = notifier.send_executive_briefing(
+            investor_briefing_html,
+            to_email=briefing_recipient(mail_ctx),
+        )
         qa_sent_at = now_local().isoformat()
-        qa_ok = notifier.send_qa_dashboard(qa_dashboard_html)
+        if mail_ctx.get("receives_ops_email"):
+            qa_ok = notifier.send_qa_dashboard(qa_dashboard_html, to_email=ops_recipient())
+        else:
+            logger.info(
+                "[DELIVER] Skipping QA dashboard email for non-owner slug=%s (ops inbox only).",
+                mail_ctx.get("slug"),
+            )
+            qa_ok = True
         email_delivery = {
             "briefing": {"ok": briefing_ok, "sent_at": briefing_sent_at},
-            "qa_dashboard": {"ok": qa_ok, "sent_at": qa_sent_at},
+            "qa_dashboard": {
+                "ok": qa_ok,
+                "sent_at": qa_sent_at,
+                "skipped": not mail_ctx.get("receives_ops_email"),
+            },
             "legal_counsel": {
                 "ok": legal_delivery.get("email_ok"),
                 "blob": legal_delivery.get("blob"),
                 "sent_at": now_local().isoformat(),
+                "skipped": not mail_ctx.get("receives_ops_email"),
             },
         }
         if briefing_ok:
@@ -231,16 +258,17 @@ async def run_deliver(run_id: str, user_id: str = "stan") -> dict:
                 "(artifacts saved to blob; check SMTP creds / App Insights).",
                 run_id, briefing_sent_at,
             )
-        if qa_ok:
-            logger.info(
-                "[DELIVER] QA dashboard email OK for run %s at %s.",
-                run_id, qa_sent_at,
-            )
-        else:
-            logger.warning(
-                "[DELIVER] QA dashboard email FAILED for run %s at %s.",
-                run_id, qa_sent_at,
-            )
+        if mail_ctx.get("receives_ops_email"):
+            if qa_ok:
+                logger.info(
+                    "[DELIVER] QA dashboard email OK for run %s at %s.",
+                    run_id, qa_sent_at,
+                )
+            else:
+                logger.warning(
+                    "[DELIVER] QA dashboard email FAILED for run %s at %s.",
+                    run_id, qa_sent_at,
+                )
 
         if not briefing_ok:
             finished = now_local()
