@@ -171,7 +171,7 @@ class BriefingCopyTests(unittest.TestCase):
         self.assertIn("Rebuttal", debate_section)
         self.assertNotRegex(debate_section, r"ROUND\s+[12]", re.I)
         self.assertIn("border-radius:50%", debate_section.replace(" ", ""))
-        self.assertIn("overflow:hidden", debate_section)
+        self.assertNotIn("overflow:hidden", debate_section)
 
 
 class ChartColorTests(unittest.TestCase):
@@ -391,7 +391,7 @@ class BriefingHtmlTests(unittest.TestCase):
         section = html[action_pos:]
         self.assertIn(PANELIST_AVATAR_URLS["tesla"], section)
         self.assertIn(PANELIST_AVATAR_URLS["hypatia"], section)
-        self.assertIn("width:42px;height:42px", section.replace(" ", ""))
+        self.assertIn("width:40px;height:40px", section.replace(" ", ""))
 
     def test_sotu_quotes_shorten_peer_names_in_body_only(self):
         hypatia = PANELIST_ROLES["hypatia"]

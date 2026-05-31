@@ -580,9 +580,8 @@ def _attach_narrative_portraits(narrative: dict) -> dict:
             ring_background=BG_SURFACE,
         )
         narrative[f"{role}_avatar_url"] = PANELIST_AVATAR_URLS[panelist_key]
-        narrative[f"{role}_avatar_ring_style"] = portrait["ring"]
-        narrative[f"{role}_avatar_cell_style"] = portrait["cell"]
         narrative[f"{role}_avatar_img_style"] = portrait["img"]
+        narrative[f"{role}_avatar_img_size"] = portrait["img_size"]
     return narrative
 
 
@@ -1018,10 +1017,9 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
         quote['sotu_bg'] = sotu_bg
         quote['sotu_border'] = sotu_border
         quote['sotu_glow'] = sotu_glow
-        portrait = portrait_clip_styles(panelist_key, ring_background=sotu_bg)
-        quote['avatar_ring_style'] = portrait["ring"]
-        quote['avatar_cell_style'] = portrait["cell"]
+        portrait = portrait_clip_styles(panelist_key)
         quote['avatar_img_style'] = portrait["img"]
+        quote['avatar_img_size'] = portrait["img_size"]
         if quote.get("quote"):
             quote["quote"] = shorten_panelist_references(
                 _sanitize_briefing_text(quote["quote"])
@@ -1162,14 +1160,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                                 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom:10px;">
                                     <tr>
                                         {% if pos.narrative.champion_avatar_url %}
-                                        <td valign="top" style="padding-right:10px;width:{{ action_plan_avatar_size }}px;">
-                                            <div style="{{ pos.narrative.champion_avatar_ring_style }}">
-                                                <table cellpadding="0" cellspacing="0" role="presentation" style="{{ pos.narrative.champion_avatar_cell_style }}">
-                                                    <tr><td style="{{ pos.narrative.champion_avatar_cell_style }}">
-                                                        <img src="{{ pos.narrative.champion_avatar_url }}" style="{{ pos.narrative.champion_avatar_img_style }}" alt="{{ pos.narrative.champion }} avatar">
-                                                    </td></tr>
-                                                </table>
-                                            </div>
+                                        <td valign="top" align="center" style="padding-right:10px;width:{{ action_plan_avatar_size }}px;">
+                                            <img src="{{ pos.narrative.champion_avatar_url }}" width="{{ pos.narrative.champion_avatar_img_size }}" height="{{ pos.narrative.champion_avatar_img_size }}" style="{{ pos.narrative.champion_avatar_img_style }}" alt="{{ pos.narrative.champion }} avatar">
                                         </td>
                                         {% endif %}
                                         <td valign="top">
@@ -1180,14 +1172,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                                 <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
                                     <tr>
                                         {% if pos.narrative.dissenter_avatar_url %}
-                                        <td valign="top" style="padding-right:10px;width:{{ action_plan_avatar_size }}px;">
-                                            <div style="{{ pos.narrative.dissenter_avatar_ring_style }}">
-                                                <table cellpadding="0" cellspacing="0" role="presentation" style="{{ pos.narrative.dissenter_avatar_cell_style }}">
-                                                    <tr><td style="{{ pos.narrative.dissenter_avatar_cell_style }}">
-                                                        <img src="{{ pos.narrative.dissenter_avatar_url }}" style="{{ pos.narrative.dissenter_avatar_img_style }}" alt="{{ pos.narrative.dissenter }} avatar">
-                                                    </td></tr>
-                                                </table>
-                                            </div>
+                                        <td valign="top" align="center" style="padding-right:10px;width:{{ action_plan_avatar_size }}px;">
+                                            <img src="{{ pos.narrative.dissenter_avatar_url }}" width="{{ pos.narrative.dissenter_avatar_img_size }}" height="{{ pos.narrative.dissenter_avatar_img_size }}" style="{{ pos.narrative.dissenter_avatar_img_style }}" alt="{{ pos.narrative.dissenter }} avatar">
                                         </td>
                                         {% endif %}
                                         <td valign="top">
@@ -1207,14 +1193,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             {% for quote in sotu_quotes %}
                 <table width="100%" cellpadding="0" cellspacing="0" class="sotu-row" style="margin: 12px 0; border-left: 4px solid {{ quote.sotu_border }}; background-color: {{ quote.sotu_bg }}; border-radius: 8px; {{ quote.sotu_glow }}">
                     <tr>
-                        <td width="{{ sotu_avatar_col_width }}" valign="top" class="sotu-avatar-col" style="{{ email_styles.sotu_avatar_cell }}">
-                            <div style="{{ quote.avatar_ring_style }}">
-                                <table cellpadding="0" cellspacing="0" role="presentation" style="{{ quote.avatar_cell_style }}">
-                                    <tr><td style="{{ quote.avatar_cell_style }}">
-                                        <img src="{{ quote.avatar_url }}" style="{{ quote.avatar_img_style }}" alt="{{ quote.board_member }} avatar">
-                                    </td></tr>
-                                </table>
-                            </div>
+                        <td width="{{ sotu_avatar_col_width }}" align="center" valign="middle" class="sotu-avatar-col" style="{{ email_styles.sotu_avatar_cell }}">
+                            <img src="{{ quote.avatar_url }}" width="{{ quote.avatar_img_size }}" height="{{ quote.avatar_img_size }}" style="{{ quote.avatar_img_style }}" alt="{{ quote.board_member }} avatar">
                         </td>
                         <td valign="middle" class="sotu-quote-col" style="{{ email_styles.sotu_quote }}">
                             <strong style="{{ email_styles.strong }}">{{ quote.board_member }}:</strong> "{{ quote.quote }}"
@@ -1234,14 +1214,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                             <table cellpadding="0" cellspacing="0" width="92%" align="{{ block.align }}" role="presentation">
                                 <tr>
                                     {% if block.align == 'left' %}
-                                    <td valign="top" style="padding-right:10px;width:{{ debate_avatar_size }}px;">
-                                        <div style="{{ block.avatar_ring_style }}">
-                                            <table cellpadding="0" cellspacing="0" role="presentation" style="{{ block.avatar_cell_style }}">
-                                                <tr><td style="{{ block.avatar_cell_style }}">
-                                                    <img src="{{ block.avatar_url }}" style="{{ block.avatar_img_style }}" alt="{{ block.speaker }} avatar">
-                                                </td></tr>
-                                            </table>
-                                        </div>
+                                    <td valign="top" align="center" style="padding-right:10px;width:{{ debate_avatar_size }}px;">
+                                        <img src="{{ block.avatar_url }}" width="{{ block.avatar_img_size }}" height="{{ block.avatar_img_size }}" style="{{ block.avatar_img_style }}" alt="{{ block.speaker }} avatar">
                                     </td>
                                     <td valign="top" style="{{ email_styles.debate_bubble }}">
                                         <p style="{{ email_styles.debate_speaker }}">{{ block.speaker }}{% if block.turn_heading %} &middot; {{ block.turn_heading }}{% endif %}</p>
@@ -1252,14 +1226,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
                                         <p style="{{ email_styles.debate_speaker }}">{{ block.speaker }}{% if block.turn_heading %} &middot; {{ block.turn_heading }}{% endif %}</p>
                                         <p style="{{ email_styles.debate_text }}">{{ block.text }}</p>
                                     </td>
-                                    <td valign="top" style="padding-left:10px;width:{{ debate_avatar_size }}px;">
-                                        <div style="{{ block.avatar_ring_style }}">
-                                            <table cellpadding="0" cellspacing="0" role="presentation" style="{{ block.avatar_cell_style }}">
-                                                <tr><td style="{{ block.avatar_cell_style }}">
-                                                    <img src="{{ block.avatar_url }}" style="{{ block.avatar_img_style }}" alt="{{ block.speaker }} avatar">
-                                                </td></tr>
-                                            </table>
-                                        </div>
+                                    <td valign="top" align="center" style="padding-left:10px;width:{{ debate_avatar_size }}px;">
+                                        <img src="{{ block.avatar_url }}" width="{{ block.avatar_img_size }}" height="{{ block.avatar_img_size }}" style="{{ block.avatar_img_style }}" alt="{{ block.speaker }} avatar">
                                     </td>
                                     {% endif %}
                                 </tr>
@@ -1396,9 +1364,8 @@ def generate_html_briefing(total_val, qqq_trend, portfolio_3m_trend, mandate, ch
             size=DEBATE_AVATAR_SIZE,
             ring_background=BG_CONTAINER,
         )
-        block["avatar_ring_style"] = portrait["ring"]
-        block["avatar_cell_style"] = portrait["cell"]
         block["avatar_img_style"] = portrait["img"]
+        block["avatar_img_size"] = portrait["img_size"]
     if any(b.get("kind") == "turn" for b in debate_bubbles):
         show_debate = True
     

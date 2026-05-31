@@ -59,9 +59,9 @@ Deliver-only re-render: `GET /api/deliver?run_id=<run_id>&code=<function-key>`.
 
 | Pri | ID | Effort | Item | Notes |
 |-----|-----|--------|------|-------|
-| **P0** | AV-1 | S | Upload bust JPGs to blob | `hypatia.jpg`, `davinci.jpg`, `suntzu.jpg`, `tesla.jpg`, `aurelius.jpg` — paths in [`briefing_avatars.md`](briefing_avatars.md) |
-| **P1** | CHAIR-1 | M | Chairman vs majority Trim/Sell | Recurring on `004535` (TSM/AVGO/ANET) and `010432` (AVGO/ASML); 10% cap → TRIM not HOLD |
-| **P1** | GFX-2 | M | Logo contrast on `#27272a` | Dark PNG logos invisible — FMP image fallback or light border |
+| **P1** | AV-2 | S | SoTU avatar ring alignment | Gold ring baked into 1024² PNG (~18px off center on `davinci`); CSS clip cannot fix reliably in Gmail. **Rejected:** split grey avatar cell — Stan prefers full stance-colored row. **Fix:** re-export 128×128 transparent circular PNGs with ring centered, or accept minor halo until AV-2. |
+| **P1** | GFX-2 | S | Logo contrast on `#27272a` | **Partial** — light chip shipped locally; verify in Gmail |
+| **P2** | GFX-QA | S | Remove `.qa-box` from investor CSS | **Done locally** — strip from `executive_briefing_css()` |
 | **P1** | GFX-3 | M | Pie categorical palette | Too many similar greens on dark canvas — distinct ramp per slice |
 | **P1** | AP-1 | S | Flash Strategic Context quality | Duplicate Champion when Flash output short |
 | **P1** | INT-1 | M | Integrity auditor R2 ground truth + JSON parse hardening | `214609` TSM lesson; `010432` parse crash |
@@ -101,8 +101,9 @@ Deliver-only re-render: `GET /api/deliver?run_id=<run_id>&code=<function-key>`.
 
 | Pri | ID | Effort | Item | Gate |
 |-----|-----|--------|------|------|
-| — | SAAS-0 | — | Design SSOT — [`saas_technical_solution.md`](saas_technical_solution.md) | **DONE** (May 29) |
-| **P2** | SAAS-1 | L | SaaS foundation (phases 1–4 in doc) | **Blocked on:** stable QA pass rate + core flow simplification |
+| — | SAAS-0 | — | Design SSOT — [`saas_technical_solution.md`](saas_technical_solution.md) + [`saas_data_schema.md`](saas_data_schema.md) + [`saas_postgres_rollout.md`](saas_postgres_rollout.md) | **DONE** (May 30) |
+| **P2** | SAAS-1 | L | Phase 1–2: `PortfolioSource` + Azure Postgres + admin-provision beta | **Blocked on:** stable QA pass rate + core flow simplification |
+| **P3** | SAAS-2 | M | Phase 4: Entra External ID self-service | After Phase 2b beta validated |
 
 ---
 

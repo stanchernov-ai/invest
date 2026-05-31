@@ -19,17 +19,19 @@ class BriefingStyleTests(unittest.TestCase):
         self.assertTrue(colors[1].startswith("#"))
         self.assertEqual(colors[2], briefing_style.CHART_NEUTRAL)
 
-    def test_portrait_clip_circular_with_matched_background(self):
-        styles = briefing_style.portrait_clip_styles(
-            "hypatia",
-            size=96,
-            ring_background=briefing_style.SOTU_BEAR_BG,
-        )
-        self.assertIn("border-radius:50%", styles["ring"])
-        self.assertIn("overflow:hidden", styles["ring"])
-        self.assertIn(briefing_style.SOTU_BEAR_BG, styles["ring"])
-        self.assertIn("width:102px;height:102px", styles["img"])
-        self.assertIn("margin:-3px", styles["img"])
+    def test_portrait_clip_circular_on_img(self):
+        styles = briefing_style.portrait_clip_styles("hypatia", size=48)
+        self.assertIn("border-radius:50%", styles["img"])
+        self.assertIn("width:48px;height:48px", styles["img"])
+
+    def test_sotu_portrait_uses_circular_clip(self):
+        styles = briefing_style.portrait_clip_styles("hypatia")
+        self.assertIn("width:128px;height:128px", styles["img"])
+        self.assertIn("border-radius:50%", styles["img"])
+
+    def test_executive_briefing_css_omits_qa_box(self):
+        css = briefing_style.executive_briefing_css()
+        self.assertNotIn(".qa-box", css)
 
     def test_chart_charge_colors_sign_semantics(self):
         colors = briefing_style.chart_charge_colors([12.0, -8.0, 0.02, 5.0])

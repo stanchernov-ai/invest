@@ -187,12 +187,9 @@ SOTU_NEUTRAL_BG = "#0f1a2e"    # dark navy — between bear and bull on #121212
 SOTU_NEUTRAL_EDGE = "#1e3a5f"
 SOTU_NEUTRAL_GLOW_RGB = "147,197,253"
 SOTU_NEUTRAL_TEXT = NEUTRAL_BLUE
-SOTU_AVATAR_SIZE = 96
-SOTU_AVATAR_COLUMN_WIDTH = 112
-# Circular clip hides square PNG corners; ~1.06 fills the disc with gold without cropping the halo.
-SOTU_AVATAR_ZOOM = 1.06
+SOTU_AVATAR_SIZE = 128
+SOTU_AVATAR_COLUMN_WIDTH = 152
 DEBATE_AVATAR_SIZE = 48
-DEBATE_AVATAR_ZOOM = 1.06
 ACTION_PLAN_AVATAR_SIZE = 40
 
 
@@ -278,11 +275,11 @@ def sotu_quote_colors(board_member_label: str) -> tuple[str, str]:
 
 def ticker_logo_inline_style(*, size: int = 28) -> str:
     """Light chip behind FMP logos so dark PNGs read on ``#27272a`` cards."""
-    chip = "#e4e4e7"
+    chip = "#f4f4f5"
     return (
         f"width:{size}px;height:{size}px;border-radius:6px;display:block;"
-        f"max-width:{size}px;background-color:{chip};padding:3px;"
-        f"border:1px solid {BORDER_SUBTLE};"
+        f"max-width:{size}px;background-color:{chip};padding:4px;"
+        f"border:1px solid #71717a;"
     )
 
 
@@ -290,31 +287,17 @@ def portrait_clip_styles(
     panelist_key: str | None = None,
     *,
     size: int = SOTU_AVATAR_SIZE,
-    zoom: float | None = None,
     ring_background: str = BG_CONTAINER,
-) -> dict[str, str]:
-    """Email-safe circular portrait — clip square PNG corners, keep gold ring visible."""
-    _ = panelist_key  # reserved for per-panelist zoom overrides
-    if size <= DEBATE_AVATAR_SIZE:
-        scale = zoom if zoom is not None else DEBATE_AVATAR_ZOOM
-    else:
-        scale = zoom if zoom is not None else SOTU_AVATAR_ZOOM
-    img_size = max(1, int(round(size * scale)))
-    inset = max(0, int((img_size - size) // 2))
-    font = "font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;"
+) -> dict[str, str | int]:
+    """Circular portrait — ``border-radius`` on ``<img>`` (email-safe)."""
+    _ = panelist_key
+    _ = ring_background
     return {
-        "ring": (
-            f"width:{size}px;height:{size}px;border-radius:50%;overflow:hidden;"
-            f"display:block;line-height:0;background-color:{ring_background};"
-        ),
-        "cell": (
-            f"width:{size}px;height:{size}px;text-align:center;vertical-align:middle;"
-            f"padding:0;margin:0;line-height:{size}px;{font}"
-        ),
         "img": (
-            f"width:{img_size}px;height:{img_size}px;display:block;border:0;"
-            f"margin:-{inset}px 0 0 -{inset}px;"
+            f"width:{size}px;height:{size}px;border-radius:50%;display:block;"
+            f"border:0;margin:0 auto;padding:0;"
         ),
+        "img_size": size,
     }
 
 
@@ -414,12 +397,8 @@ def executive_briefing_inline_styles() -> dict[str, str]:
         "ticker_logo_sm": ticker_logo_inline_style(size=28),
         "ticker_logo_md": ticker_logo_inline_style(size=48),
         "sotu_avatar_cell": (
-            f"padding:14px 0 14px 14px;vertical-align:top;width:{SOTU_AVATAR_COLUMN_WIDTH}px;"
-        ),
-        "sotu_avatar_ring": (
-            f"width:{SOTU_AVATAR_SIZE}px;height:{SOTU_AVATAR_SIZE}px;"
-            f"border-radius:50%;overflow:hidden;display:block;line-height:0;"
-            f"background-color:{BG_CONTAINER};"
+            f"padding:12px;text-align:center;vertical-align:middle;"
+            f"width:{SOTU_AVATAR_COLUMN_WIDTH}px;"
         ),
         "sotu_quote": (
             f"padding:14px 16px 14px 6px;font-style:italic;color:{TEXT_PRIMARY};line-height:1.55;{font}"
@@ -581,15 +560,6 @@ def executive_briefing_css() -> str:
                 border-top: 1px solid var(--border-subtle);
                 padding-top: 20px;
             }}
-            .qa-box {{
-                margin-top: 40px;
-                font-size: 0.85em;
-                line-height: 1.7;
-                color: var(--text-primary);
-                border-top: 1px dashed var(--border-subtle);
-                padding-top: 15px;
-            }}
-            .qa-box strong {{ color: var(--text-highlight); }}
             """
 
 
