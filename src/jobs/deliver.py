@@ -242,6 +242,9 @@ async def run_deliver(run_id: str) -> dict:
         merged_telemetry = _merge_telemetry(
             prep.get("telemetry"), debate.get("telemetry"), deliver_activity
         )
+        from src.qa.qa_augmentation import extract_qa_execution
+
+        merged_telemetry["QA_EXECUTION"] = extract_qa_execution(qa_reports)
         merged_telemetry["QA_SCORECARD"] = qa_scorecard
         storage_client.save_report(f"api_telemetry_{run_id}.json", json.dumps(merged_telemetry, indent=4))
 

@@ -221,7 +221,7 @@ Runs **1 hour after** the daily pipeline timer (`0 0 7 * * *` vs `0 0 6 * * *` i
 
 | Module | Purpose |
 |--------|---------|
-| `src/hr_review.py` | KEEP / MERGE / CUT roster analysis from `AGENT_ACTIVITY` |
+| `src/hr_review.py` | KEEP / IMPROVE / CUT roster analysis from `AGENT_ACTIVITY` + `QA_EXECUTION` — see [`hr_qa_roster_handoff.md`](hr_qa_roster_handoff.md) |
 | `src/finance_oversight.py` | Subscription / plan-fit audit |
 
 ### 3.6 Cross-run state — verdict memory & scout

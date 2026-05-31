@@ -1,7 +1,7 @@
 """Deterministic Systems Architect QA pre-checks — chairman JSON, raw_verdicts, log bloat.
 
 Python catches structural failures and debate-log bloat; the LLM is skipped on
-deterministic PASS (token/latency gate). On FAIL, Python findings are authoritative.
+deterministic PASS. On FAIL, a Flash LLM pass augments Python findings (see qa_augmentation).
 """
 from __future__ import annotations
 

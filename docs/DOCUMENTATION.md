@@ -28,6 +28,7 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | See agent diagrams, production roster, QA layers | [`agent_architecture.md`](agent_architecture.md) |
 | **Agent audit, runtime optimizations, funding sell** | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) |
 | **Cursor agents, ecosystem_state, post-job sync** | [`cursor_dev_plane_handoff.md`](cursor_dev_plane_handoff.md) |
+| **HR roster review, QA token augmentation, agent KEEP/IMPROVE policy** | [`hr_qa_roster_handoff.md`](hr_qa_roster_handoff.md) |
 | Understand **which QA module** does what | [`qa_layers.md`](qa_layers.md) |
 | Understand pipeline phases, deploy, data layer, **vote_engine** | [`technical_solution.md`](technical_solution.md) |
 | Plan SaaS / multi-tenant (blocked on stabilization) | [`saas_technical_solution.md`](saas_technical_solution.md) |
@@ -67,6 +68,7 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | [`agent_architecture.md`](agent_architecture.md) | Agent inventory, mermaid diagrams, QA layers L0–L7, golden fixtures |
 | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) | **May 2026 audit**, telemetry baseline, funding sell, planned runtime tickets A1–B4 |
 | [`cursor_dev_plane_handoff.md`](cursor_dev_plane_handoff.md) | Cursor agents, ecosystem_state sync, standing QA digest tickets C1–C5 |
+| [`hr_qa_roster_handoff.md`](hr_qa_roster_handoff.md) | HR Efficiency Consultant, `QA_EXECUTION`, augmentation policy, Stan roster decisions |
 | [`qa_layers.md`](qa_layers.md) | **Which QA file runs when** — deliver vs weekly vs dev |
 | [`briefing_charts_handoff.md`](briefing_charts_handoff.md) | QuickChart, palettes, briefing layout |
 | [`technical_solution.md`](technical_solution.md) | End-to-end flow, repo layout, env vars, blob containers, vote_engine |

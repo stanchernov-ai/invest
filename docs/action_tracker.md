@@ -1,7 +1,7 @@
 # SC Invest Boardroom — Action Tracker
 
 **Status:** Active  
-**Last Updated:** May 30, 2026 (deploy batch staged — commit/deploy blocked)
+**Last Updated:** May 30, 2026 (deploy batch + review universe **shipped**; prod run `20260530_205821` SUCCESS)
 
 **Purpose:** Current session pickup and prioritized backlog. Historical handoffs and Phase 0–6 specs live in [`archive/implementation_log_2026-05.md`](archive/implementation_log_2026-05.md). Maintenance rules: [`doc_hygiene.md`](doc_hygiene.md). Doc map: [`DOCUMENTATION.md`](DOCUMENTATION.md).
 
@@ -9,92 +9,91 @@
 
 ---
 
-## Session Handoff — May 30, 2026 deploy batch (**pick up here**)
+## Session Handoff — May 30, 2026 deploy + review universe (**pick up here**)
 
-**Theme:** Large **deliver + compliance + briefing UX** batch is **fully staged** but **not committed**. Prior agent hung on `git commit` (pre-commit runs full `unittest discover`). **Prod unchanged** at `a17792b`.
+**Theme:** **Deploy batch and REVIEW-1 are on prod.** Prior stream handoff (staged / not committed) is **superseded** — this session committed, pushed, deployed, and validated.
 
 | State | Detail |
 |-------|--------|
-| **Prod HEAD** | `a17792b` — vote digest SSOT, Action Plan context, email delivery logging |
-| **Last validated run** | `20260530_190325` (~3m46s, QA PASS, email ok) — pre–Legal Counsel / UNICORN-1 |
-| **Local git** | **33 files staged** (~1,591 lines); **not committed, not pushed** |
-| **Deploy** | Blocked — push `main` triggers GitHub Actions → `app-boardroom-prod` |
-| **Next run** | After deploy: `GET /api/prepare?code=<function-key>` on regional hostname below |
+| **Prod HEAD** | `9f26173` — Legal Counsel + briefing UX (`83ecdca`) + review universe / Yahoo cache / FMP stable screener (`9f26173`) |
+| **Last validated run** | **`20260530_205821`** (~4 min, pipeline SUCCESS, email ok) — first post–Legal Counsel / UNICORN-1 / Mag7 run |
+| **Local git** | `main` synced with `origin/main`; **uncommitted WIP** in working tree (HR/QA roster, SaaS docs — see below) |
+| **Deploy** | GitHub Actions on push to `main` → `app-boardroom-prod` (no `gh` CLI on Stan's Windows box — poll Azure or GitHub web) |
 
-**Kickoff:** `GET /api/prepare?code=<function-key>` — hostname: `app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewebsites.net` ([`engineering_playbook.md`](engineering_playbook.md)). Function key: `az functionapp keys list -g rg-boardroom-prod -n app-boardroom-prod --query functionKeys.default -o tsv`.
-
-### First steps (successor — do in order)
-
-1. **Commit staged batch only** (PowerShell — no bash heredoc):
-
-```powershell
-cd c:\Projects\sc-invest-boardroom
-@'
-Add Legal Counsel QA, briefing UX fixes, and investor voice.
-
-Legal counsel scans briefing HTML and codebase daily; catalyst fallback, per-stock debate, QA review footer, hide Unicorn when no actionable unanimous trades.
-'@ | Set-Content -Encoding utf8 _commitmsg.txt
-git commit -F _commitmsg.txt
-Remove-Item _commitmsg.txt
-```
-
-Pre-commit hook runs **full** `unittest discover` — expect **2–10 min**; do not interrupt. If hook fails, fix and **new commit** (do not amend unless hook auto-fixed files).
-
-2. **Push:** `$env:GIT_TERMINAL_PROMPT=0; git push origin main`
-3. **Watch deploy:** `gh run watch --exit-status` (latest “Deploy to Azure Functions” workflow)
-4. **Kick off run** (note local `run_id` = timestamp at trigger):
+**Kickoff (manual run):** `GET /api/prepare?code=<function-key>` — hostname: `app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewebsites.net`. Function key: `az functionapp keys list -g rg-boardroom-prod -n app-boardroom-prod --query functionKeys.default -o tsv`. **Note:** `/api/prepare` is **synchronous** — waits for prepare phase (~8–60s) before returning 202; do not interrupt.
 
 ```powershell
 $key = az functionapp keys list -g rg-boardroom-prod -n app-boardroom-prod --query functionKeys.default -o tsv
 Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewebsites.net/api/prepare?code=$key" -UseBasicParsing
+.venv\Scripts\python.exe scripts\wait_for_run.py --run-id YYYYMMDD_HHMMSS --timeout 2700 --post-job
 ```
 
-5. **Poll:** `.venv\Scripts\python.exe scripts\wait_for_run.py --run-id YYYYMMDD_HHMMSS --timeout 2700 --post-job`
-6. **Human QA (Gmail):** section order, per-stock debate, catalysts, Legal Counsel email, QA review footer link, Unicorn hidden when no 5/5 Buy/Reduce
-
-### Staged batch (ready to ship)
+### Shipped in `83ecdca` + `9f26173`
 
 | Area | Key paths | What |
 |------|-----------|------|
-| **Legal Counsel QA** | `src/qa/legal_audit.py`, `legal_policy.py`, `legal_delivery.py`, `src/jobs/legal_code_audit.py`, `function_app.py` | Briefing HTML scan at deliver; daily 8 AM code audit timer + `GET /api/legal-code-audit`; findings blob + email Stan |
-| **Investor voice** | `src/core/investor_voice.py`, `agents.py` | Panelists cite named investors + industry terms; SaaS-safe attribution mandate |
-| **Briefing UX** | `reporting.py`, `briefing_style.py` | GFX-4 order (Charts → SoTU → Alpha → Debate → Unicorn → Action Plan); QA review footer CTA; catalyst fallback; **UNICORN-1** hide when empty |
-| **Debate** | `boardroom_brawl.py`, `engine.py` | Per-stock Round 1 positions (not SoTU duplicate) |
-| **Catalysts** | `catalysts.py`, `deliver.py` | `ensure_chairman_catalysts` when chairman `upcoming_events` empty |
-| **INT-1** | `integrity_audit.py`, `qa_pipeline.py`, fixtures | Vote digest in integrity prompt; Post Mortem cross-check; `count_equity_buys` cap fix |
-| **Tests** | `test_legal_*`, `test_catalysts`, `test_unicorn_protocol`, `test_boardroom_brawl`, etc. | 52+ tests pass on touched modules (run full suite before push) |
+| **Legal Counsel QA** | `src/qa/legal_*.py`, `src/jobs/legal_code_audit.py`, `function_app.py` | Briefing HTML scan at deliver; daily 8 AM code audit; findings blob + email |
+| **Investor voice** | `src/core/investor_voice.py`, `agents.py` | Panelists cite named investors; SaaS-safe attribution |
+| **Briefing UX** | `reporting.py`, `briefing_style.py` | GFX-4 order; QA review footer; catalyst fallback; **UNICORN-1** hide when empty |
+| **Debate** | `boardroom_brawl.py`, `engine.py` | Per-stock Round 1 positions |
+| **Catalysts** | `catalysts.py`, `deliver.py` | `ensure_chairman_catalysts` fallback |
+| **INT-1** | `integrity_audit.py`, `qa_pipeline.py` | Vote digest in integrity prompt; cap fix |
+| **REVIEW-1** | `src/data/review_universe.py`, `prepare.py`, `scout.py` | Mag7 + manual + **daily-cached** Yahoo; FMP `/stable/company-screener` fallback |
+| **Scout validation** | `scripts/validate_scout_sources.py` | Live probe before prod scout changes — run and PASS before deploy |
 
-**Pre-push sanity:**
+### Run `20260530_205821` — post-deploy QA notes
 
-```powershell
-.venv\Scripts\python.exe -m pytest tests/test_unicorn_protocol.py tests/test_legal_audit.py tests/test_legal_delivery.py tests/test_catalysts.py tests/test_boardroom_brawl.py tests/test_vote_engine.py -q
-```
+| Phase | Duration | Status |
+|-------|----------|--------|
+| Prepare | 8s | success |
+| Debate | 106s | success |
+| Deliver | 97s | success |
 
-### Not in staged batch (separate WIP — do not mix into first commit)
+**Email:** briefing + QA dashboard + Legal Counsel — all sent.
+
+**QA advisory (non-blocking):**
+- **Systems Architect** — debate log Pass spam (164 mentions / 27 symbols) — Mag7 + Yahoo universe widened watchlist
+- **Graphics Designer** — SoTU `box-shadow` non-SSOT colors; MSFT logo contrast (GFX-2)
+- **Integrity** — disputed Graphics CRITICAL (meta-QA disagreement)
+
+**Human QA still open (Gmail):** section order (GFX-4), per-stock debate, catalysts, Legal Counsel email, QA review footer, Unicorn hidden when no 5/5 trades.
+
+**Artifacts cached:** `.cache/reports/executive_briefing_20260530_205821.html`, `qa_dashboard_*.html`, `state/legal_counsel_briefing_*.json`
+
+### Uncommitted WIP (do not assume prod)
 
 | Path | Status |
 |------|--------|
-| `src/data/review_universe.py`, `tests/test_review_universe.py` | **Untracked** — Mag7 + Yahoo watchlist merge at prepare |
-| `src/jobs/prepare.py`, `src/scout.py` | **Unstaged** — wires `build_review_universe()`; needs its own commit + test |
-| `docs/saas_technical_solution.md` | Unstaged edits |
-| `docs/saas_data_schema.md`, `docs/saas_postgres_rollout.md` | Untracked SaaS design (SAAS-0 docs only) |
+| `docs/saas_data_schema.md`, `docs/saas_postgres_rollout.md`, `docs/saas_technical_solution.md` | Untracked / unstaged — SAAS-0 design only |
+| `docs/hr_qa_roster_handoff.md`, `src/hr_review.py`, `src/finance_oversight.py`, `tests/test_hr_review.py` | HR/QA roster stream — separate commit |
+| `src/qa_pipeline.py`, `src/qa/architect_audit.py`, `src/qa/persona_audit.py`, etc. | Unstaged local edits — verify before next deploy |
 
 ### Open items (prioritized)
 
 | Pri | ID | Effort | Item | Notes |
 |-----|-----|--------|------|-------|
-| **P0** | DEPLOY-1 | S | Commit + push staged batch + prod run | **Blocked this session** — pre-commit hang |
+| **P0** | QA-HUMAN-1 | S | Gmail review of `20260530_205821` | GFX-4, Legal Counsel, UNICORN-1, debate |
+| **P1** | HR-1 | S | Commit + deploy HR/QA_EXECUTION batch | WIP: `hr_review`, `deliver`, `qa_pipeline` — see [`hr_qa_roster_handoff.md`](hr_qa_roster_handoff.md) |
+| **P1** | H1 | S | Post-deploy HR check with `QA_EXECUTION` | Partial on `205821` — table OK locally, telemetry field missing on prod |
+| **P1** | PASS-SPAM-1 | M | Reduce watchlist Pass spam in debate log | Architect FAIL on `205821`; 27-symbol universe |
 | **P1** | AV-2 | S | SoTU avatar ring alignment | Re-export 128×128 centered PNGs |
-| **P1** | GFX-2 | S | Logo contrast on `#27272a` | Partial locally — verify Gmail post-deploy |
+| **P1** | GFX-2 | S | Logo contrast on `#27272a` | Confirmed on `205821` — MSFT Alpha Pick |
 | **P1** | GFX-3 | M | Pie categorical palette | Too many similar greens |
 | **P1** | CHAIR-1 | S | Post Mortem Trim→Hold mandate | AVGO/ASML on `010432` |
 | **P1** | AP-2 | S | “Today’s actions” summary box | Not started |
-| **P1** | REVIEW-1 | M | Watchlist universe refactor | `review_universe.py` WIP — untracked |
 | **P2** | B2 | S | Skip `prompt_engineer` LLM on deterministic FAIL | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) §B2 |
 | **P2** | R2-1 | M | Round 2 verbatim R1 copy | Prompt Engineer recurring |
-| **P3** | MKT-QA-1 | M | Marketing QA agent | After private beta — see below |
+| **P3** | MKT-QA-1 | M | Marketing QA agent | After private beta |
 
-**Done locally (in staged batch, not prod):** AP-1, GFX-4, GFX-QA, INT-1, UNICORN-1, Legal Counsel QA, catalysts, per-stock debate, QA review footer, investor voice.
+**Done (now prod):** DEPLOY-1, REVIEW-1, AP-1, GFX-4, GFX-QA, INT-1, UNICORN-1, Legal Counsel QA, catalysts, per-stock debate, QA review footer, investor voice, Yahoo daily cache, scout validation script.
+
+**HR / roster (partial):** `qa_augmentation.py` on prod; full HR status + `QA_EXECUTION` telemetry — **WIP, not prod**. Pickup: [`hr_qa_roster_handoff.md`](hr_qa_roster_handoff.md) §9.
+
+---
+
+## Session Handoff — May 30 deploy batch prep (archived)
+
+**Theme:** Prior agent staged 33 files but commit hung on pre-commit. **Successor completed:** `83ecdca` + `9f26173` pushed; prod run `20260530_205821`. Original commit recipe and staged-batch table preserved in git history for this file (~May 30 AM).
 
 ---
 
@@ -153,6 +152,7 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 
 | Area | Commit(s) | Run / note |
 |------|-----------|------------|
+| **Deploy batch + review universe** | `83ecdca`, `9f26173` | Prod run **`20260530_205821`** — Legal Counsel, UNICORN-1, Mag7/Yahoo cache |
 | **Hypatia roster + Stealth Wealth** | `d970f20` | Focus-group personas; avatar SSOT; dark native pies |
 | **Gmail inline dark palette** | `58a94ab` | Validated `20260530_010432` |
 | SoTU + chart typography | `2bcbd04` | Round 1 portfolio quotes |

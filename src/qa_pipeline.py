@@ -193,12 +193,51 @@ async def run_system_architect_qa(
     if not violations:
         merged = merge_architect_reports([], None)
         merged["agent_role"] = role_name
+        merged["agent_key"] = "system_architect"
+        merged["execution_mode"] = "deterministic_pass"
         logger.info("Systems Architect deterministic PASS — skipping LLM audit.")
         return reconcile_compliance(merged)
 
-    merged = merge_architect_reports(violations, None)
+    from src.qa.architect_audit import format_architect_digest
+    from src.qa.qa_augmentation import should_augment_architect_llm
+
+    digest = format_architect_digest(violations)
+    log_excerpt = (raw_log or "")[:120_000]
+    chair_excerpt = (chairman_json or "")[:25_000]
+    prompt_text = (
+        f"{digest}\n\nRAW DEBATE LOG (excerpt):\n{log_excerpt}\n\n"
+        f"FINAL CHAIRMAN ALLOCATION JSON:\n{chair_excerpt}"
+    )
+    contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt_text)])]
+    info = agent_config["board_members"]["system_architect"]
+    config_params = {
+        "system_instruction": info["system_instruction"],
+        "temperature": 0.15,
+        "response_mime_type": "application/json",
+        "response_schema": QAAgentReport,
+        "max_output_tokens": FLASH_TOKEN_LIMIT,
+    }
+    llm_report = None
+    execution_mode = "deterministic_fail"
+    if should_augment_architect_llm(violations):
+        try:
+            res = await call_gemini_async(
+                FAST_MODEL,
+                contents,
+                types.GenerateContentConfig(**config_params),
+                agent_name="system_architect",
+            )
+            llm_report = json.loads(res.text)
+            llm_report["agent_role"] = role_name
+            execution_mode = "llm_fail"
+            logger.info("Systems Architect LLM audit ran after deterministic FAIL.")
+        except Exception as exc:
+            logger.error(f"Systems Architect LLM audit failed: {exc}")
+
+    merged = merge_architect_reports(violations, llm_report)
     merged["agent_role"] = role_name
-    logger.info("Systems Architect deterministic FAIL — skipping LLM audit.")
+    merged["agent_key"] = "system_architect"
+    merged["execution_mode"] = execution_mode
     return reconcile_compliance(merged)
 
 
@@ -231,9 +270,72 @@ async def run_post_mortem_qa(
         portfolio_symbols=portfolio_symbols,
         raw_board_messages=raw_board_messages,
     )
+    drift_warnings = []
+    try:
+        from src.qa.qa_augmentation import (
+            collect_post_mortem_drift_warnings,
+            should_augment_post_mortem_spot,
+        )
+
+        drift_warnings = collect_post_mortem_drift_warnings(
+            chairman,
+            raw_verdicts,
+            raw_board_messages,
+            all_symbols=all_symbols or [],
+            portfolio_symbols=portfolio_symbols,
+        )
+    except Exception as exc:
+        logger.warning("Post Mortem drift pre-check failed (non-blocking): %s", exc)
+
     if not violations:
+        from src.qa.qa_augmentation import should_augment_post_mortem_spot
+
+        if should_augment_post_mortem_spot(chairman, drift_warnings):
+            digest = format_post_mortem_digest(
+                [],
+                raw_verdicts,
+                all_symbols=all_symbols or [],
+                portfolio_symbols=portfolio_symbols,
+            )
+            drift_text = "\n".join(f"  - {w}" for w in drift_warnings) or "  (none)"
+            prompt_text = (
+                f"{digest}\n\nPROCEDURAL DRIFT SPOT-CHECK (deterministic PASS; verify or dismiss):\n"
+                f"{drift_text}\n\n"
+                f"Vote-engine or clean majority day — sample whether chairman narrative still matches "
+                f"Round 2 SSOT. Flag WARNING only if material drift; do not fail on style.\n\n"
+                f"RAW DEBATE LOG (excerpt):\n{(raw_log or '')[:80_000]}\n\n"
+                f"FINAL CHAIRMAN ALLOCATION:\n{chairman_json[:20_000]}"
+            )
+            contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt_text)])]
+            info = agent_config["board_members"]["post_mortem_qa"]
+            config_params = {
+                "system_instruction": info["system_instruction"],
+                "temperature": 0.15,
+                "response_mime_type": "application/json",
+                "response_schema": QAAgentReport,
+                "max_output_tokens": FLASH_TOKEN_LIMIT,
+            }
+            try:
+                res = await call_gemini_async(
+                    FAST_MODEL,
+                    contents,
+                    types.GenerateContentConfig(**config_params),
+                    agent_name="post_mortem_qa",
+                )
+                parsed = json.loads(res.text)
+                parsed["agent_role"] = role_name
+                merged = merge_post_mortem_reports([], parsed)
+                merged["agent_key"] = "post_mortem_qa"
+                merged["execution_mode"] = "llm_spot_check"
+                logger.info("Post Mortem LLM spot-check ran (deterministic PASS).")
+                return reconcile_compliance(merged)
+            except Exception as exc:
+                logger.error(f"Post Mortem spot-check LLM failed: {exc}")
+
         merged = merge_post_mortem_reports([], None)
         merged["agent_role"] = role_name
+        merged["agent_key"] = "post_mortem_qa"
+        merged["execution_mode"] = "deterministic_pass"
         logger.info("Post Mortem deterministic PASS — skipping LLM audit.")
         return reconcile_compliance(merged)
 
@@ -265,12 +367,16 @@ async def run_post_mortem_qa(
         parsed = json.loads(res.text)
         parsed["agent_role"] = role_name
         merged = merge_post_mortem_reports(violations, parsed)
+        merged["agent_key"] = "post_mortem_qa"
+        merged["execution_mode"] = "llm_fail"
         return reconcile_compliance(merged)
     except Exception as exc:
         logger.error(f"QA execution failed for {role_name}: {exc}")
         if violations:
             merged = merge_post_mortem_reports(violations, None)
             merged["agent_role"] = role_name
+            merged["agent_key"] = "post_mortem_qa"
+            merged["execution_mode"] = "deterministic_fail"
             return reconcile_compliance(merged)
         return _execution_error_report(role_name, exc)
 
@@ -304,17 +410,58 @@ async def run_prompt_engineer_qa(
     raw_board_messages: list[dict],
     all_symbols: list[str],
 ) -> dict:
-    """Persona audit: deterministic pre-check (LLM skipped — Python is authoritative)."""
-    from src.qa.persona_audit import audit_debate_persona, merge_persona_reports
+    """Persona audit: Python gate + LLM on FAIL or borderline unanimous PASS."""
+    from src.qa.persona_audit import (
+        audit_debate_persona,
+        format_persona_digest,
+        merge_persona_reports,
+    )
+    from src.qa.qa_augmentation import should_augment_persona_llm
 
     role_name = agent_config["board_members"]["prompt_engineer"]["role"]
-    violations, _stats = audit_debate_persona(raw_board_messages, all_symbols)
-    merged = merge_persona_reports(violations, None)
-    merged["agent_role"] = role_name
-    if violations:
-        logger.info("Persona deterministic FAIL — skipping LLM audit.")
+    violations, stats = audit_debate_persona(raw_board_messages, all_symbols)
+    digest = format_persona_digest(violations, stats)
+    llm_report = None
+    execution_mode = "deterministic_pass"
+
+    if should_augment_persona_llm(violations, stats):
+        execution_mode = "llm_fail" if violations else "llm_borderline"
+        prompt_text = (
+            f"{digest}\n\nRAW DEBATE LOG:\n{raw_log[:80_000]}\n\n"
+            f"FINAL CHAIRMAN ALLOCATION JSON:\n{chairman_json[:20_000]}"
+        )
+        contents = [types.Content(role="user", parts=[types.Part.from_text(text=prompt_text)])]
+        info = agent_config["board_members"]["prompt_engineer"]
+        config_params = {
+            "system_instruction": info["system_instruction"],
+            "temperature": 0.15,
+            "response_mime_type": "application/json",
+            "response_schema": QAAgentReport,
+        }
+        try:
+            res = await call_gemini_async(
+                info["model"],
+                contents,
+                types.GenerateContentConfig(**config_params),
+                agent_name="prompt_engineer",
+            )
+            llm_report = json.loads(res.text)
+            llm_report["agent_role"] = role_name
+            logger.info("Prompt Engineer LLM audit ran (%s).", execution_mode)
+        except Exception as exc:
+            logger.error(f"Prompt Engineer LLM audit failed: {exc}")
+            if violations:
+                execution_mode = "deterministic_fail"
+    elif violations:
+        execution_mode = "deterministic_fail"
+        logger.info("Persona deterministic FAIL — LLM augmentation disabled after error.")
     else:
         logger.info("Persona deterministic PASS — skipping LLM audit.")
+
+    merged = merge_persona_reports(violations, llm_report)
+    merged["agent_role"] = role_name
+    merged["agent_key"] = "prompt_engineer"
+    merged["execution_mode"] = execution_mode
     return reconcile_compliance(merged)
 
 
@@ -439,7 +586,10 @@ async def run_graphics_designer_qa(
         )
         parsed = json.loads(res.text)
         parsed["agent_role"] = info["role"]
-        return _merge_graphics_reports(deterministic, reconcile_compliance(parsed))
+        merged = _merge_graphics_reports(deterministic, reconcile_compliance(parsed))
+        merged["agent_key"] = "graphics_designer_qa"
+        merged["execution_mode"] = "llm_active"
+        return merged
     except asyncio.TimeoutError:
         logger.warning(f"Graphics Designer QA timed out after {timeout_seconds}s; using deterministic report only.")
         deterministic["findings"] = list(deterministic.get("findings") or []) + [{
@@ -510,6 +660,8 @@ async def run_legal_counsel_qa(
         parsed = json.loads(res.text)
         parsed["agent_role"] = info["role"]
         merged = merge_legal_reports(deterministic, reconcile_compliance(parsed))
+        merged["agent_key"] = "legal_counsel_qa"
+        merged["execution_mode"] = "llm_active"
         return reconcile_compliance(merged)
     except asyncio.TimeoutError:
         logger.warning(f"Legal Counsel QA timed out after {timeout_seconds}s; using deterministic report only.")
@@ -728,7 +880,10 @@ async def run_qa_integrity_audit(qa_reports, raw_log: str, chairman_json: str,
             parsed_res["is_compliant"] = True
             suffix = " LLM pass: no substantiated QA accuracy issues after evidence filter."
             parsed_res["summary"] = (parsed_res.get("summary") or "").strip() + suffix
-        return merge_integrity_reports(deterministic, reconcile_compliance(parsed_res))
+        merged = merge_integrity_reports(deterministic, reconcile_compliance(parsed_res))
+        merged["agent_key"] = "qa_integrity_auditor"
+        merged["execution_mode"] = "llm_active"
+        return merged
     except asyncio.TimeoutError:
         logger.warning(f"QA Integrity Audit timed out after {timeout_seconds}s; emitting non-blocking WARNING.")
         timeout_report = {

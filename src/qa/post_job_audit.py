@@ -79,7 +79,7 @@ def build_post_job_oversight(
 
     qa_reports = qa_reports or []
     activity = telemetry.get("AGENT_ACTIVITY") or {}
-    rows = build_utilization(activity)
+    rows = build_utilization(activity, telemetry=telemetry)
     idle = [r["agent"] for r in rows if r.get("idle") and r["agent"] in EXPECTED_ACTIVE_KEYS]
     unexpected_idle = [k for k in OPTIONAL_KEYS if activity.get(k, {}).get("invocations", 0) == 0]
     token_ranking = [

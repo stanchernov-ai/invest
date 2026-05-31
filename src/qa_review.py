@@ -195,7 +195,9 @@ async def run_qa_review_team():
         telemetry_obj = json.loads(latest_telemetry) if latest_telemetry else {}
         activity = telemetry_obj.get("AGENT_ACTIVITY", {})
         if activity:
-            hr_result = await hr_review.run_hr_efficiency_review(activity, raw_log=latest_debate or "")
+            hr_result = await hr_review.run_hr_efficiency_review(
+                activity, raw_log=latest_debate or "", telemetry=telemetry_obj,
+            )
             hr_html = hr_review.generate_hr_section_html(hr_result["utilization"], hr_result["report"])
         else:
             logger.warning("No AGENT_ACTIVITY in latest telemetry; skipping HR Efficiency Consultant.")

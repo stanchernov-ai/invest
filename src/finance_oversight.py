@@ -171,7 +171,7 @@ def build_telemetry_context(telemetry: dict) -> str:
     parts = []
     activity = telemetry.get("AGENT_ACTIVITY", {})
     if activity:
-        rows = hr_review.build_utilization(activity)
+        rows = hr_review.build_utilization(activity, telemetry=telemetry)
         parts.append("AGENT_ACTIVITY (per-run Gemini usage estimate):\n" + hr_review.format_utilization_text(rows))
     duration = None
     for key in ("run_duration_seconds", "duration_seconds"):

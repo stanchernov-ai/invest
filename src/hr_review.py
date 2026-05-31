@@ -6,8 +6,8 @@ utilization report (built from the per-agent activity ledger captured in
 reviewer that issues keep / merge / cut verdicts and proposes new roles.
 
 The deterministic table is the ground truth (invocations, tokens, est. cost,
-idle agents); the LLM only reasons about redundancy, impact, and gaps on top of
-it - it never has to guess who fired.
+execution status); the LLM reasons about redundancy, impact, and prompt gaps on
+top of it — it never has to guess who fired.
 
 Standalone usage (reads AGENT_ACTIVITY from a telemetry JSON, prints the table):
   .venv\\Scripts\\python.exe -m src.hr_review .cache/state/api_telemetry_YYYYMMDD_HHMMSS.json
@@ -25,6 +25,7 @@ from google.genai import types
 from src.core.agents import (
     agent_config, call_gemini_async, HEAVY_MODEL, FAST_MODEL, FLASH_TOKEN_LIMIT,
 )
+from src.qa.qa_augmentation import execution_mode_display
 
 logger = logging.getLogger(__name__)
 
@@ -37,25 +38,32 @@ PRICING = {
     HEAVY_MODEL: {"input": 1.25, "output": 10.00},
 }
 
-# Short architecture hint so the reviewer can reason about whether each agent's
-# output is actually consumed downstream (the classic "discarded output" smell).
+INFRA_AGENTS = frozenset({"data_oracle"})
+ON_DEMAND_AGENTS = frozenset({"legal_counsel_code"})
+
 PIPELINE_DATAFLOW_NOTE = (
-    "Pipeline data flow (for consumed-by reasoning): the 5 voting panelists "
-    "(hypatia, davinci, suntzu, tesla, aurelius) debate over multiple rounds; the "
-    "clerk (Chief of Staff) synthesizes the debate; the chairman makes final "
-    "allocations; compliance audits the chairman; red_teamer writes a bear case "
-    "rendered in the briefing but NOT fed back into decisions; data_oracle is a "
-    "deterministic Python price gate in prepare (no LLM). Post-flight QA agents (post_mortem_qa, system_architect, "
-    "prompt_engineer, graphics_designer_qa, qa_integrity_auditor) review the run "
-    "and populate the QA dashboard."
+    "Pipeline data flow (for consumed-by reasoning):\n"
+    "- Panel (hypatia, davinci, suntzu, tesla, aurelius): two-round debate; primary token spend.\n"
+    "- clerk: synthesizes debate for downstream consumers.\n"
+    "- chairman: final allocations — often VOTE_ENGINE (Python) when board majority is clear; "
+    "Pro LLM chairman reserved for ambiguous days and future per-user investment-style personas.\n"
+    "- compliance: audits chairman; PYTHON_GATE when vote_engine ran (no LLM).\n"
+    "- red_teamer: bear case + unicorn rebuttals — consumed in investor briefing (Alpha Pick, "
+    "Unicorn Protocol); does not change allocation math.\n"
+    "- data_oracle: INFRA — deterministic price gate in prepare (not an LLM roster seat).\n"
+    "- Post-flight QA: Python pre-checks first; LLM augments on FAIL, borderline persona, "
+    "architect structural FAIL, or post-mortem spot-check (see QA_EXECUTION / STATUS column).\n"
+    "- legal_counsel_qa: briefing HTML review in deliver; legal_counsel_code is on-demand codebase audit.\n"
+    "Prefer KEEP + prompt/configuration improvements over CUT unless an agent has no downstream consumer."
 )
 
 
 class AgentVerdict(BaseModel):
     agent: str = Field(description="The agent key/role being judged.")
-    recommendation: Literal["KEEP", "MERGE", "CUT", "ADD_BUDGET", "WATCH"] = Field(
+    recommendation: Literal["KEEP", "MERGE", "CUT", "ADD_BUDGET", "WATCH", "IMPROVE"] = Field(
         description="KEEP=earning its seat; MERGE=fold into another agent; CUT=remove; "
-                    "ADD_BUDGET=under-resourced/high-value; WATCH=monitor."
+                    "ADD_BUDGET=under-resourced/high-value; WATCH=monitor; "
+                    "IMPROVE=retain but upgrade prompts/config (preferred over CUT)."
     )
     rationale: str = Field(description="One or two sentences citing utilization, redundancy, or impact.")
 
@@ -77,6 +85,7 @@ def roster() -> dict[str, dict]:
             "role": info.get("role", key),
             "model": info.get("model", "unknown"),
             "summary": (instr[:200] + "...") if len(instr) > 200 else instr,
+            "infra": key in INFRA_AGENTS,
         }
     return out
 
@@ -90,9 +99,32 @@ def estimate_cost(model: str, prompt_tokens: int, output_tokens: int, thinking_t
     return round(inp + out, 4)
 
 
-def build_utilization(activity: dict) -> list[dict]:
-    """Merge the full configured roster with the run's activity ledger so idle
-    agents (0 invocations) are surfaced, not silently absent. Sorted by cost."""
+def resolve_execution_status(agent: str, row: dict, telemetry: dict | None) -> str:
+    """Human-readable status: distinguish idle vs deterministic vs vote-engine paths."""
+    tel = telemetry or {}
+    qa_exec = tel.get("QA_EXECUTION") or {}
+    if agent in qa_exec:
+        return execution_mode_display(qa_exec[agent])
+
+    inv = row.get("invocations", 0) or 0
+    if inv > 0:
+        return "OK" if not row.get("errors") else "ERRORS"
+
+    if agent in INFRA_AGENTS:
+        return "INFRA"
+    if agent in ON_DEMAND_AGENTS:
+        return "ON_DEMAND"
+    if agent == "chairman" and tel.get("chairman_bypassed"):
+        return "VOTE_ENGINE"
+    if agent == "compliance" and tel.get("compliance_source") == "python_only":
+        return "PYTHON_GATE"
+    if agent in {"post_mortem_qa", "prompt_engineer", "system_architect"}:
+        return "DET_PASS"
+    return "NOT_INVOKED"
+
+
+def build_utilization(activity: dict, telemetry: dict | None = None) -> list[dict]:
+    """Merge roster + activity ledger; attach execution status from telemetry."""
     activity = activity or {}
     r = roster()
     keys = set(r.keys()) | set(activity.keys())
@@ -106,6 +138,7 @@ def build_utilization(activity: dict) -> list[dict]:
         think_t = act.get("thinking_tokens", 0)
         total_t = act.get("total_tokens", 0) or (prompt_t + out_t + think_t)
         invs = act.get("invocations", 0)
+        status = resolve_execution_status(key, {"invocations": invs, "errors": act.get("errors", 0)}, telemetry)
         rows.append({
             "agent": key,
             "role": meta.get("role", key),
@@ -117,8 +150,10 @@ def build_utilization(activity: dict) -> list[dict]:
             "thinking_tokens": think_t,
             "total_tokens": total_t,
             "est_cost_usd": estimate_cost(model, prompt_t, out_t, think_t),
-            "idle": invs == 0,
+            "status": status,
+            "idle": status == "NOT_INVOKED",
             "in_roster": key in r,
+            "infra": meta.get("infra", key in INFRA_AGENTS),
         })
     rows.sort(key=lambda x: (x["est_cost_usd"], x["total_tokens"]), reverse=True)
     return rows
@@ -128,20 +163,28 @@ def format_utilization_text(rows: list[dict]) -> str:
     if not rows:
         return "No agent activity recorded for this run."
     lines = [
-        f"{'AGENT':<22}{'MODEL':<20}{'CALLS':>6}{'ERR':>5}{'TOToks':>10}{'THINKToks':>11}{'~USD':>9}  STATUS",
+        f"{'AGENT':<22}{'MODEL':<18}{'CALLS':>6}{'ERR':>5}{'TOToks':>10}{'~USD':>9}  STATUS",
     ]
     tot_calls = tot_tokens = 0
     tot_cost = 0.0
     for r in rows:
-        status = "IDLE (never fired)" if r["idle"] else ("OK" if not r["errors"] else "HAD ERRORS")
         lines.append(
-            f"{r['agent']:<22}{r['model']:<20}{r['invocations']:>6}{r['errors']:>5}"
-            f"{r['total_tokens']:>10,}{r['thinking_tokens']:>11,}{r['est_cost_usd']:>9.4f}  {status}"
+            f"{r['agent']:<22}{r['model']:<18}{r['invocations']:>6}{r['errors']:>5}"
+            f"{r['total_tokens']:>10,}{r['est_cost_usd']:>9.4f}  {r['status']}"
         )
         tot_calls += r["invocations"]
         tot_tokens += r["total_tokens"]
         tot_cost += r["est_cost_usd"]
-    lines.append(f"{'TOTAL':<22}{'':<20}{tot_calls:>6}{'':>5}{tot_tokens:>10,}{'':>11}{tot_cost:>9.4f}")
+    lines.append(f"{'TOTAL':<22}{'':<18}{tot_calls:>6}{'':>5}{tot_tokens:>10,}{tot_cost:>9.4f}")
+    run_meta = []
+    if rows and any(r.get("status") == "VOTE_ENGINE" for r in rows):
+        run_meta.append("Run note: chairman_bypassed=true (vote_engine allocation).")
+    idle_count = sum(1 for r in rows if r.get("idle") and r.get("in_roster"))
+    if idle_count:
+        run_meta.append(f"True NOT_INVOKED roster agents: {idle_count}.")
+    if run_meta:
+        lines.append("")
+        lines.extend(run_meta)
     return "\n".join(lines)
 
 
@@ -158,15 +201,18 @@ def render_utilization_html(rows: list[dict]) -> str:
         "<th style='padding:8px; border-bottom:2px solid #e5e7eb; text-align:right;'>~USD</th>"
         "<th style='padding:8px; border-bottom:2px solid #e5e7eb;'>Status</th></tr>"
     )
+    status_colors = {
+        "OK": "#16a34a", "LLM_OK": "#16a34a", "DET_PASS": "#2563eb", "VOTE_ENGINE": "#2563eb",
+        "PYTHON_GATE": "#2563eb", "INFRA": "#6b7280", "ON_DEMAND": "#6b7280",
+        "NOT_INVOKED": "#dc2626", "ERRORS": "#d97706",
+    }
     body = []
     tot_cost = 0.0
     for r in rows:
-        if r["idle"]:
-            status, color = "IDLE", "#dc2626"
-        elif r["errors"]:
-            status, color = f"{r['errors']} err", "#d97706"
-        else:
-            status, color = "OK", "#16a34a"
+        status = r.get("status", "NOT_INVOKED")
+        color = status_colors.get(status.split()[0], "#6b7280")
+        if status.startswith("LLM"):
+            color = "#16a34a"
         body.append(
             "<tr>"
             f"<td style='padding:8px; border-bottom:1px solid #f3f4f6;'>{r['role']} <span style='color:#9ca3af;'>({r['agent']})</span></td>"
@@ -187,31 +233,44 @@ def render_utilization_html(rows: list[dict]) -> str:
 
 HR_SYSTEM_INSTRUCTION = (
     "You are the HR Efficiency Consultant for a multi-agent AI investment boardroom. "
-    "Your job is to keep the agent roster LEAN as the team keeps adding agents - eliminate "
-    "redundant, idle, or low-impact agents and propose new roles only where they add clear value. "
-    "You are given a DETERMINISTIC UTILIZATION TABLE (invocations, tokens, est. cost, idle flags) "
-    "that is ground truth - trust it over any assumption about who ran. "
-    "For every agent in the roster issue a verdict: KEEP (earns its seat), MERGE (fold into another "
-    "agent - say which), CUT (remove), ADD_BUDGET (under-resourced but high value), or WATCH. "
-    "Judge on three axes: UTILIZATION (did it fire / token cost vs. value), REDUNDANCY (outputs that "
-    "overlap or are never consumed downstream - an idle agent or a discarded output is a strong CUT/MERGE "
-    "signal), and IMPACT (does its output change a decision or is it decorative). Call out specific "
-    "redundancies and propose concrete new roles only where there is a real governance or decision gap. "
-    "Be blunt and specific; cite the numbers."
+    "Stan's policy: IMPROVE agent prompts and configuration before CUT or MERGE. Agents stood up "
+    "quickly — WATCH and IMPROVE are preferred when STATUS shows DET_PASS, VOTE_ENGINE, PYTHON_GATE, "
+    "or INFRA (those often mean Python did the work, not that the role is useless). "
+    "Only recommend CUT when an agent has no downstream consumer and no planned product use. "
+    "red_teamer is consumed in the executive briefing (Alpha Pick bear case, Unicorn Protocol). "
+    "chairman may show VOTE_ENGINE on clear-majority days; Pro chairman is kept for ambiguous runs "
+    "and future per-user investment-style selection. data_oracle is INFRA (Python), not LLM headcount. "
+    "You are given a DETERMINISTIC UTILIZATION TABLE (invocations, tokens, est. cost, STATUS) as ground truth. "
+    "For every roster agent issue a verdict: KEEP, IMPROVE (retain + upgrade prompts/config), WATCH, "
+    "MERGE (only with clear duplicate), ADD_BUDGET, or CUT (last resort). "
+    "Judge on UTILIZATION, REDUNDANCY, and IMPACT (including investor-facing briefing consumption). "
+    "Be specific; cite STATUS and token numbers."
 )
 
 
-async def run_hr_efficiency_review(activity: dict, raw_log: str = "") -> dict:
+async def run_hr_efficiency_review(
+    activity: dict,
+    raw_log: str = "",
+    telemetry: dict | None = None,
+) -> dict:
     """Run the HR Efficiency Consultant over the run's activity ledger."""
-    rows = build_utilization(activity)
+    rows = build_utilization(activity, telemetry=telemetry)
     util_text = format_utilization_text(rows)
     roster_text = "\n".join(
-        f"- {k} | role={v['role']} | model={v['model']} | does: {v['summary']}"
+        f"- {k} | role={v['role']} | model={v['model']} | infra={v.get('infra', False)} | does: {v['summary']}"
         for k, v in roster().items()
     )
+    run_ctx = ""
+    if telemetry:
+        run_ctx = (
+            f"\nRUN CONTEXT: chairman_bypassed={telemetry.get('chairman_bypassed')!r}, "
+            f"allocation_source={telemetry.get('allocation_source')!r}, "
+            f"compliance_source={telemetry.get('compliance_source')!r}, "
+            f"QA_EXECUTION={json.dumps(telemetry.get('QA_EXECUTION') or {}, sort_keys=True)}\n"
+        )
 
     prompt = (
-        f"{PIPELINE_DATAFLOW_NOTE}\n\n"
+        f"{PIPELINE_DATAFLOW_NOTE}\n{run_ctx}\n"
         f"DETERMINISTIC UTILIZATION TABLE (ground truth for this run):\n{util_text}\n\n"
         f"FULL CONFIGURED ROSTER (role, model, what each does):\n{roster_text}\n\n"
         f"RAW DEBATE LOG (optional evidence of impact / who actually contributed):\n{raw_log[:15000]}"
@@ -224,7 +283,10 @@ async def run_hr_efficiency_review(activity: dict, raw_log: str = "") -> dict:
         "response_schema": HRReport,
     }
     try:
-        res = await call_gemini_async(HEAVY_MODEL, contents, types.GenerateContentConfig(**config_params), agent_name="hr_efficiency_consultant")
+        res = await call_gemini_async(
+            HEAVY_MODEL, contents, types.GenerateContentConfig(**config_params),
+            agent_name="hr_efficiency_consultant",
+        )
         report = json.loads(res.text)
     except Exception as e:
         logger.error(f"HR Efficiency review failed: {e}")
@@ -241,7 +303,7 @@ async def run_hr_efficiency_review(activity: dict, raw_log: str = "") -> dict:
 def generate_hr_section_html(rows: list[dict], report: dict) -> str:
     """Render the HR section (deterministic table + LLM verdicts) for the digest."""
     verdict_colors = {
-        "KEEP": "#16a34a", "WATCH": "#2563eb", "ADD_BUDGET": "#7c3aed",
+        "KEEP": "#16a34a", "IMPROVE": "#7c3aed", "WATCH": "#2563eb", "ADD_BUDGET": "#7c3aed",
         "MERGE": "#d97706", "CUT": "#dc2626",
     }
     html = ["<div style='background:#ffffff; padding:20px; margin-bottom:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); border-left:5px solid #6366f1;'>"]
@@ -289,7 +351,7 @@ def _standalone(telemetry_path: str) -> int:
     if not activity:
         print("No AGENT_ACTIVITY found in telemetry. Run a pipeline build first (activity logging landed with 5.4).", file=sys.stderr)
         return 3
-    rows = build_utilization(activity)
+    rows = build_utilization(activity, telemetry=telemetry)
     print(format_utilization_text(rows))
     return 0
 
