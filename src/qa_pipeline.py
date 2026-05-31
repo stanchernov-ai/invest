@@ -459,6 +459,10 @@ async def run_graphics_designer_qa(
 async def run_qa_integrity_audit(qa_reports, raw_log: str, chairman_json: str,
                                  qa_dashboard_html: str, *,
                                  executive_briefing_html: str = "",
+                                 raw_verdicts: dict | None = None,
+                                 all_symbols: list[str] | None = None,
+                                 portfolio_symbols: set[str] | None = None,
+                                 raw_board_messages: list | None = None,
                                  model_override: str = None,
                                  timeout_seconds: int = QA_INTEGRITY_TIMEOUT_SECONDS):
     """The QA-of-the-QA: deterministic pre-checks plus LLM verdict validation.
@@ -473,13 +477,35 @@ async def run_qa_integrity_audit(qa_reports, raw_log: str, chairman_json: str,
     from src.qa.integrity_audit import (
         build_deterministic_integrity_report,
         build_evidence_context,
+        build_vote_ground_truth_context,
         format_evidence_digest,
+        format_vote_ground_truth_digest,
         merge_integrity_reports,
         sanitize_llm_integrity_findings,
     )
 
     logger.info("Initiating QA Integrity Audit (QA-of-the-QA).")
-    deterministic = build_deterministic_integrity_report(qa_reports, qa_dashboard_html)
+    try:
+        chairman = json.loads(chairman_json) if chairman_json else {}
+    except json.JSONDecodeError:
+        chairman = {}
+
+    vote_ctx = build_vote_ground_truth_context(
+        chairman,
+        raw_verdicts,
+        all_symbols=all_symbols or [],
+        portfolio_symbols=portfolio_symbols,
+        raw_board_messages=raw_board_messages,
+    )
+    vote_digest = format_vote_ground_truth_digest(vote_ctx)
+
+    deterministic = build_deterministic_integrity_report(
+        qa_reports,
+        qa_dashboard_html,
+        vote_ctx=vote_ctx,
+        raw_board_messages=raw_board_messages,
+        all_symbols=all_symbols,
+    )
     evidence_ctx = build_evidence_context(qa_reports, qa_dashboard_html, executive_briefing_html)
     evidence_digest = format_evidence_digest(evidence_ctx, deterministic)
 
@@ -497,7 +523,9 @@ async def run_qa_integrity_audit(qa_reports, raw_log: str, chairman_json: str,
     dashboard_excerpt = (qa_dashboard_html or "")[:INTEGRITY_DASHBOARD_HTML_CHAR_LIMIT]
     qa_prompt = (
         f"{evidence_digest}\n\n"
-        f"RAW DEBATE LOG (ground truth of what actually happened):\n{raw_log[:25000]}\n\n"
+        f"{vote_digest}\n\n"
+        f"RAW DEBATE LOG (quote attribution and persona checks only — vote counts come from VOTE GROUND TRUTH above):\n"
+        f"{raw_log[:25000]}\n\n"
         f"FINAL CHAIRMAN ALLOCATION:\n{chairman_json[:8000]}\n\n"
         f"QA AGENT REPORTS (verdicts to verify — do not re-parse dashboard HTML):\n{reports_digest[:15000]}\n\n"
         f"EXECUTIVE BRIEFING HTML EXCERPT (validate Graphics Designer claims here):\n"
@@ -527,7 +555,7 @@ async def run_qa_integrity_audit(qa_reports, raw_log: str, chairman_json: str,
         parsed_res["agent_role"] = info["role"]
         if parsed_res.get("findings"):
             parsed_res["findings"] = sanitize_llm_integrity_findings(
-                parsed_res["findings"], evidence_ctx
+                parsed_res["findings"], evidence_ctx, vote_ctx=vote_ctx
             )
         else:
             parsed_res["findings"] = []

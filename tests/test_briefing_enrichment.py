@@ -117,6 +117,76 @@ class BriefingEnrichmentTests(unittest.TestCase):
         self.assertIn("growth camp won the room", nvda["strategic_context"])
         self.assertNotEqual(nvda["strategic_context"], nvda["narrative"]["champion_quote"])
 
+    def test_strategic_context_never_duplicates_champion_on_sync_path(self):
+        if not os.path.exists(FIXTURE_DEBATE):
+            self.skipTest("cached debate.json not available")
+        with open(FIXTURE_DEBATE, encoding="utf-8") as f:
+            debate = json.load(f)
+        portfolio_symbols = {
+            p["symbol"] for p in debate["chairman_data"].get("portfolio_positions") or []
+        }
+        chairman = briefing_enrichment.enrich_chairman_for_briefing_sync(
+            debate["chairman_data"],
+            debate["raw_verdicts"],
+            portfolio_symbols=portfolio_symbols,
+            sanitize_fn=reporting._sanitize_briefing_text,
+        )
+        for section in ("portfolio_positions", "watchlist_positions"):
+            for pos in chairman.get(section) or []:
+                ctx = (pos.get("strategic_context") or "").strip()
+                narrative = pos.get("narrative") or {}
+                champion = (narrative.get("champion_quote") or "").strip()
+                dissenter = (narrative.get("dissenter_quote") or "").strip()
+                if not ctx or not champion:
+                    continue
+                with self.subTest(symbol=pos.get("symbol")):
+                    self.assertFalse(
+                        briefing_enrichment._overlaps_panel_quotes(ctx, champion, dissenter),
+                        msg=f"Strategic context duplicated panel quote for {pos.get('symbol')}",
+                    )
+                    self.assertNotEqual(ctx, champion)
+
+    def test_flash_duplicate_context_replaced_with_synthetic(self):
+        if not os.path.exists(FIXTURE_DEBATE):
+            self.skipTest("cached debate.json not available")
+        with open(FIXTURE_DEBATE, encoding="utf-8") as f:
+            debate = json.load(f)
+        nvda = next(p for p in debate["chairman_data"]["portfolio_positions"] if p["symbol"] == "NVDA")
+        with_narratives = briefing_enrichment.enrich_position_narratives(
+            nvda,
+            debate["raw_verdicts"],
+            sanitized_synthesis=reporting._sanitize_briefing_text(nvda["synthesis"]),
+        )
+        champion_quote = with_narratives["narrative"]["champion_quote"]
+        mock_response = AsyncMock()
+        mock_response.text = json.dumps({
+            "items": [{"symbol": "NVDA", "strategic_context": champion_quote}],
+        })
+
+        async def _run():
+            with patch("src.output.briefing_enrichment.client", True), patch(
+                "src.output.briefing_enrichment.call_gemini_async",
+                new_callable=AsyncMock,
+                return_value=mock_response,
+            ):
+                return await briefing_enrichment.enrich_chairman_for_briefing(
+                    debate["chairman_data"],
+                    debate["raw_verdicts"],
+                    portfolio_symbols={"NVDA"},
+                    sanitize_fn=reporting._sanitize_briefing_text,
+                )
+
+        import asyncio
+        chairman = asyncio.run(_run())
+        enriched_nvda = next(p for p in chairman["portfolio_positions"] if p["symbol"] == "NVDA")
+        self.assertNotEqual(enriched_nvda["strategic_context"], champion_quote)
+        self.assertIn("buy_side=", enriched_nvda["strategic_context"])
+        self.assertFalse(
+            briefing_enrichment._overlaps_panel_quotes(
+                enriched_nvda["strategic_context"], champion_quote,
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

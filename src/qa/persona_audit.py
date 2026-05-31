@@ -119,9 +119,19 @@ def audit_debate_persona(raw_messages: list[dict], all_symbols: list[str]) -> tu
         hits = _scan_forbidden_phrases(agent_key, round2)
         if hits:
             stats["persona_keyword_hits"][agent_key] = hits
+            evidence = ""
+            lower = round2.lower()
+            for phrase in hits:
+                idx = lower.find(phrase)
+                if idx >= 0:
+                    start = max(0, idx - 40)
+                    end = min(len(round2), idx + len(phrase) + 60)
+                    evidence = round2[start:end].replace("\n", " ").strip()
+                    break
+            snippet = f' Evidence: "...{evidence}..."' if evidence else ""
             violations.append(
                 f"PERSONA DRIFT ({marker}): Round 2 rebuttal uses forbidden vocabulary for this persona: "
-                f"{', '.join(repr(h) for h in hits)}."
+                f"{', '.join(repr(h) for h in hits)}.{snippet}"
             )
 
     return violations, stats

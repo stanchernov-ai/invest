@@ -63,8 +63,8 @@ Deliver-only re-render: `GET /api/deliver?run_id=<run_id>&code=<function-key>`.
 | **P1** | GFX-2 | S | Logo contrast on `#27272a` | **Partial** — light chip shipped locally; verify in Gmail |
 | **P2** | GFX-QA | S | Remove `.qa-box` from investor CSS | **Done locally** — strip from `executive_briefing_css()` |
 | **P1** | GFX-3 | M | Pie categorical palette | Too many similar greens on dark canvas — distinct ramp per slice |
-| **P1** | AP-1 | S | Flash Strategic Context quality | Duplicate Champion when Flash output short |
-| **P1** | INT-1 | M | Integrity auditor R2 ground truth + JSON parse hardening | `214609` TSM lesson; `010432` parse crash |
+| **P1** | AP-1 | S | Flash Strategic Context quality | **Done locally** — synthetic fallback uses vote math + camp labels (no quote paste); overlap guard rejects Flash/champion duplicates |
+| **P1** | INT-1 | M | Integrity auditor R2 ground truth + JSON parse hardening | **In progress locally** — vote digest injected into integrity prompt; deterministic Post Mortem/persona cross-check; sanitize false max-3 target_tickers findings; `count_equity_buys` for cap. Validated on `181651` (0 prose drift, Post Mortem PASS). |
 | **P2** | GFX-4 | S | Section order | Graphics WARNING: move SoTU after Action Plan |
 | **P2** | B2 | S | Skip `prompt_engineer` LLM on deterministic FAIL | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) §B2 |
 | **P2** | R2-1 | M | Round 2 verbatim R1 copy | Prompt Engineer recurring |

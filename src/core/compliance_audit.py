@@ -216,16 +216,19 @@ def audit_chairman_compliance_limits(chairman: dict) -> list[str]:
 
     violations: list[str] = []
 
-    buy_count = count_buy_verdicts(chairman)
+    buy_count = count_equity_buys(chairman)
     if buy_count > MAX_DAILY_BUYS:
         symbols = []
         for section in ("portfolio_positions", "watchlist_positions"):
             for pos in chairman.get(section) or []:
+                sym = pos.get("symbol", "?")
+                if _is_hedge_symbol(sym):
+                    continue
                 if _normalize_verdict(pos.get("final_verdict", "")) in BUY_VERDICTS:
-                    symbols.append(pos.get("symbol", "?"))
+                    symbols.append(sym)
         violations.append(
-            f"MAX 3 BUYS: output contains {buy_count} Buy/Strong Buy verdicts "
-            f"({', '.join(symbols)}) — limit is {MAX_DAILY_BUYS}."
+            f"MAX 3 BUYS: output contains {buy_count} equity Buy/Strong Buy verdicts "
+            f"({', '.join(symbols)}) — limit is {MAX_DAILY_BUYS} (TLT/VXX hedge excluded)."
         )
 
     hedge_executed = _hedge_in_targets(chairman) or _hedge_buy_verdict(chairman)

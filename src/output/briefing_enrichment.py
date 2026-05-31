@@ -10,7 +10,12 @@ from google.genai import types
 
 from src.core.agents import FAST_MODEL, FLASH_TOKEN_LIMIT, call_gemini_async, client
 from src.core.schemas import ActionPlanStrategicContexts
-from src.core.board_roster import normalize_panelist_key, resolve_panelist_key
+from src.core.board_roster import (
+    PANELIST_ARCHETYPES,
+    normalize_panelist_key,
+    panelist_short_name,
+    resolve_panelist_key,
+)
 from src.core.vote_engine import (
     AGENT_DISPLAY,
     BUY_VERDICTS,
@@ -37,6 +42,10 @@ for legacy_name, key in (
     ("Marcus Aurelius", "aurelius"),
 ):
     _DISPLAY_TO_AGENT.setdefault(legacy_name, key)
+
+_MIN_STRATEGIC_CONTEXT_CHARS = 48
+_QUOTE_OVERLAP_WORD_THRESHOLD = 0.42
+_QUOTE_OVERLAP_SUBSTRING_CHARS = 40
 
 _GENERIC_SYNTHESIS_MARKERS = (
     "consensus mandate from today's panel vote",
@@ -286,8 +295,130 @@ def _build_symbol_prompt_block(
     return "\n".join(lines)
 
 
-def _fallback_strategic_context(pos: dict, raw_verdicts: dict[str, dict], summaries: dict) -> str:
-    """Degraded strategic context from real Round 2 prose when Flash is unavailable."""
+def _normalize_overlap_text(text: str) -> str:
+    lowered = (text or "").lower()
+    return re.sub(r"[^a-z0-9\s]", " ", lowered)
+
+
+def _word_overlap_ratio(left: str, right: str) -> float:
+    left_words = {w for w in _normalize_overlap_text(left).split() if len(w) > 2}
+    right_words = {w for w in _normalize_overlap_text(right).split() if len(w) > 2}
+    if not left_words or not right_words:
+        return 0.0
+    return len(left_words & right_words) / min(len(left_words), len(right_words))
+
+
+def _overlaps_panel_quotes(text: str, *quotes: str) -> bool:
+    """True when strategic context reuses Champion/Dissent Round 2 prose."""
+    ctx = (text or "").strip()
+    if not ctx:
+        return False
+    ctx_norm = _normalize_overlap_text(ctx)
+    for quote in quotes:
+        q = (quote or "").strip()
+        if not q or q.upper() == "N/A":
+            continue
+        q_norm = _normalize_overlap_text(q)
+        if len(q_norm) >= _QUOTE_OVERLAP_SUBSTRING_CHARS:
+            if q_norm[:_QUOTE_OVERLAP_SUBSTRING_CHARS] in ctx_norm:
+                return True
+            if ctx_norm[:_QUOTE_OVERLAP_SUBSTRING_CHARS] in q_norm:
+                return True
+        if _word_overlap_ratio(ctx, q) >= _QUOTE_OVERLAP_WORD_THRESHOLD:
+            return True
+    return False
+
+
+def _panelist_camp_label(row: dict) -> str:
+    archetype = PANELIST_ARCHETYPES.get(row["agent_key"], "")
+    short = panelist_short_name(row["agent_key"])
+    if archetype:
+        return f"{short} ({archetype.replace('The ', '')})"
+    return short
+
+
+def _committee_camps_sentence(rows: list[dict], final_verdict: str) -> str:
+    """Name aligned vs opposing camps without quoting Round 2 analysis."""
+    if not rows:
+        return ""
+    buy, sell, neutral, pass_ = [], [], [], []
+    for row in rows:
+        side = panel_verdict_side(row["verdict"], row["section"])
+        label = _panelist_camp_label(row)
+        if side == "buy":
+            buy.append(label)
+        elif side == "sell":
+            sell.append(label)
+        elif side == "pass":
+            pass_.append(label)
+        else:
+            neutral.append(label)
+
+    final = _normalize_verdict(final_verdict)
+    sym = rows[0]["symbol"]
+
+    def _join(names: list[str]) -> str:
+        if not names:
+            return ""
+        if len(names) == 1:
+            return names[0]
+        return ", ".join(names[:-1]) + f", and {names[-1]}"
+
+    if final in BUY_VERDICTS and buy:
+        lead = _join(buy)
+        if sell:
+            return (
+                f"The buy-side camp ({lead}) carried the room to an executed {final} "
+                f"over reduce dissent ({_join(sell)})."
+            )
+        return f"The committee aligned on the buy-side ({lead}) for an executed {final} on {sym}."
+
+    if final in ("STRONG SELL", "SELL", "TRIM") and sell:
+        lead = _join(sell)
+        if buy:
+            return (
+                f"The reduce camp ({lead}) set the mandate; growth dissent ({_join(buy)}) "
+                f"did not block the executed {final}."
+            )
+        return f"The board aligned on the reduce side ({lead}) for an executed {final} on {sym}."
+
+    if final == "PASS" and pass_:
+        return (
+            f"No actionable conviction emerged — {_join(pass_)} led the Pass stance on {sym}."
+        )
+
+    if final == "HOLD" and neutral:
+        return f"The panel split without a tradeable edge; {_join(neutral)} anchored Hold on {sym}."
+
+    camps = buy + sell + neutral + pass_
+    if camps:
+        return f"The committee debated across {len(camps)} distinct camps before landing on {final} for {sym}."
+    return ""
+
+
+def _vote_math_sentence(sym: str, summary, final_verdict: str) -> str:
+    if not summary:
+        return ""
+    buy, sell = summary.buy_side_count(), summary.sell_side_count()
+    final = _normalize_verdict(final_verdict)
+    if summary.is_unanimous("reduce"):
+        return f"The board reached a unanimous {sell}-0 Round 2 reduce mandate on {sym} (executed {final})."
+    if summary.is_unanimous("buy"):
+        return f"The board reached a unanimous {buy}-0 Round 2 buy mandate on {sym} (executed {final})."
+    if summary.is_unanimous():
+        return f"The panel voted unanimously on {sym}; committee executes {final}."
+    return (
+        f"Round 2 split buy_side={buy}/5 sell_side={sell}/5 on {sym}; "
+        f"committee executes {final}."
+    )
+
+
+def _synthetic_strategic_context(
+    pos: dict,
+    raw_verdicts: dict[str, dict],
+    summaries: dict,
+) -> str:
+    """Deterministic strategic context — vote math + camp labels, never panel quote paste."""
     sym = (pos.get("symbol") or "").strip().upper()
     rows = _symbol_rows(raw_verdicts, sym)
     final = pos.get("final_verdict", "")
@@ -296,30 +427,42 @@ def _fallback_strategic_context(pos: dict, raw_verdicts: dict[str, dict], summar
     if override:
         parts.append(override)
     summary = summaries.get(sym)
-    if summary:
-        buy, sell = summary.buy_side_count(), summary.sell_side_count()
-        if summary.is_unanimous("reduce"):
-            parts.append(
-                f"The board reached a unanimous {sell}-0 Round 2 reduce mandate on {sym}."
-            )
-        elif summary.is_unanimous("buy"):
-            parts.append(
-                f"The board reached a unanimous {buy}-0 Round 2 buy mandate on {sym}."
-            )
-        else:
-            parts.append(
-                f"Round 2 split buy_side={buy}/5 sell_side={sell}/5; committee executes {final}."
-            )
-    aligned = [
-        r for r in rows
-        if _side_matches_final(panel_verdict_side(r["verdict"], r["section"]), final, r["section"])
-    ]
-    aligned.sort(key=lambda r: -r["conviction"])
-    for row in aligned[:2]:
-        if row["analysis"]:
-            parts.append(row["analysis"])
+    vote_line = _vote_math_sentence(sym, summary, final)
+    if vote_line:
+        parts.append(vote_line)
+    camp_line = _committee_camps_sentence(rows, final)
+    if camp_line:
+        parts.append(camp_line)
     text = " ".join(parts).strip()
     return text[:800] if text else ""
+
+
+def _fallback_strategic_context(pos: dict, raw_verdicts: dict[str, dict], summaries: dict) -> str:
+    """Degraded strategic context when Flash is unavailable or returns duplicate prose."""
+    return _synthetic_strategic_context(pos, raw_verdicts, summaries)
+
+
+def _finalize_strategic_context(
+    pos: dict,
+    ctx: str,
+    raw_verdicts: dict[str, dict],
+    summaries: dict,
+) -> str:
+    """Ensure strategic context is distinct from Champion/Dissent quotes."""
+    narrative = pos.get("narrative") or {}
+    quotes = (
+        narrative.get("champion_quote") or "",
+        narrative.get("dissenter_quote") or "",
+    )
+    cleaned = (ctx or "").strip()
+    if (
+        not cleaned
+        or _is_generic_synthesis(cleaned)
+        or len(cleaned) < _MIN_STRATEGIC_CONTEXT_CHARS
+        or _overlaps_panel_quotes(cleaned, *quotes)
+    ):
+        return _synthetic_strategic_context(pos, raw_verdicts, summaries)
+    return cleaned
 
 
 def _apply_strategic_contexts(
@@ -335,8 +478,7 @@ def _apply_strategic_contexts(
             row = dict(pos)
             sym = (row.get("symbol") or "").strip().upper()
             ctx = (contexts.get(sym) or "").strip()
-            if not ctx or _is_generic_synthesis(ctx):
-                ctx = _fallback_strategic_context(row, raw_verdicts, summaries)
+            ctx = _finalize_strategic_context(row, ctx, raw_verdicts, summaries)
             row["strategic_context"] = ctx
             row["synthesis"] = ctx
             enriched.append(row)

@@ -160,6 +160,7 @@ class TestIntegrityQALLMGate(unittest.IsolatedAsyncioTestCase):
         prompt = mock_llm.call_args[0][1][0].parts[0].text
         self.assertIn("Executive briefing HTML: PROVIDED", prompt)
         self.assertIn("Do NOT report it as missing", prompt)
+        self.assertIn("VOTE GROUND TRUTH", prompt)
         self.assertFalse(report["is_compliant"])
         self.assertTrue(any(f.get("category") == "Dashboard Fidelity" for f in report["findings"]))
 

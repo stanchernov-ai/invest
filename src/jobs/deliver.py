@@ -152,6 +152,10 @@ async def run_deliver(run_id: str) -> dict:
         integrity_report = await qa_pipeline.run_qa_integrity_audit(
             qa_reports, raw_log_combined, json.dumps(c_data), interim_qa_dashboard_html,
             executive_briefing_html=briefing_html,
+            raw_verdicts=raw_verdicts or None,
+            all_symbols=all_symbols,
+            portfolio_symbols=portfolio_symbols,
+            raw_board_messages=raw_board_messages,
         )
         qa_reports.append(integrity_report)
 
@@ -167,8 +171,54 @@ async def run_deliver(run_id: str) -> dict:
         storage_client.save_report(f"executive_briefing_{run_id}.html", investor_briefing_html)
         storage_client.save_report(f"raw_debate_log_{run_id}.md", raw_log_combined)
 
-        notifier.send_executive_briefing(investor_briefing_html)
-        notifier.send_qa_dashboard(qa_dashboard_html)
+        briefing_sent_at = now_local().isoformat()
+        briefing_ok = notifier.send_executive_briefing(investor_briefing_html)
+        qa_sent_at = now_local().isoformat()
+        qa_ok = notifier.send_qa_dashboard(qa_dashboard_html)
+        email_delivery = {
+            "briefing": {"ok": briefing_ok, "sent_at": briefing_sent_at},
+            "qa_dashboard": {"ok": qa_ok, "sent_at": qa_sent_at},
+        }
+        if briefing_ok:
+            logger.info(
+                "[DELIVER] Executive briefing email OK for run %s at %s.",
+                run_id, briefing_sent_at,
+            )
+        else:
+            logger.error(
+                "[DELIVER] Executive briefing email FAILED for run %s at %s "
+                "(artifacts saved to blob; check SMTP creds / App Insights).",
+                run_id, briefing_sent_at,
+            )
+        if qa_ok:
+            logger.info(
+                "[DELIVER] QA dashboard email OK for run %s at %s.",
+                run_id, qa_sent_at,
+            )
+        else:
+            logger.warning(
+                "[DELIVER] QA dashboard email FAILED for run %s at %s.",
+                run_id, qa_sent_at,
+            )
+
+        if not briefing_ok:
+            finished = now_local()
+            err = "executive briefing email delivery failed (SMTP or missing credentials)"
+            notifier.send_error_alert(
+                f"Deliver phase for run {run_id}: {err}. "
+                f"Briefing HTML saved as executive_briefing_{run_id}.html."
+            )
+            storage_client.mark_phase(
+                run_id, "deliver", "failed",
+                started_at=started.isoformat(),
+                finished_at=finished.isoformat(),
+                duration_seconds=round((finished - started).total_seconds(), 1),
+                error=err,
+                email_delivery=email_delivery,
+                briefing_blob=f"executive_briefing_{run_id}.html",
+                qa_blob=f"qa_dashboard_{run_id}.html",
+            )
+            return {"run_id": run_id, "status": "failed"}
 
         # Merge telemetry from all three phases into the canonical run file.
         deliver_activity = agent_activity.snapshot()
@@ -201,7 +251,8 @@ async def run_deliver(run_id: str) -> dict:
                                   finished_at=finished.isoformat(),
                                   duration_seconds=round((finished - started).total_seconds(), 1),
                                   briefing_blob=f"executive_briefing_{run_id}.html",
-                                  qa_blob=f"qa_dashboard_{run_id}.html")
+                                  qa_blob=f"qa_dashboard_{run_id}.html",
+                                  email_delivery=email_delivery)
         # Mirror briefing/qa blob names to the top level for existing monitors.
         status = storage_client.load_run_status_for_run(run_id) or {}
         status["briefing_blob"] = f"executive_briefing_{run_id}.html"

@@ -221,6 +221,8 @@ def _claims_finding_truncated(description: str, findings_rendered: dict[str, lis
 def sanitize_llm_integrity_findings(
     findings: list[dict],
     ctx: dict,
+    *,
+    vote_ctx: dict | None = None,
 ) -> list[dict]:
     """Drop LLM findings that contradict deterministic evidence context."""
     cleaned: list[dict] = []
@@ -228,6 +230,10 @@ def sanitize_llm_integrity_findings(
         desc = finding.get("description") or ""
         cat = (finding.get("category") or "").lower()
 
+        if vote_ctx and _claims_false_max_buy_violation(desc, vote_ctx):
+            continue
+        if vote_ctx and _contradicts_deterministic_post_mortem_pass(desc, vote_ctx):
+            continue
         if ctx.get("briefing_provided") and _claims_missing_briefing(desc):
             continue
         if _claims_missing_dashboard_section(desc, ctx.get("agent_sections") or {}):
@@ -367,7 +373,233 @@ def audit_qa_coverage(qa_reports: list[dict]) -> list[dict]:
     return findings
 
 
-def build_deterministic_integrity_report(qa_reports: list[dict], dashboard_html: str) -> dict:
+def _find_qa_report(qa_reports: list[dict], role_substring: str) -> dict | None:
+    needle = _normalize_role(role_substring)
+    for report in qa_reports or []:
+        role = _normalize_role(report.get("agent_role", ""))
+        if needle in role:
+            return report
+    return None
+
+
+def build_vote_ground_truth_context(
+    chairman: dict | None,
+    raw_verdicts: dict | None,
+    *,
+    all_symbols: list[str] | None = None,
+    portfolio_symbols: set[str] | None = None,
+    raw_board_messages: list | None = None,
+) -> dict:
+    """Round 2 JSON vote digest + deterministic post-mortem re-check for integrity audit."""
+    from src.core.guardrails import MAX_DAILY_BUYS, count_equity_buys
+    from src.core.vote_engine import build_vote_summaries, format_vote_digest
+    from src.qa.post_mortem_audit import (
+        audit_debate_prose_vs_raw_verdicts,
+        audit_post_mortem_deterministic,
+        format_post_mortem_digest,
+    )
+
+    chairman = chairman or {}
+    all_symbols = all_symbols or []
+    portfolio_symbols = portfolio_symbols or set()
+
+    ctx: dict = {
+        "equity_buy_count": count_equity_buys(chairman) if chairman else 0,
+        "max_equity_buys": MAX_DAILY_BUYS,
+        "vote_digest_text": "",
+        "post_mortem_digest_text": "",
+        "deterministic_violations": None,
+        "prose_drift": [],
+        "persona_violations": [],
+    }
+
+    if not raw_verdicts or not all_symbols:
+        return ctx
+
+    summaries = build_vote_summaries(
+        raw_verdicts, all_symbols, portfolio_symbols=portfolio_symbols
+    )
+    ctx["vote_digest_text"] = format_vote_digest(
+        summaries, portfolio_symbols=portfolio_symbols
+    )
+    ctx["deterministic_violations"] = audit_post_mortem_deterministic(
+        chairman,
+        raw_verdicts,
+        all_symbols=all_symbols,
+        portfolio_symbols=portfolio_symbols,
+        raw_board_messages=raw_board_messages,
+    )
+    ctx["post_mortem_digest_text"] = format_post_mortem_digest(
+        ctx["deterministic_violations"],
+        raw_verdicts,
+        all_symbols=all_symbols,
+        portfolio_symbols=portfolio_symbols,
+    )
+    ctx["prose_drift"] = audit_debate_prose_vs_raw_verdicts(
+        raw_board_messages, raw_verdicts, all_symbols=all_symbols
+    )
+    return ctx
+
+
+def format_vote_ground_truth_digest(vote_ctx: dict) -> str:
+    """Human-readable vote SSOT block for the integrity LLM prompt."""
+    lines = [
+        "VOTE GROUND TRUTH (Round 2 raw_verdicts JSON — authoritative for vote counts):",
+        "Do NOT infer buy/sell tallies from debate markdown; use the digest below.",
+        "",
+    ]
+    if vote_ctx.get("vote_digest_text"):
+        lines.append(vote_ctx["vote_digest_text"])
+    else:
+        lines.append("  (raw_verdicts not available for this run)")
+    lines.append("")
+    lines.append(
+        f"MAX EQUITY BUYS: {vote_ctx.get('equity_buy_count', 0)}/"
+        f"{vote_ctx.get('max_equity_buys', 3)} Buy/Strong Buy equity positions "
+        f"(TLT/VXX hedge excluded from cap). "
+        f"capital_flow_audit.target_tickers may list TLT/VXX plus equity targets — "
+        f"do NOT flag a max-3 violation from target_tickers length alone."
+    )
+    drift = vote_ctx.get("prose_drift") or []
+    if drift:
+        lines.append("")
+        lines.append("PROSE vs JSON DRIFT (debate markdown disagrees with raw_verdicts):")
+        for item in drift[:8]:
+            lines.append(f"  - {item}")
+    det = vote_ctx.get("deterministic_violations")
+    if det is None:
+        return "\n".join(lines)
+    if det:
+        lines.append("")
+        lines.append(
+            "DETERMINISTIC POST MORTEM RE-CHECK (Python vote_engine — authoritative):"
+        )
+        for item in det:
+            lines.append(f"  - {item}")
+    else:
+        lines.append("")
+        lines.append(
+            "DETERMINISTIC POST MORTEM RE-CHECK: PASS — chairman aligns with vote digest."
+        )
+    return "\n".join(lines)
+
+
+def audit_post_mortem_report_accuracy(
+    qa_reports: list[dict],
+    vote_ctx: dict,
+) -> list[dict]:
+    """Compare Post Mortem QA verdict to deterministic vote_engine re-check."""
+    report = _find_qa_report(qa_reports, "post mortem")
+    det = vote_ctx.get("deterministic_violations")
+    if not report or det is None:
+        return []
+
+    expected_pass = len(det) == 0
+    actual_pass = bool(report.get("is_compliant"))
+    if actual_pass == expected_pass:
+        return []
+
+    if actual_pass and not expected_pass:
+        return [{
+            "severity": "CRITICAL",
+            "category": "Verdict Accuracy - Post Mortem QA",
+            "description": (
+                f"Post Mortem QA reported PASS but deterministic vote_engine re-check found "
+                f"{len(det)} violation(s): {'; '.join(det[:3])}"
+            ),
+            "recommendation": "Post Mortem must FAIL when Python vote alignment fails.",
+        }]
+
+    return [{
+        "severity": "WARNING",
+        "category": "Verdict Accuracy - Post Mortem QA",
+        "description": (
+            "Post Mortem QA reported FAIL but deterministic vote_engine re-check found "
+            "no violations — LLM may have inferred vote counts from debate markdown."
+        ),
+        "recommendation": "Trust raw_verdicts vote digest over debate prose parsing.",
+    }]
+
+
+def audit_prompt_engineer_report_accuracy(
+    qa_reports: list[dict],
+    raw_board_messages: list | None,
+    all_symbols: list[str] | None,
+) -> list[dict]:
+    """Compare Prompt Engineer QA verdict to deterministic persona re-check."""
+    from src.qa.persona_audit import audit_debate_persona
+
+    report = _find_qa_report(qa_reports, "prompt engineer")
+    if not report:
+        return []
+
+    violations, _ = audit_debate_persona(raw_board_messages or [], all_symbols or [])
+    expected_pass = len(violations) == 0
+    actual_pass = bool(report.get("is_compliant"))
+    if actual_pass == expected_pass:
+        return []
+
+    if actual_pass and not expected_pass:
+        return [{
+            "severity": "CRITICAL",
+            "category": "Verdict Accuracy - Prompt Engineer QA",
+            "description": (
+                f"Prompt Engineer QA reported PASS but deterministic persona re-check found "
+                f"{len(violations)} issue(s): {'; '.join(violations[:2])}"
+            ),
+            "recommendation": "Prompt Engineer must FAIL when Python persona audit fails.",
+        }]
+
+    return [{
+        "severity": "WARNING",
+        "category": "Verdict Accuracy - Prompt Engineer QA",
+        "description": (
+            "Prompt Engineer QA reported FAIL but deterministic persona re-check found "
+            "no violations — verify quote attribution against Round 2 blocks."
+        ),
+        "recommendation": "Use per-panelist Round 2 blocks; cite evidence snippets.",
+    }]
+
+
+def _claims_false_max_buy_violation(description: str, vote_ctx: dict) -> bool:
+    """Drop LLM findings that count hedge symbols in target_tickers toward max-3."""
+    equity = vote_ctx.get("equity_buy_count")
+    cap = vote_ctx.get("max_equity_buys", 3)
+    if equity is None or equity > cap:
+        return False
+    desc = (description or "").lower()
+    if not any(t in desc for t in ("max 3", "max-3", "3-buy", "buy count", "exceeds")):
+        return False
+    if "target_ticker" in desc or "target tickers" in desc:
+        return True
+    if re.search(r"\b4\b", desc) and "buy" in desc:
+        return True
+    return False
+
+
+def _contradicts_deterministic_post_mortem_pass(description: str, vote_ctx: dict) -> bool:
+    """Drop LLM claims Post Mortem missed violations when Python re-check passed."""
+    det = vote_ctx.get("deterministic_violations")
+    if det:
+        return False
+    desc = (description or "").lower()
+    if "post mortem" not in desc:
+        return False
+    if any(t in desc for t in ("failed to identify", "incorrectly reported", "false negative", "rubber-stamp")):
+        return _claims_false_max_buy_violation(description, vote_ctx) or (
+            "max 3" in desc or "max-3" in desc or "3-buy" in desc
+        )
+    return False
+
+
+def build_deterministic_integrity_report(
+    qa_reports: list[dict],
+    dashboard_html: str,
+    *,
+    vote_ctx: dict | None = None,
+    raw_board_messages: list | None = None,
+    all_symbols: list[str] | None = None,
+) -> dict:
     """Run all deterministic integrity pre-checks — no LLM."""
     findings = []
     findings.extend(audit_qa_coverage(qa_reports))
@@ -375,6 +607,12 @@ def build_deterministic_integrity_report(qa_reports: list[dict], dashboard_html:
     findings.extend(audit_dashboard_fidelity(qa_reports, dashboard_html))
     findings.extend(audit_dashboard_sections(qa_reports, dashboard_html))
     findings.extend(audit_findings_rendered(qa_reports, dashboard_html))
+    if vote_ctx is not None:
+        findings.extend(audit_post_mortem_report_accuracy(qa_reports, vote_ctx))
+    if raw_board_messages is not None and all_symbols:
+        findings.extend(
+            audit_prompt_engineer_report_accuracy(qa_reports, raw_board_messages, all_symbols)
+        )
 
     has_critical = any(str(f.get("severity", "")).upper() == "CRITICAL" for f in findings)
     crit = sum(1 for f in findings if str(f.get("severity", "")).upper() == "CRITICAL")
