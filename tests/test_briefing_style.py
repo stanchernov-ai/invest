@@ -83,8 +83,8 @@ class BriefingStyleTests(unittest.TestCase):
         bull = briefing_style.sotu_quote_style(f"{PANELIST_ROLES['hypatia']} (⭐⭐⭐⭐ Bullish)")
         self.assertEqual(bull[0], briefing_style.SOTU_BULL_BG)
         self.assertEqual(bull[1], briefing_style.BULL_TEXT)
-        self.assertIn("box-shadow", bull[2])
-        self.assertIn("110,231,183", bull[2])
+        self.assertNotIn("box-shadow", bull[2])
+        self.assertIn(briefing_style.SOTU_BULL_EDGE, bull[2])
 
         three_bull = briefing_style.sotu_quote_style(f"{PANELIST_ROLES['davinci']} (⭐⭐⭐ Bullish)")
         self.assertEqual(three_bull[0], briefing_style.SOTU_BULL_BG)
@@ -93,12 +93,17 @@ class BriefingStyleTests(unittest.TestCase):
         neutral = briefing_style.sotu_quote_style(f"{PANELIST_ROLES['suntzu']} (⭐⭐ Neutral)")
         self.assertEqual(neutral[0], briefing_style.SOTU_NEUTRAL_BG)
         self.assertEqual(neutral[1], briefing_style.SOTU_NEUTRAL_TEXT)
-        self.assertIn("147,197,253", neutral[2])
+        self.assertNotIn("box-shadow", neutral[2])
 
         bear = briefing_style.sotu_quote_style(f"{PANELIST_ROLES['aurelius']} (⭐ Bearish)")
         self.assertEqual(bear[0], briefing_style.SOTU_BEAR_BG)
         self.assertEqual(bear[1], briefing_style.BEAR_TEXT)
-        self.assertIn("252,165,165", bear[2])
+        self.assertNotIn("box-shadow", bear[2])
+
+    def test_alpha_pick_logo_spotlight_chip(self):
+        lg = briefing_style.ticker_logo_inline_style(size=72, spotlight=True)
+        self.assertIn("#ffffff", lg)
+        self.assertIn("padding:10px", lg)
 
     def test_investor_qa_summary_uses_advisory_not_emoji(self):
         html = briefing_style.format_investor_qa_summary([

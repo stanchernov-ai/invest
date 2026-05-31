@@ -255,27 +255,20 @@ def _sotu_stance(board_member_label: str) -> str:
 
 
 def sotu_quote_style(board_member_label: str) -> tuple[str, str, str]:
-    """Return (background, border-left, row_glow_style) for State of the Union quote rows."""
+    """Return (background, border-left, row_border_style) for State of the Union quote rows."""
     stance = _sotu_stance(board_member_label)
     if stance == "bullish":
-        bg, edge, glow_rgb, border = SOTU_BULL_BG, SOTU_BULL_EDGE, SOTU_BULL_GLOW_RGB, BULL_TEXT
+        bg, edge, border = SOTU_BULL_BG, SOTU_BULL_EDGE, BULL_TEXT
     elif stance == "bearish":
-        bg, edge, glow_rgb, border = SOTU_BEAR_BG, SOTU_BEAR_EDGE, SOTU_BEAR_GLOW_RGB, BEAR_TEXT
+        bg, edge, border = SOTU_BEAR_BG, SOTU_BEAR_EDGE, BEAR_TEXT
     else:
-        bg, edge, glow_rgb, border = (
-            SOTU_NEUTRAL_BG,
-            SOTU_NEUTRAL_EDGE,
-            SOTU_NEUTRAL_GLOW_RGB,
-            SOTU_NEUTRAL_TEXT,
-        )
-    glow = (
-        f"box-shadow: inset 0 0 28px {_rgba_rgb(glow_rgb, SOTU_GLOW_ALPHA)}, "
-        f"0 0 14px {_rgba_rgb(glow_rgb, SOTU_GLOW_ALPHA * 0.45)}; "
+        bg, edge, border = SOTU_NEUTRAL_BG, SOTU_NEUTRAL_EDGE, SOTU_NEUTRAL_TEXT
+    row_border = (
         f"border-top: 1px solid {edge}; "
         f"border-right: 1px solid {edge}; "
         f"border-bottom: 1px solid {edge};"
     )
-    return bg, border, glow
+    return bg, border, row_border
 
 
 def sotu_quote_colors(board_member_label: str) -> tuple[str, str]:
@@ -284,13 +277,15 @@ def sotu_quote_colors(board_member_label: str) -> tuple[str, str]:
     return bg, border
 
 
-def ticker_logo_inline_style(*, size: int = 28) -> str:
-    """Light chip behind FMP logos so dark PNGs read on ``#27272a`` cards."""
-    chip = "#f4f4f5"
+def ticker_logo_inline_style(*, size: int = 28, spotlight: bool = False) -> str:
+    """Light chip behind FMP logos — ``spotlight=True`` for Alpha Pick on ``#27272a`` cards."""
+    chip = "#ffffff" if spotlight else "#f4f4f5"
+    padding = 10 if spotlight else 4
+    border = "#e4e4e7" if spotlight else "#71717a"
     return (
-        f"width:{size}px;height:{size}px;border-radius:6px;display:block;"
-        f"max-width:{size}px;background-color:{chip};padding:4px;"
-        f"border:1px solid #71717a;"
+        f"width:{size}px;height:{size}px;border-radius:8px;display:block;"
+        f"max-width:{size}px;background-color:{chip};padding:{padding}px;"
+        f"border:1px solid {border};"
     )
 
 
@@ -419,7 +414,7 @@ def executive_briefing_inline_styles() -> dict[str, str]:
         "li": f"color:{TEXT_PRIMARY};margin-bottom:6px;{font}",
         "ticker_logo_sm": ticker_logo_inline_style(size=28),
         "ticker_logo_md": ticker_logo_inline_style(size=48),
-        "ticker_logo_lg": ticker_logo_inline_style(size=ALPHA_PICK_LOGO_SIZE),
+        "ticker_logo_lg": ticker_logo_inline_style(size=ALPHA_PICK_LOGO_SIZE, spotlight=True),
         "sotu_avatar_cell": (
             f"padding:12px;text-align:center;vertical-align:middle;"
             f"width:{SOTU_AVATAR_COLUMN_WIDTH}px;"

@@ -80,10 +80,10 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 | **P1** | PE-PERSONA-1 | done | Prompt Engineer | agent | Round 2 persona drift — forbidden vocab (`margin of safety`, `relative strength`, `the tape`) across panelists | qa_reports_20260531_014121.json |
 | **P1** | R2-1 | done | Prompt Engineer | agent | Round 2 `overall_portfolio_critique` verbatim copy of Round 1 | qa_reports_20260530_205821.json |
 | **P1** | HR-TELEM-1 | open | HR | code | HR Efficiency review on prod telemetry — `hr_review` on `20260531_014121` (`QA_EXECUTION` now on prod) | api_telemetry_20260531_014121.json |
-| **P1** | GFX-2 | open | Graphics Designer | code | Logo contrast on `#27272a` — MSFT Alpha Pick | qa_reports_20260530_205821.json |
-| **P1** | GFX-SOTU-1 | open | Graphics Designer | code | SoTU non-SSOT `box-shadow` / colors | qa_reports_20260530_205821.json |
-| **P1** | AV-2 | open | manual | code | SoTU avatar ring alignment — re-export 128×128 centered PNGs |  |
-| **P1** | GFX-3 | open | manual | code | Pie categorical palette — too many similar greens |  |
+| **P1** | GFX-2 | done | Graphics Designer | code | Logo contrast on `#27272a` — MSFT Alpha Pick | qa_reports_20260530_205821.json |
+| **P1** | GFX-SOTU-1 | done | Graphics Designer | code | SoTU non-SSOT `box-shadow` / colors | qa_reports_20260530_205821.json |
+| **P1** | AV-2 | done | manual | code | SoTU avatar ring alignment — re-export 128×128 centered PNGs |  |
+| **P1** | GFX-3 | done | manual | code | Pie categorical palette — too many similar greens |  |
 | **P1** | CHAIR-1 | open | Post Mortem QA | code | Post Mortem Trim→Hold mandate — AVGO/ASML on `010432` |  |
 | **P1** | HR-1 | open | manual | code | Commit + deploy remaining HR/QA roster WIP | [`hr_qa_roster_handoff.md`](hr_qa_roster_handoff.md) |
 | **P2** | GFX-LLM-1 | open | Graphics Designer | agent | Visual review LLM parse error (deterministic chart audit still PASS) | qa_reports_20260531_014121.json |
@@ -92,7 +92,7 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 | **P2** | HR-ROSTER-1 | open | HR | agent | Reduce deliver QA overlap / token sink | [`agent_architecture.md`](agent_architecture.md) §9 |
 | **P3** | LEG-MUNGER-1 | open | Legal Counsel | code | Rename `MUNGER_DOCTRINE` user-facing string for SaaS | debate injection only |
 
-**Done (now prod):** PASS-SPAM-1, R2-1, PE-PERSONA-1, DEPLOY-1, REVIEW-1, AP-1, **AP-2**, GFX-4, GFX-QA, INT-1, UNICORN-1, Legal Counsel QA, catalysts, per-stock debate, QA review footer, investor voice, Yahoo cache, scout validation, **PE-VOICE-1**, **Crucible palette** (`760ebb6`), **QA triage UI** (`52613b2`), **backlog sync** (`b6984fa`), `qa_augmentation.py` (B2).
+**Done (now prod):** GFX-2, GFX-SOTU-1, AV-2, GFX-3, PASS-SPAM-1, R2-1, PE-PERSONA-1, DEPLOY-1, REVIEW-1, AP-1, **AP-2**, GFX-4, GFX-QA, INT-1, UNICORN-1, Legal Counsel QA, catalysts, per-stock debate, QA review footer, investor voice, Yahoo cache, scout validation, **PE-VOICE-1**, **Crucible palette** (`760ebb6`), **QA triage UI** (`52613b2`), **backlog sync** (`b6984fa`), `qa_augmentation.py` (B2).
 
 **Dropped / merged:** H1 → HR-TELEM-1; MKT-QA-1 lives in GTM section only; auto-sync rows that duplicate PASS-SPAM-1 / PE-PERSONA-1 / GFX-LLM-1 — discard via triage.
 

@@ -62,6 +62,11 @@ from src.output.briefing_style import (
     CHART_GAIN,
     CHART_LOSS,
     CHART_NEUTRAL,
+    CHART_GAIN_LIGHT,
+    CHART_GAIN_DARK,
+    CHART_LOSS_LIGHT,
+    CHART_LOSS_DARK,
+    CHART_NEUTRAL_EPS,
     BAR_CHART_WIDTH,
     BAR_CHART_HEIGHT,
     BAR_DATALABEL_ANCHOR,
@@ -703,8 +708,20 @@ def _render_outlabeled_pie_chart(labels, data, colors):
 
 
 def pie_chart_colors(values: list[float]) -> list[str]:
-    """Slice/bar hues from return magnitude — darker green = larger gain."""
-    return chart_magnitude_colors(values)
+    """Pie slice hues — rank-spread within each sign so similar returns stay distinguishable."""
+    if not values:
+        return []
+    floats = [float(v) for v in values]
+    colors = [CHART_NEUTRAL] * len(floats)
+    pos_idxs = [i for i, v in enumerate(floats) if v > CHART_NEUTRAL_EPS]
+    neg_idxs = [i for i, v in enumerate(floats) if v < -CHART_NEUTRAL_EPS]
+    for rank, idx in enumerate(sorted(pos_idxs, key=lambda i: floats[i])):
+        t = rank / max(len(pos_idxs) - 1, 1)
+        colors[idx] = _lerp_hex(CHART_GAIN_LIGHT, CHART_GAIN_DARK, t)
+    for rank, idx in enumerate(sorted(neg_idxs, key=lambda i: floats[i])):
+        t = rank / max(len(neg_idxs) - 1, 1)
+        colors[idx] = _lerp_hex(CHART_LOSS_LIGHT, CHART_LOSS_DARK, t)
+    return colors
 
 
 def colors_for_metric(values: list[float], *, theme: str = "light") -> list[str]:

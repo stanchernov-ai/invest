@@ -285,6 +285,12 @@ class ChartColorTests(unittest.TestCase):
         self.assertEqual(len(colors), 4)
         self.assertNotEqual(colors[0], colors[-1])
 
+    def test_pie_similar_positive_returns_spread_by_rank(self):
+        similar = [18.0, 18.5, 19.0, 19.5, 20.0]
+        colors = reporting.pie_chart_colors(similar)
+        self.assertEqual(len(colors), 5)
+        self.assertEqual(len(set(colors)), 5)
+
     def test_pie_uses_magnitude_colors_by_return(self):
         ledger = [
             ("A", {"Total": 5000, "Personal_Return_Pct": 8.0}),
@@ -295,7 +301,7 @@ class ChartColorTests(unittest.TestCase):
             reporting.build_portfolio_pie_chart(ledger)
         colors = mock_url.call_args[0][0]["data"]["datasets"][0]["backgroundColor"]
         self.assertEqual(len(colors), 3)
-        self.assertEqual(colors, reporting.chart_magnitude_colors([8.0, -3.0, 35.0]))
+        self.assertEqual(colors, reporting.pie_chart_colors([8.0, -3.0, 35.0]))
         self.assertNotEqual(colors[0], colors[2])
 
     def test_bar_chart_uses_magnitude_colors(self):
@@ -333,7 +339,7 @@ class ChartColorTests(unittest.TestCase):
             reporting.build_portfolio_pie_chart(ledger)
         outlabels = mock_url.call_args[0][0]["options"]["plugins"]["outlabels"]
         self.assertEqual(outlabels["color"], reporting.PIE_OUTLABEL_COLOR)
-        expected_bg = reporting.chart_magnitude_colors([8.0, 22.0])
+        expected_bg = reporting.pie_chart_colors([8.0, 22.0])
         self.assertEqual(outlabels["backgroundColor"], expected_bg)
         self.assertEqual(outlabels["stretch"], reporting.PIE_OUTLABEL_STRETCH)
         self.assertEqual(outlabels["font"]["weight"], str(reporting.CHART_OUTLABEL_WEIGHT))
