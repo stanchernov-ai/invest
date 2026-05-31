@@ -11,12 +11,16 @@ from src.qa.qa_augmentation import (
 
 
 class TestQaAugmentationPolicy(unittest.TestCase):
-    def test_persona_augment_on_fail(self):
-        self.assertTrue(should_augment_persona_llm(["SYCOPHANCY"], {}))
+    def test_persona_skip_llm_on_fail(self):
+        self.assertFalse(should_augment_persona_llm(["SYCOPHANCY"], {}))
 
     def test_persona_augment_borderline_pass(self):
-        stats = {"total_tickers": 5, "unanimous_rate": 0.5}
+        stats = {"total_tickers": 5, "unanimous_rate": 0.55}
         self.assertTrue(should_augment_persona_llm([], stats))
+
+    def test_persona_skip_below_borderline_band(self):
+        stats = {"total_tickers": 5, "unanimous_rate": 0.50}
+        self.assertFalse(should_augment_persona_llm([], stats))
 
     def test_persona_skip_low_unanimity(self):
         stats = {"total_tickers": 5, "unanimous_rate": 0.2}

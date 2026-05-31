@@ -60,7 +60,7 @@ Central policy helpers:
 
 | Agent | LLM runs when |
 |-------|----------------|
-| **prompt_engineer** | Deterministic persona **FAIL**, or PASS with unanimous rate **≥ 45% and &lt; 60%** (borderline consensus) |
+| **prompt_engineer** | Borderline unanimous PASS only (rate **≥ 52% and &lt; 60%**); **no LLM on deterministic FAIL** (B2) |
 | **system_architect** | Deterministic structural/bloat checks only — **no LLM on FAIL** (May 30; saves tokens; `test_architect_audit` SSOT). |
 | **post_mortem_qa** | Existing path on deterministic **FAIL**; on PASS: **spot-check** (Flash) if procedural drift warnings **or** vote-engine scratchpad (`PYTHON VOTE ENGINE` / `VOTE ENGINE ALLOCATION`) |
 
@@ -209,7 +209,7 @@ flowchart LR
 
 1. **Commit + deploy HR-1 batch** — `hr_review.py`, `deliver.py`, `qa_pipeline.py`, consumers, `test_hr_review.py`, this doc + `DOCUMENTATION.md` / `agent_architecture.md` links.
 2. After deploy: `fetch_azure_reports --run-id <id>` → `python -m src.hr_review ...` — confirm `QA_EXECUTION` in telemetry blob and LLM_* status labels.
-3. If borderline persona LLM fires too often, tune `PERSONA_BORDERLINE_UNANIMOUS_RATE` in `qa_augmentation.py` (default `0.45`).
+3. Borderline persona band is `PERSONA_BORDERLINE_UNANIMOUS_RATE`–60% (default **0.52**); raise to fire less often on green runs.
 4. When starting chairman-per-user work, link design doc to §2 chairman row and `engine.execute_chairman_arbitration`.
 
 ---

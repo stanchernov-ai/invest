@@ -81,7 +81,7 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 | **P1** | GFX-3 | M | Pie categorical palette | Too many similar greens |
 | **P1** | CHAIR-1 | S | Post Mortem Trim→Hold mandate | AVGO/ASML on `010432` |
 | **P1** | AP-2 | S | “Today’s actions” summary box | Not started |
-| **P2** | B2 | S | Skip `prompt_engineer` LLM on deterministic FAIL | [`agent_optimization_handoff.md`](agent_optimization_handoff.md) §B2 |
+| **P2** | B2 | S | Skip `prompt_engineer` LLM on deterministic FAIL | **Done** — `qa_augmentation.py`; borderline band 52–60% |
 | **P2** | R2-1 | M | Round 2 verbatim R1 copy | Prompt Engineer recurring |
 | **P3** | MKT-QA-1 | M | Marketing QA agent | After private beta |
 

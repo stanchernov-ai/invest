@@ -410,7 +410,7 @@ async def run_prompt_engineer_qa(
     raw_board_messages: list[dict],
     all_symbols: list[str],
 ) -> dict:
-    """Persona audit: Python gate + LLM on FAIL or borderline unanimous PASS."""
+    """Persona audit: Python gate + LLM on borderline unanimous PASS only (not on deterministic FAIL)."""
     from src.qa.persona_audit import (
         audit_debate_persona,
         format_persona_digest,
@@ -425,7 +425,7 @@ async def run_prompt_engineer_qa(
     execution_mode = "deterministic_pass"
 
     if should_augment_persona_llm(violations, stats):
-        execution_mode = "llm_fail" if violations else "llm_borderline"
+        execution_mode = "llm_borderline"
         prompt_text = (
             f"{digest}\n\nRAW DEBATE LOG:\n{raw_log[:80_000]}\n\n"
             f"FINAL CHAIRMAN ALLOCATION JSON:\n{chairman_json[:20_000]}"
@@ -450,11 +450,10 @@ async def run_prompt_engineer_qa(
             logger.info("Prompt Engineer LLM audit ran (%s).", execution_mode)
         except Exception as exc:
             logger.error(f"Prompt Engineer LLM audit failed: {exc}")
-            if violations:
-                execution_mode = "deterministic_fail"
+            execution_mode = "deterministic_pass"
     elif violations:
         execution_mode = "deterministic_fail"
-        logger.info("Persona deterministic FAIL — LLM augmentation disabled after error.")
+        logger.info("Persona deterministic FAIL — skipping LLM (Python authoritative).")
     else:
         logger.info("Persona deterministic PASS — skipping LLM audit.")
 

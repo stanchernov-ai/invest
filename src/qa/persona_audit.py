@@ -1,7 +1,7 @@
 """Deterministic persona / sycophancy pre-checks for Prompt Engineer QA.
 
 Python catches unanimous-vote collapse and forbidden cross-persona vocabulary;
-the LLM runs on deterministic FAIL or borderline unanimous PASS (see qa_augmentation).
+the LLM runs on borderline unanimous PASS only — not on deterministic FAIL (see qa_augmentation).
 """
 from __future__ import annotations
 

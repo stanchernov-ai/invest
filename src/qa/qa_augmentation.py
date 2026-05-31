@@ -7,8 +7,9 @@ from __future__ import annotations
 
 from src.qa.persona_audit import MIN_TICKERS_FOR_UNANIMITY, UNANIMOUS_TICKER_RATE_THRESHOLD
 
-# Persona: augment on FAIL, or on PASS when consensus is suspiciously high but below collapse threshold.
-PERSONA_BORDERLINE_UNANIMOUS_RATE = 0.45
+# Persona: LLM only on borderline unanimous PASS — not on deterministic FAIL (B2).
+# Band [PERSONA_BORDERLINE_UNANIMOUS_RATE, UNANIMOUS_TICKER_RATE_THRESHOLD).
+PERSONA_BORDERLINE_UNANIMOUS_RATE = 0.52
 
 EXECUTION_MODES = frozenset({
     "deterministic_pass",
@@ -36,9 +37,9 @@ ROLE_TO_AGENT_KEY: dict[str, str] = {
 
 
 def should_augment_persona_llm(violations: list[str], stats: dict) -> bool:
-    """Run Prompt Engineer LLM on deterministic FAIL or borderline unanimous PASS."""
+    """Run Prompt Engineer LLM on borderline unanimous PASS only — skip when Python already FAIL."""
     if violations:
-        return True
+        return False
     total = stats.get("total_tickers", 0) or 0
     if total < MIN_TICKERS_FOR_UNANIMITY:
         return False
