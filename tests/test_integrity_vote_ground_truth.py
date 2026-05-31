@@ -56,9 +56,9 @@ class TestVoteGroundTruthContext(unittest.TestCase):
         digest = ctx["vote_digest_text"]
         for sym in ("ASML", "AVGO", "TSM"):
             self.assertIn(f"{sym}:", digest)
-        # Sell-side majority for ASML/TSM (exact 4/5 vs 5/5 varies by run — mandate=Sell is stable).
-        self.assertRegex(digest, r"ASML:.*sell_side=[34]/5.*mandate=Sell")
-        self.assertRegex(digest, r"TSM:.*sell_side=[34]/5.*mandate=Sell")
+        # Sell-side majority for ASML/TSM (4/5 → Strong Sell; 3/5 → Sell).
+        self.assertRegex(digest, r"ASML:.*sell_side=[34]/5.*mandate=(?:Strong Sell|Sell)")
+        self.assertRegex(digest, r"TSM:.*sell_side=[34]/5.*mandate=(?:Strong Sell|Sell)")
 
 
 class TestPostMortemReportAccuracy(unittest.TestCase):

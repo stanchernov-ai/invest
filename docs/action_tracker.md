@@ -1,7 +1,7 @@
 # SC Invest Boardroom — Action Tracker
 
 **Status:** Active  
-**Last Updated:** May 30, 2026 (deploy batch + review universe **shipped**; prod run `20260530_205821` SUCCESS)
+**Last Updated:** May 30, 2026 (deploy batch shipped; **HR / Prompt Engineer / Legal** review logged below; prod `20260530_205821`)
 
 **Purpose:** Current session pickup and prioritized backlog. Historical handoffs and Phase 0–6 specs live in [`archive/implementation_log_2026-05.md`](archive/implementation_log_2026-05.md). Maintenance rules: [`doc_hygiene.md`](doc_hygiene.md). Doc map: [`DOCUMENTATION.md`](DOCUMENTATION.md).
 
@@ -68,12 +68,33 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 | `docs/hr_qa_roster_handoff.md`, `src/hr_review.py`, `src/finance_oversight.py`, `tests/test_hr_review.py` | HR/QA roster stream — separate commit |
 | `src/qa_pipeline.py`, `src/qa/architect_audit.py`, `src/qa/persona_audit.py`, etc. | Unstaged local edits — verify before next deploy |
 
+### Issue log — HR / Prompt Engineer / Legal Counsel (May 30, 2026)
+
+*Session: three-agent review (system roster, prompts vs runtime, SaaS-safe investor voice). Deterministic legal code scan: 0 CRITICAL. No prod telemetry in `.cache` for full HR LLM verdict.*
+
+| ID | Agent | Sev | Issue | Status |
+|----|-------|-----|-------|--------|
+| PE-VOICE-1 | Prompt Engineer + Legal | P1 | Panel prompts: modern lexicon + no quotation marks on real investors; `META_DIRECTIVE` rationales; legal SAFE list aligned; deterministic `persona_audit` fabricated-quote gate | **Shipped** — `tests/test_persona_audit.py`; validate on next prod run |
+| HR-ROSTER-1 | HR | P2 | Deliver-phase QA overlap (`post_mortem_qa`, `system_architect`, `prompt_engineer`, `qa_integrity_auditor`) — main token sink on vote_engine days | **Open** — consolidate per [`agent_architecture.md`](agent_architecture.md) §9 |
+| HR-TELEM-1 | HR | P1 | Full HR utilization + KEEP/IMPROVE verdicts need `AGENT_ACTIVITY` from prod telemetry | **Open** — extends H1; `python -m src.hr_review <telemetry>` |
+| PE-R2-1 | Prompt Engineer | P1 | Round 2 `overall_portfolio_critique` verbatim copy of Round 1 | **Open** — same as backlog R2-1; deterministic gate exists |
+| PE-SYCO-1 | Prompt Engineer | P2 | Unanimous verdict buckets on most tickers (sycophancy collapse) | **Open** — deterministic threshold 60%; tune prompts if recurring |
+| LEG-SAFE-1 | Legal Counsel | P1 | `legal_counsel_code` SAFE list contradicted `investor_voice` (cited attributed public-record quotes) | **Shipped** — part of PE-VOICE-1 |
+| LEG-BRIEF-1 | Legal Counsel | P2 | Briefing Jinja wraps `champion_quote` in `"..."` — safe when speaker is panelist; FAIL if body reads like Buffett/Lynch live quote | **Open** — extend `legal_audit.py` or Legal Counsel QA checklist |
+| LEG-MUNGER-1 | Legal Counsel | P3 | `MUNGER_DOCTRINE` in `schemas.py` names Charlie Munger in injected debate text — not endorsement; optional rename to “concentration discipline” for SaaS copy | **Open** |
+| ARCH-PASS-1 | Systems Architect | P1 | Watchlist Pass spam in debate log (27 symbols / Mag7+Yahoo universe) | **Open** — same as PASS-SPAM-1 (`205821`) |
+| GFX-SOTU-1 | Graphics Designer | P1 | SoTU non-SSOT `box-shadow` / colors | **Open** — `205821` advisory |
+| GFX-LOGO-1 | Graphics Designer | P1 | MSFT logo contrast on dark canvas | **Open** — GFX-2 |
+
 ### Open items (prioritized)
 
 | Pri | ID | Effort | Item | Notes |
 |-----|-----|--------|------|-------|
 | **P0** | QA-HUMAN-1 | S | Gmail review of `20260530_205821` | GFX-4, Legal Counsel, UNICORN-1, debate |
 | **P1** | HR-1 | S | Commit + deploy HR/QA_EXECUTION batch | WIP: `hr_review`, `deliver`, `qa_pipeline` — see [`hr_qa_roster_handoff.md`](hr_qa_roster_handoff.md) |
+| **P1** | HR-TELEM-1 | S | HR Efficiency review on prod telemetry | `fetch_azure_reports` → `hr_review`; `QA_EXECUTION` on prod (H1) |
+| **P2** | LEG-BRIEF-1 | S | Legal: panelist-only champion_quote in briefing HTML | LEG-BRIEF-1 — see issue log |
+| **P2** | HR-ROSTER-1 | M | Reduce deliver QA overlap / token sink | HR-ROSTER-1; B3 partial shipped — see [`agent_optimization_handoff.md`](agent_optimization_handoff.md) |
 | **P1** | H1 | S | Post-deploy HR check with `QA_EXECUTION` | Partial on `205821` — table OK locally, telemetry field missing on prod |
 | **P1** | PASS-SPAM-1 | M | Reduce watchlist Pass spam in debate log | Architect FAIL on `205821`; 27-symbol universe |
 | **P1** | AV-2 | S | SoTU avatar ring alignment | Re-export 128×128 centered PNGs |
@@ -82,10 +103,11 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 | **P1** | CHAIR-1 | S | Post Mortem Trim→Hold mandate | AVGO/ASML on `010432` |
 | **P1** | AP-2 | S | “Today’s actions” summary box | Not started |
 | **P2** | B2 | S | Skip `prompt_engineer` LLM on deterministic FAIL | **Done** — `qa_augmentation.py`; borderline band 52–60% |
-| **P2** | R2-1 | M | Round 2 verbatim R1 copy | Prompt Engineer recurring |
+| **P2** | R2-1 | M | Round 2 verbatim R1 copy | PE-R2-1 — deterministic `persona_audit`; recurring on prod |
+| **P3** | LEG-MUNGER-1 | S | Rename `MUNGER_DOCTRINE` user-facing string for SaaS | Optional; debate injection only |
 | **P3** | MKT-QA-1 | M | Marketing QA agent | After private beta |
 
-**Done (now prod):** DEPLOY-1, REVIEW-1, AP-1, GFX-4, GFX-QA, INT-1, UNICORN-1, Legal Counsel QA, catalysts, per-stock debate, QA review footer, investor voice, Yahoo daily cache, scout validation script.
+**Done (now prod):** DEPLOY-1, REVIEW-1, AP-1, GFX-4, GFX-QA, INT-1, UNICORN-1, Legal Counsel QA, catalysts, per-stock debate, QA review footer, investor voice (initial), Yahoo daily cache, scout validation script, **PE-VOICE-1** (SaaS-safe attribution + fabricated-quote persona gate).
 
 **HR / roster (partial):** `qa_augmentation.py` on prod; full HR status + `QA_EXECUTION` telemetry — **WIP, not prod**. Pickup: [`hr_qa_roster_handoff.md`](hr_qa_roster_handoff.md) §9.
 
@@ -130,7 +152,7 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 
 | Pri | ID | Effort | Item | Gate |
 |-----|-----|--------|------|------|
-| — | SAAS-0 | — | Design SSOT — [`saas_technical_solution.md`](saas_technical_solution.md) + [`saas_data_schema.md`](saas_data_schema.md) + [`saas_postgres_rollout.md`](saas_postgres_rollout.md) | **DONE** (May 30) |
+| — | SAAS-0 | — | Design SSOT — [`saas_technical_solution.md`](saas_technical_solution.md) + schema + rollout + client + [`saas_tenancy_gaps.md`](saas_tenancy_gaps.md) | **DONE** (May 30) |
 | **P2** | SAAS-1 | L | Phase 1–2: `PortfolioSource` + Azure Postgres + admin-provision beta | **Blocked on:** stable QA pass rate + core flow simplification |
 | **P3** | SAAS-2 | M | Phase 4: Entra External ID self-service | After Phase 2b beta validated |
 

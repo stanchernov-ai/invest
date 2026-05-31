@@ -516,6 +516,7 @@ Areas with **multiple owners** — track reductions in `action_tracker.md`:
 
 | Date | Change |
 |------|--------|
+| May 30, 2026 | **PE-VOICE-1** — investor attribution mandates + fabricated-quote persona gate; issue log in [`action_tracker.md`](action_tracker.md) |
 | May 30, 2026 | **`ensure_funding_sell`** — Python reallocation (lowest conviction; skip if board >1 sell or all portfolio buys); [`agent_optimization_handoff.md`](agent_optimization_handoff.md) |
 | May 30, 2026 | **`briefing_enrichment`** — Round 2 quotes at render time; `LIQUIDATION_CAP_PCT` env hook in settings |
 | May 30, 2026 | Agent optimization + Cursor dev plane **handoff docs**; telemetry baseline run `20260529_152151` |

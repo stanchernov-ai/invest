@@ -30,6 +30,15 @@ The **debate bottleneck is largely resolved** on `vote_engine` days: chairman Pr
 
 **Do not implement Tier 2–3 tickets in this doc unless explicitly assigned** — pick from [`action_tracker.md`](action_tracker.md) open items.
 
+### Issue log — HR / Prompt Engineer / Legal (May 30, 2026)
+
+Cross-ref: [`action_tracker.md`](action_tracker.md) → **Issue log** table (IDs `PE-VOICE-1`, `HR-ROSTER-1`, `HR-TELEM-1`, `LEG-BRIEF-1`, etc.).
+
+| Outcome | Detail |
+|---------|--------|
+| **Shipped (local)** | PE-VOICE-1 — modern/classic lexicon; no fake investor quotes; `META_DIRECTIVE` rationales; legal SAFE list; `persona_audit` deterministic gate |
+| **Open** | HR deliver QA token overlap; prod HR telemetry; briefing `champion_quote` vs third-party investor speech (LEG-BRIEF-1); R2 verbatim copy (R2-1) |
+
 ---
 
 ## 2. Telemetry snapshot — run `20260529_152151`

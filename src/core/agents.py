@@ -42,7 +42,7 @@ META_DIRECTIVE = (
     "Consensus is not the goal rigorous persona driven analysis is. A debate where all agents agree is a failed debate. "
     "Challenge the premises of other agents based on your unique worldview. Your performance is judged on the authenticity of your persona not on your agreement with the majority. "
     "WASH SALE AVOIDANCE Always check the purchase dates provided in the asset context. You are strictly forbidden from recommending a sell on any asset acquired within the last thirty days. "
-    "NO NAKED LISTS You MUST write out an explicit financial rationale paragraph for every single asset you grade in every single round. You are strictly forbidden from outputting naked bulleted lists. The Chairman requires your written quotes to build the executive briefing."
+    "NO NAKED LISTS You MUST write out an explicit financial rationale paragraph for every single asset you grade in every single round. You are strictly forbidden from outputting naked bulleted lists. The Chairman requires your written rationales to build the executive briefing."
 )
 
 
@@ -266,7 +266,10 @@ agent_config = {
                 "a failed audit.\n"
                 "- If 4+ panelists share identical Round 2 verdict buckets on most tickers, flag SYCOPHANCY unless "
                 "each cites a distinct worldview.\n"
-                "- Do NOT contradict a deterministic FAIL on unanimous collapse or forbidden vocabulary.\n\n"
+                "- Do NOT contradict a deterministic FAIL on unanimous collapse, forbidden vocabulary, or "
+                "fabricated investor-quote attribution.\n"
+                "- Flag CRITICAL if a living or deceased public investor appears inside quotation marks or as if "
+                "speaking today (e.g. Buffett said \"…\"). Paraphrase and -esque framing are acceptable.\n\n"
                 "[MANDATORY PER-AGENT CHECKLIST — cite Round 2 text for every flagged item]:\n"
                 "A. HYPATIA (Value Anchor): Value/moat/FCF language? No momentum-tape buys? No Strong Buy "
                 "cheerleading on obvious growth/momentum names without margin-of-safety caveat?\n"
@@ -398,7 +401,8 @@ agent_config = {
                 "- Nominative fair use ('Mungeresque', 'Lynch-style Fast Grower').\n"
                 "- Industry jargon (margin of safety, moat, relative strength).\n"
                 "- Historical fictional board personas (Hypatia, da Vinci, Sun Tzu, Nikola Tesla, Marcus Aurelius).\n"
-                "- Instructions to paraphrase or cite public-record quotes with attribution.\n\n"
+                "- Instructions to paraphrase hero investors or use -esque framing without quotation marks.\n"
+                "- Operator-verified public-record excerpts in non-agent copy (not model-invented panel dialogue).\n\n"
                 "[OUTPUT RULES]:\n"
                 "- Set is_compliant=false if ANY CRITICAL finding exists.\n"
                 "- Cite file path + snippet for each finding.\n"

@@ -26,6 +26,27 @@ class TestPersonaAudit(unittest.TestCase):
         self.assertEqual(matrix["META"]["hypatia"], "Buy")
         self.assertEqual(matrix["META"]["davinci"], "Hold")
 
+    def test_fabricated_investor_quote_detected(self):
+        messages = [
+            _round2_msg(
+                PANELIST_ROLES["hypatia"],
+                '* **NVDA**: Hold. Buffett said "buy wonderful companies at fair prices."',
+            ),
+        ]
+        violations, stats = audit_debate_persona(messages, ["NVDA"])
+        self.assertIn("hypatia", stats["investor_quote_hits"])
+        self.assertTrue(any("FABRICATED INVESTOR QUOTE" in v for v in violations))
+
+    def test_mungeresque_framing_allowed(self):
+        messages = [
+            _round2_msg(
+                PANELIST_ROLES["hypatia"],
+                "* **NVDA**: Hold. In a Mungeresque read, the moat is wide but the price offers no margin of safety.",
+            ),
+        ]
+        violations, _ = audit_debate_persona(messages, ["NVDA"])
+        self.assertEqual(violations, [])
+
     def test_suntzu_forbidden_pe_ratio(self):
         messages = [
             _round2_msg(PANELIST_ROLES["suntzu"], "* **NVDA**: Buy. The P/E ratio supports momentum."),

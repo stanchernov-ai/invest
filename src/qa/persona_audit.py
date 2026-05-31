@@ -42,6 +42,21 @@ FORBIDDEN_PHRASES: dict[str, tuple[str, ...]] = {
 UNANIMOUS_TICKER_RATE_THRESHOLD = 0.60
 MIN_TICKERS_FOR_UNANIMITY = 3
 
+# SaaS-safe: panelists must not attribute invented speech to real investors in quotation marks.
+_INVESTOR_NAME = (
+    r"(?:warren\s+)?buffett|charlie\s+munger|peter\s+lynch|jesse\s+livermore|william\s+o'?neil|ed\s+thorp"
+)
+_FABRICATED_INVESTOR_QUOTE_RE = re.compile(
+    r"(?:"
+    r'["\u201c][^"\u201d]{8,}["\u201d]\s*[-—]\s*'
+    rf"(?:{_INVESTOR_NAME})"
+    r"|"
+    rf"\b(?:{_INVESTOR_NAME})\s+"
+    r'(?:said|wrote|once\s+said|famously\s+said)\s*["\u201c]'
+    r")",
+    re.IGNORECASE,
+)
+
 
 def _verdict_bucket(verdict: str) -> str:
     v = (verdict or "").upper()
@@ -86,6 +101,18 @@ def _scan_forbidden_phrases(agent_key: str, text: str) -> list[str]:
     return hits
 
 
+def _scan_fabricated_investor_quotes(text: str) -> str | None:
+    """Return matched snippet if Round 2 text attributes quoted speech to a real investor."""
+    if not text:
+        return None
+    match = _FABRICATED_INVESTOR_QUOTE_RE.search(text)
+    if not match:
+        return None
+    start = max(0, match.start() - 20)
+    end = min(len(text), match.end() + 40)
+    return text[start:end].replace("\n", " ").strip()
+
+
 def audit_debate_persona(raw_messages: list[dict], all_symbols: list[str]) -> tuple[list[str], dict]:
     """Return (violation strings, stats dict) for the debate transcript."""
     from src.core.rebuttal import extract_panelist_round2_block, extract_round_overview, is_verbatim_r1_copy
@@ -96,6 +123,7 @@ def audit_debate_persona(raw_messages: list[dict], all_symbols: list[str]) -> tu
     stats = _unanimous_ticker_stats(matrix)
     stats["persona_keyword_hits"] = {}
     stats["verbatim_r1_copies"] = []
+    stats["investor_quote_hits"] = {}
 
     if stats["total_tickers"] >= MIN_TICKERS_FOR_UNANIMITY:
         if stats["unanimous_rate"] >= UNANIMOUS_TICKER_RATE_THRESHOLD:
@@ -116,6 +144,14 @@ def audit_debate_persona(raw_messages: list[dict], all_symbols: list[str]) -> tu
             )
 
         round2 = _extract_round2_text(raw_messages, agent_key)
+        quote_snippet = _scan_fabricated_investor_quotes(round2)
+        if quote_snippet:
+            stats["investor_quote_hits"][agent_key] = quote_snippet
+            violations.append(
+                f"FABRICATED INVESTOR QUOTE ({marker}): Round 2 attributes quoted speech to a real public investor. "
+                f'Evidence: "...{quote_snippet}..." — use paraphrase or -esque framing only.'
+            )
+
         hits = _scan_forbidden_phrases(agent_key, round2)
         if hits:
             stats["persona_keyword_hits"][agent_key] = hits
@@ -150,6 +186,12 @@ def format_persona_digest(violations: list[str], stats: dict) -> str:
             lines.append(f"  {PANELIST_MARKERS.get(agent, agent)} forbidden phrases: {', '.join(hits)}")
     else:
         lines.append("  Forbidden cross-persona vocabulary: none detected in Round 2.")
+    quote_hits = stats.get("investor_quote_hits") or {}
+    if quote_hits:
+        for agent, snippet in quote_hits.items():
+            lines.append(f"  {PANELIST_MARKERS.get(agent, agent)} fabricated investor quote: {snippet[:80]}…")
+    else:
+        lines.append("  Fabricated investor-quote attribution: none detected in Round 2.")
     verbatim = stats.get("verbatim_r1_copies") or []
     if verbatim:
         names = ", ".join(PANELIST_MARKERS.get(k, k) for k in verbatim)
