@@ -207,7 +207,7 @@ def build_yahoo_discovery(
     return watchlist
 
 
-def run_scout_pipeline(owned_tickers=None):
+def run_scout_pipeline(owned_tickers=None, user_id="stan"):
     """Legacy entry — writes Yahoo-only slice to daily_target_list.json."""
     logger.info("Scout Engine Booting. Hunting for organic Alpha.")
     data_dir = DATA_DIR

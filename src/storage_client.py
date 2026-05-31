@@ -14,9 +14,16 @@ REPORT_CONTAINER = f"boardroom{dash}reports"
 RUN_STATUS_BLOB = "run_status.json"
 RUN_STATUS_CURRENT_BLOB = "run_status_current.json"
 
+DEFAULT_USER = "stan"
 
-def _run_status_blob_for_run(run_id: str) -> str:
-    return f"run_status_{run_id}.json"
+def _run_status_blob(user_id: str) -> str:
+    return f"{user_id}/{RUN_STATUS_BLOB}"
+
+def _run_status_current_blob(user_id: str) -> str:
+    return f"{user_id}/{RUN_STATUS_CURRENT_BLOB}"
+
+def _run_status_blob_for_run(run_id: str, user_id: str = DEFAULT_USER) -> str:
+    return f"{user_id}/runs/{run_id}/run_status.json"
 
 
 def _run_status_local_path(filename: str) -> str:
@@ -76,10 +83,10 @@ def _load_run_status_blob(blob_name: str) -> dict | None:
     return None
 
 
-def save_run_status_for_run(run_id: str, payload: dict) -> None:
+def save_run_status_for_run(run_id: str, payload: dict, user_id: str = DEFAULT_USER) -> None:
     """Persist phased status for one run_id (survives overlapping kicks)."""
     json_str = json.dumps(payload, indent=2)
-    per_run_blob = _run_status_blob_for_run(run_id)
+    per_run_blob = _run_status_blob_for_run(run_id, user_id)
     _write_run_status_local(per_run_blob, json_str)
 
     client = get_blob_service_client()
@@ -87,36 +94,39 @@ def save_run_status_for_run(run_id: str, payload: dict) -> None:
         _upload_run_status_blob(client, per_run_blob, json_str)
 
 
-def save_run_status(payload: dict) -> None:
+def save_run_status(payload: dict, user_id: str = DEFAULT_USER) -> None:
     """Publish the current-run pointer (monitors + HTTP guards read this)."""
     client = get_blob_service_client()
     json_str = json.dumps(payload, indent=2)
 
-    for filename in (RUN_STATUS_BLOB, RUN_STATUS_CURRENT_BLOB):
+    blob = _run_status_blob(user_id)
+    curr_blob = _run_status_current_blob(user_id)
+
+    for filename in (blob, curr_blob):
         _write_run_status_local(filename, json_str)
 
     run_id = payload.get("run_id")
     if run_id:
-        save_run_status_for_run(run_id, payload)
+        save_run_status_for_run(run_id, payload, user_id)
 
     if client:
-        for blob_name in (RUN_STATUS_BLOB, RUN_STATUS_CURRENT_BLOB):
+        for blob_name in (blob, curr_blob):
             _upload_run_status_blob(client, blob_name, json_str)
 
 
-def load_run_status() -> dict | None:
+def load_run_status(user_id: str = DEFAULT_USER) -> dict | None:
     """Load the current pipeline pointer (run_status_current.json, then run_status.json)."""
-    return _load_run_status_blob(RUN_STATUS_CURRENT_BLOB) or _load_run_status_blob(RUN_STATUS_BLOB)
+    return _load_run_status_blob(_run_status_current_blob(user_id)) or _load_run_status_blob(_run_status_blob(user_id))
 
 
-def load_run_status_for_run(run_id: str) -> dict | None:
+def load_run_status_for_run(run_id: str, user_id: str = DEFAULT_USER) -> dict | None:
     """Load phased status for a specific run_id."""
-    return _load_run_status_blob(_run_status_blob_for_run(run_id))
+    return _load_run_status_blob(_run_status_blob_for_run(run_id, user_id))
 
 
-def is_run_in_flight() -> dict | None:
+def is_run_in_flight(user_id: str = DEFAULT_USER) -> dict | None:
     """Return current status dict when overall status is 'running', else None."""
-    status = load_run_status()
+    status = load_run_status(user_id)
     if status and status.get("status") == "running":
         return status
     return None
@@ -131,9 +141,9 @@ def _parse_iso_datetime(value: str | None):
         return None
 
 
-def abort_run(run_id: str, *, reason: str, finished_at: str) -> dict:
+def abort_run(run_id: str, *, reason: str, finished_at: str, user_id: str = DEFAULT_USER) -> dict:
     """Mark a run as aborted (terminal). Used when a watchdog detects a stale run."""
-    status = load_run_status_for_run(run_id) or {}
+    status = load_run_status_for_run(run_id, user_id) or {}
     if status.get("run_id") != run_id:
         status = _base_run_status(run_id, finished_at)
 
@@ -150,18 +160,18 @@ def abort_run(run_id: str, *, reason: str, finished_at: str) -> dict:
             entry["error"] = reason
             status[phase] = entry
 
-    save_run_status_for_run(run_id, status)
-    current = load_run_status()
+    save_run_status_for_run(run_id, status, user_id)
+    current = load_run_status(user_id)
     if not current or current.get("run_id") == run_id:
-        save_run_status(status)
+        save_run_status(status, user_id)
     return status
 
 
-def abort_stale_run_if_needed(max_age_seconds: int = STALE_RUN_MAX_SECONDS) -> dict | None:
+def abort_stale_run_if_needed(max_age_seconds: int = STALE_RUN_MAX_SECONDS, user_id: str = DEFAULT_USER) -> dict | None:
     """If the current pointer run has been non-terminal too long, mark it aborted."""
     from src.config.settings import now_local
 
-    status = load_run_status()
+    status = load_run_status(user_id)
     if not status or status.get("status") != "running":
         return None
 
@@ -184,7 +194,7 @@ def abort_stale_run_if_needed(max_age_seconds: int = STALE_RUN_MAX_SECONDS) -> d
         f"stale run: no terminal status after {int(age)}s "
         f"(limit {max_age_seconds}s)"
     )
-    return abort_run(run_id, reason=reason, finished_at=now.isoformat())
+    return abort_run(run_id, reason=reason, finished_at=now.isoformat(), user_id=user_id)
 
 def get_blob_service_client():
     if not settings.AZURE_CONN_STR:
@@ -195,7 +205,7 @@ def get_blob_service_client():
         logger.error("Failed to connect to Azure.")
         return None
 
-def sync_inputs_from_cloud(state_allowlist=None):
+def sync_inputs_from_cloud(state_allowlist=None, user_id: str = DEFAULT_USER):
     """Pull brokerage/watchlist inputs and a curated set of state singletons.
 
     `state_allowlist` defaults to STATE_SYNC_ALLOWLIST; pass an explicit list to
@@ -209,7 +219,7 @@ def sync_inputs_from_cloud(state_allowlist=None):
     allowlist = set(STATE_SYNC_ALLOWLIST if state_allowlist is None else state_allowlist)
 
     try:
-        data_dir = DATA_DIR
+        data_dir = os.path.join(DATA_DIR, user_id)
         os.makedirs(data_dir, exist_ok=True)
 
         input_client = client.get_container_client(INPUT_CONTAINER)
@@ -221,9 +231,11 @@ def sync_inputs_from_cloud(state_allowlist=None):
 
         state_client = client.get_container_client(STATE_CONTAINER)
         if state_client.exists():
-            for blob in state_client.list_blobs():
-                if blob.name in allowlist:
-                    file_path = os.path.join(data_dir, blob.name)
+            for blob in state_client.list_blobs(name_starts_with=f"{user_id}/"):
+                # strip user_id for matching allowlist if needed, or keep it
+                base_name = blob.name[len(user_id)+1:]
+                if base_name in allowlist:
+                    file_path = os.path.join(DATA_DIR, blob.name)
                     os.makedirs(os.path.dirname(file_path) or data_dir, exist_ok=True)
                     with open(file_path, "wb") as f:
                         f.write(state_client.download_blob(blob.name).readall())
@@ -234,18 +246,18 @@ def sync_inputs_from_cloud(state_allowlist=None):
         logger.warning("Failed to sync inputs from Azure. Falling back to local files.")
 
 
-def _checkpoint_blob_name(run_id: str, phase: str) -> str:
-    return f"runs/{run_id}/{phase}.json"
+def _checkpoint_blob_name(run_id: str, phase: str, user_id: str = DEFAULT_USER) -> str:
+    return f"{user_id}/runs/{run_id}/{phase}.json"
 
 
-def save_checkpoint(run_id: str, phase: str, payload: dict) -> None:
+def save_checkpoint(run_id: str, phase: str, payload: dict, user_id: str = DEFAULT_USER) -> None:
     """Persist a phase's hand-off payload so the next job can resume the run.
 
     Written to STATE_CONTAINER under runs/{run_id}/{phase}.json (and cached
     locally for dev). This is the contract between prepare -> debate -> deliver."""
     data = json.dumps(payload, default=str)
 
-    local = os.path.join(DATA_DIR, "runs", run_id, f"{phase}.json")
+    local = os.path.join(DATA_DIR, user_id, "runs", run_id, f"{phase}.json")
     os.makedirs(os.path.dirname(local), exist_ok=True)
     with open(local, "w", encoding="utf-8") as f:
         f.write(data)
@@ -254,7 +266,7 @@ def save_checkpoint(run_id: str, phase: str, payload: dict) -> None:
     if client:
         try:
             blob_client = client.get_blob_client(
-                container=STATE_CONTAINER, blob=_checkpoint_blob_name(run_id, phase)
+                container=STATE_CONTAINER, blob=_checkpoint_blob_name(run_id, phase, user_id)
             )
             blob_client.upload_blob(data, overwrite=True)
             logger.info(f"Checkpoint '{phase}' for run {run_id} persisted to Azure.")
@@ -262,21 +274,21 @@ def save_checkpoint(run_id: str, phase: str, payload: dict) -> None:
             logger.error(f"Failed to persist '{phase}' checkpoint for run {run_id} to Azure.")
 
 
-def load_checkpoint(run_id: str, phase: str) -> dict | None:
+def load_checkpoint(run_id: str, phase: str, user_id: str = DEFAULT_USER) -> dict | None:
     """Load a phase hand-off payload written by save_checkpoint (Azure first,
     local cache as fallback)."""
     client = get_blob_service_client()
     if client:
         try:
             blob_client = client.get_blob_client(
-                container=STATE_CONTAINER, blob=_checkpoint_blob_name(run_id, phase)
+                container=STATE_CONTAINER, blob=_checkpoint_blob_name(run_id, phase, user_id)
             )
             if blob_client.exists():
                 return json.loads(blob_client.download_blob().readall())
         except Exception:
             logger.warning(f"Could not load '{phase}' checkpoint for run {run_id} from Azure.")
 
-    local = os.path.join(DATA_DIR, "runs", run_id, f"{phase}.json")
+    local = os.path.join(DATA_DIR, user_id, "runs", run_id, f"{phase}.json")
     if os.path.exists(local):
         try:
             with open(local, encoding="utf-8") as f:
@@ -302,24 +314,25 @@ def _base_run_status(run_id: str, started_at: str) -> dict:
     }
 
 
-def begin_run_status(run_id: str, started_at: str) -> dict:
+def begin_run_status(run_id: str, started_at: str, user_id: str = DEFAULT_USER) -> dict:
     """Initialize (or reset) the phased run status blob at the start of a run."""
     status = _base_run_status(run_id, started_at)
-    save_run_status_for_run(run_id, status)
-    save_run_status(status)
+    save_run_status_for_run(run_id, status, user_id)
+    save_run_status(status, user_id)
     return status
 
 
 def mark_phase(run_id: str, phase: str, phase_status: str, *,
                started_at: str = None, finished_at: str = None,
                duration_seconds: float = None, error: str = None,
+               user_id: str = DEFAULT_USER,
                **extra) -> dict:
     """Update one phase's sub-status and the overall run status in one place.
 
     Overall `status` becomes 'failed' if any phase fails, 'aborted' when explicitly
     aborted, and 'success' only when the deliver phase succeeds. Intermediate phase
     success or 'queued' keeps overall 'running' so monitors wait for the full run."""
-    status = load_run_status_for_run(run_id) or {}
+    status = load_run_status_for_run(run_id, user_id) or {}
     if status.get("run_id") != run_id:
         status = _base_run_status(run_id, started_at or finished_at or "")
 
@@ -351,30 +364,31 @@ def mark_phase(run_id: str, phase: str, phase_status: str, *,
     else:
         status["status"] = "running"
 
-    save_run_status_for_run(run_id, status)
-    current = load_run_status()
+    save_run_status_for_run(run_id, status, user_id)
+    current = load_run_status(user_id)
     if not current or current.get("run_id") == run_id:
-        save_run_status(status)
+        save_run_status(status, user_id)
     return status
 
 
-def load_state_blob(filename: str):
+def load_state_blob(filename: str, user_id: str = DEFAULT_USER):
     """Load a JSON or text blob from STATE_CONTAINER (Azure first, local OUTPUT_DIR fallback)."""
+    full_path = f"{user_id}/{filename}"
     client = get_blob_service_client()
     if client:
         try:
-            blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=filename)
+            blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=full_path)
             if blob_client.exists():
                 raw = blob_client.download_blob().readall()
                 if filename.endswith(".json"):
                     return json.loads(raw)
                 return raw.decode("utf-8")
         except Exception:
-            logger.warning(f"Could not load state blob {filename} from Azure.")
+            logger.warning(f"Could not load state blob {full_path} from Azure.")
 
-    filepath = os.path.join(OUTPUT_DIR, filename)
+    filepath = os.path.join(OUTPUT_DIR, user_id, filename)
     if not os.path.exists(filepath):
-        filepath = os.path.join(DATA_DIR, filename)
+        filepath = os.path.join(DATA_DIR, user_id, filename)
     if os.path.exists(filepath):
         try:
             with open(filepath, encoding="utf-8") as f:
@@ -386,48 +400,50 @@ def load_state_blob(filename: str):
     return None
 
 
-def save_state_blob(filename: str, payload) -> None:
+def save_state_blob(filename: str, payload, user_id: str = DEFAULT_USER) -> None:
     """Persist JSON or text to STATE_CONTAINER and local OUTPUT_DIR."""
     if filename.endswith(".json"):
         content = json.dumps(payload, indent=2, default=str)
     else:
         content = payload if isinstance(payload, str) else str(payload)
 
-    filepath = os.path.join(OUTPUT_DIR, filename)
+    filepath = os.path.join(OUTPUT_DIR, user_id, filename)
     os.makedirs(os.path.dirname(filepath) or OUTPUT_DIR, exist_ok=True)
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(content)
 
     client = get_blob_service_client()
     if client:
+        full_path = f"{user_id}/{filename}"
         try:
-            blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=filename)
+            blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=full_path)
             blob_client.upload_blob(content, overwrite=True)
-            logger.info(f"State blob {filename} uploaded to Azure.")
+            logger.info(f"State blob {full_path} uploaded to Azure.")
         except Exception:
-            logger.error(f"Failed to save state blob {filename} to Azure.")
+            logger.error(f"Failed to save state blob {full_path} to Azure.")
 
 
-def save_report(filename, content):
+def save_report(filename, content, user_id: str = DEFAULT_USER):
     client = get_blob_service_client()
     
-    filepath = os.path.join(OUTPUT_DIR, filename)
+    filepath = os.path.join(OUTPUT_DIR, user_id, filename)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, "w", encoding="utf" + chr(45) + "8") as f:
         f.write(content)
         
     if client:
+        full_path = f"{user_id}/{filename}"
         try:
             if filename.endswith(".json"):
-                blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=filename)
+                blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=full_path)
             else:
-                blob_client = client.get_blob_client(container=REPORT_CONTAINER, blob=filename)
+                blob_client = client.get_blob_client(container=REPORT_CONTAINER, blob=full_path)
             blob_client.upload_blob(content, overwrite=True)
             logger.info("Payload uploaded to Azure Blob Storage.")
         except Exception:
             logger.error("Failed to save payload to Azure.")
 
-def execute_retention_policy(days_to_keep=14):
+def execute_retention_policy(days_to_keep=14, user_id: str = None):
     client = get_blob_service_client()
     if not client:
         return
@@ -441,8 +457,12 @@ def execute_retention_policy(days_to_keep=14):
             if not container_client.exists():
                 continue
 
-            for blob in container_client.list_blobs():
-                if blob.name in [
+            prefix = f"{user_id}/" if user_id else None
+
+            for blob in container_client.list_blobs(name_starts_with=prefix):
+                # We skip certain singletons but they are under user_id/ now.
+                base_name = blob.name.split("/")[-1]
+                if base_name in [
                     "daily_execution.lock",
                     "board_verdicts.json",
                     "portfolio_history.json",

@@ -294,8 +294,16 @@ Replaces hardcoded values in `generate_dynamic_mandate()` (`src/core/schemas.py`
   "monthly_contribution_usd": 500,
   "benchmark": "NASDAQ",
   "benchmark_alpha_target_pct": 5,
-  "risk_posture": "aggressive_growth",
+  "primary_panelist": "tesla",
+  "risk_slider": 75,
+  "conviction_slider": 80,
   "liquidation_cap_pct": 0.10,
+  "max_daily_buys": 3,
+  "asset_guidance": {
+    "equity_target_pct": 100,
+    "bond_etf_symbols": ["TLT", "BND"],
+    "hedge_symbols": ["TLT", "VXX"]
+  },
   "timezone": "America/Los_Angeles"
 }
 ```

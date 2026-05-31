@@ -1,7 +1,7 @@
 # Debate Quality & Systems Architect Handoff
 
-**Status:** Active handoff (local WIP — not yet deployed)  
-**Last updated:** May 31, 2026  
+**Status:** Deployed to prod — first validation run **`20260531_090637`** (partial green)  
+**Last updated:** May 31, 2026 (post-deploy validation)  
 **Owner:** Stan  
 **Audience:** Systems Architect QA agent, Prompt Engineer QA agent, and supervising agents reviewing debate pipeline / post-flight QA.
 
@@ -11,7 +11,7 @@
 
 ## 1. Why this doc exists
 
-May 31, 2026 working session with Stan: triaged three **P1** items from prod run **`20260531_014121`** that were failing **Prompt Engineer QA** and **Systems Architect QA**. All three are **fixed in code** on local `main` but **not yet committed or validated on prod**.
+May 31, 2026 working session with Stan: triaged three **P1** items from prod run **`20260531_014121`** that were failing **Prompt Engineer QA** and **Systems Architect QA**. Shipped in commits **`29052fa`** → **`4d0bbaa`** → **`c66e52e`**; first prod validation run **`20260531_090637`** on HEAD **`c66e52e`**.
 
 Stan’s working rules for this effort:
 
@@ -138,61 +138,103 @@ Still flags when `pass_mentions >= max(72, symbol_count × 6)` on raw log. Slim 
 
 ---
 
-## 6. Validation plan (post-deploy)
+## 6. Prod validation — run `20260531_090637`
 
-1. **Commit + deploy** local WIP (see §7).
-2. **Manual prod run** — same kickoff as [`action_tracker.md`](action_tracker.md) Session Handoff.
-3. **Fetch artifacts:**
-   ```powershell
-   .venv\Scripts\python.exe tools/fetch_azure_reports.py --run-id YYYYMMDD_HHMMSS --post-job
-   ```
-4. **Confirm Systems Architect deterministic PASS:**
-   - No `Pass' mentions` bloat finding in `qa_reports_*.json`
-   - No repetitive Pass analysis finding (unless panelists actually copy-paste)
-5. **Confirm Prompt Engineer:**
-   - No `PERSONA DRIFT` forbidden vocab CRITICALs
-   - No `VERBATIM R1 COPY` CRITICALs
-6. **Spot-check** `raw_debate_log_*.md` — each panelist round should show one `Watchlist — no buy case` summary instead of dozens of `Pass` lines.
-7. **Unit tests:** `.venv\Scripts\python.exe -m unittest discover -s tests -v`
+**Kickoff:** May 31, 2026 ~09:06 PT · **Prod HEAD** `c66e52e` · pipeline **SUCCESS** (~4.5 min) · all emails sent.
+
+| Phase | Duration | Status |
+|-------|----------|--------|
+| Prepare | 10.3s | success |
+| Debate | 125.4s | success |
+| Deliver | 109.5s | success |
+
+**Fetch:**
+```powershell
+.venv\Scripts\python.exe tools/fetch_azure_reports.py --run-id 20260531_090637 --post-job
+```
+
+### 6.1 Session fixes — prod verdict
+
+| ID | Prod verdict | Evidence |
+|----|--------------|----------|
+| **PASS-SPAM-1** | **PASS** | Systems Architect `deterministic_pass`; **0** `\bPass\b` in `raw_debate_log_20260531_090637.md`; 10× `Watchlist — no buy case` summary lines |
+| **R2-1** | **PASS** | No `VERBATIM R1 COPY` CRITICAL in `qa_reports_20260531_090637.json` |
+| **PE-PERSONA-1** | **Partial** | Down from 3 CRITICALs → **1** (Marcus Aurelius: `margin of safety` in Round 2). Anti-drift prompt helped; not fully closed |
+| **GFX-2 / GFX-SOTU-1 / GFX-3** | **Shipped** | Visual commits on prod; human Gmail spot-check still open (**QA-HUMAN-1**) |
+| **AV-2** | **Closed (duplicate)** | Reverted accidental `4d0bbaa` re-recenter; blob restored to **GFX-5** (`d8b7385`) in `c66e52e` |
+
+### 6.2 New / residual QA on this run
+
+| Agent | Verdict | Notes for architect |
+|-------|---------|---------------------|
+| **Systems Architect** | PASS | No action |
+| **Post Mortem** | PASS | Chairman overrides compliant |
+| **Legal Counsel** | PASS | 0 CRITICAL |
+| **Prompt Engineer** | FAIL (1 CRITICAL) | Aurelius persona drift — see PE-PERSONA-1 partial above |
+| **Graphics Designer** | FAIL (2 CRITICAL) | LLM path active: chart titles not `--brand-sage`; Debate section wall-of-text. Warnings: MSFT logo white chip, avatar hue discipline, missing footer. **Not** the prior parse-error (**GFX-LLM-1**) — triage separately |
+| **QA Integrity** | FAIL (1 CRITICAL) | Integrity auditor could not verify PE finding — cited Round 2 quote absent from debate log **excerpt** supplied to integrity LLM. **Process gap**, not necessarily false persona drift |
+
+**Post-job:** 4 QA CRITICAL · ~273k tokens · artifacts in `.cache/` for run `20260531_090637`.
 
 ---
 
-## 7. Git state (as of handoff)
+## 7. Additional deploy batch (same session, after debate QA)
 
-**Modified:** `docs/action_tracker.md`, `src/core/rebuttal.py`, `src/core/engine.py`, `src/core/boardroom_brawl.py`, `src/qa/architect_audit.py`, `tests/test_rebuttal.py`, `tests/test_architect_audit.py`
+Commit **`4d0bbaa`** — briefing visuals (prod before avatar revert):
 
-**New:** `src/core/debate_format.py`, `tests/test_debate_format.py`
+| ID | Change | Paths |
+|----|--------|-------|
+| **GFX-2** | Alpha Pick ticker logo — white spotlight chip on `#27272a` | `briefing_style.py` |
+| **GFX-SOTU-1** | Remove non-SSOT SoTU `box-shadow`; edge borders only | `briefing_style.py` |
+| **GFX-3** | Pie chart rank-spread palette (similar greens fix) | `reporting.py` `pie_chart_colors()` |
 
-**Untracked (unrelated):** `assets/avatars/_recenter_proof.png`
-
-**Not committed** — architect agent should treat this handoff + diff as source of truth until Stan requests commit/deploy.
+Commit **`c66e52e`** — **revert** five panelist PNGs to **GFX-5** (`d8b7385`); **`4d0bbaa`** had accidentally re-run `recenter_avatars.py` on already-fixed rings. **AV-2** tracker row closed as duplicate of **GFX-5**. Blob re-uploaded (five panelists only).
 
 ---
 
-## 8. Still open (adjacent — not in this session)
+## 8. Git state (as of validation)
+
+**Prod HEAD:** `c66e52e` on `origin/main` (auto-deploy via GitHub Actions).
+
+**Shipped commits** (`b6984fa` → `c66e52e`):
+
+| Commit | Summary |
+|--------|---------|
+| `29052fa` | PE-PERSONA-1, R2-1, PASS-SPAM-1 (`debate_format.py`, `rebuttal.py`, `engine.py`, `architect_audit.py`) |
+| `4d0bbaa` | GFX-2, GFX-SOTU-1, GFX-3 (+ mistaken avatar re-recenter) |
+| `c66e52e` | Avatar revert to GFX-5; tracker AV-2 → closed duplicate |
+
+**Local WIP (not in this deploy):** `portfolio_policy.py`, edits to `engine.py` / `guardrails.py` / `schemas.py` / `prepare.py`, `docs/saas_data_schema.md`.
+
+---
+
+## 9. Still open (architect backlog)
 
 | ID | Pri | Notes for architect |
 |----|-----|-------------------|
-| **PE-SYCO-1** | P2 | Unanimous verdict buckets — persona_audit 60% threshold; separate from PE-PERSONA-1 |
-| **HR-TELEM-1** | P1 | HR review on prod telemetry after deploy |
-| **GFX-LLM-1** | P2 | Graphics Designer LLM parse error; deterministic chart audit PASS |
-| **QA-HUMAN-1** | P0 | Gmail review of briefing / debate UX |
+| **PE-PERSONA-1** | P1 | **Partial on prod** — 1/3 CRITICALs remain (Aurelius `margin of safety`); tighten anti-drift or persona map |
+| **QA-INTEGRITY-1** | P1 | **New** — integrity auditor debate log excerpt missing Round 2; PE findings unverifiable → spurious FAIL |
+| **GFX-LLM-1** | P2 | Prior parse error on `20260531_014121`; this run LLM parsed OK but raised new chart-title / debate-density CRITICALs |
+| **PE-SYCO-1** | P2 | Unanimous verdict buckets — persona_audit 60% threshold |
+| **HR-TELEM-1** | P1 | HR review on prod telemetry (`api_telemetry_20260531_090637.json` now available) |
+| **QA-HUMAN-1** | P0 | Gmail review — Crucible, SoTU borders, pie palette, avatar rings, Today's Actions |
 
 Full table: [`action_tracker.md`](action_tracker.md) Open items.
 
 ---
 
-## 9. Human actions
+## 10. Human actions
 
 | Who | Action |
 |-----|--------|
-| **Stan** | Review handoff; approve commit + deploy when ready |
-| **Architect / implementer** | Run prod validation checklist (§6); update Session Handoff in `action_tracker.md` after first green run |
-| **Supervisor** | Pre-push: scoped tests green; no forbidden API patterns (`scripts/pre_commit_check.py`) |
+| **Stan** | Gmail spot-check run `20260531_090637` (**QA-HUMAN-1**); confirm GFX-5 avatar rings in briefing |
+| **Architect** | Triage **QA-INTEGRITY-1** (Round 2 in integrity excerpt); decide if Aurelius drift needs prompt vs audit tweak |
+| **Prompt Engineer agent** | Close remaining PE-PERSONA-1 on Aurelius forbidden vocab |
+| **Supervisor** | Pre-push: scoped tests green; validate tracker rows before next fix |
 
 ---
 
-## 10. Quick reference — debate data flow
+## 11. Quick reference — debate data flow
 
 ```mermaid
 flowchart LR

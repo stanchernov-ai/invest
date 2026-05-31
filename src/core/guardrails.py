@@ -239,12 +239,16 @@ def apply_chairman_guardrails(
     ref: datetime | None = None,
     raw_verdicts: dict[str, dict] | None = None,
     all_symbols: list[str] | None = None,
+    user_profile: dict | None = None,
 ) -> dict:
     """Apply all P0 chairman guardrails in deterministic order."""
     from src.core.chairman_alignment import apply_board_and_cap_coherence
+    from src.core.portfolio_policy import resolve_policy
+    
+    policy = resolve_policy(user_profile)
 
     result = deepcopy(chairman)
-    enforce_max_buys(result)
+    enforce_max_buys(result, max_buys=policy.max_daily_buys)
     portfolio_symbols = set((portfolio_holdings or {}).keys())
     universe = set(all_symbols or []) | portfolio_symbols
     watchlist_symbols = universe - portfolio_symbols
@@ -267,5 +271,6 @@ def apply_chairman_guardrails(
         result,
         total_portfolio_value=total_portfolio_value,
         portfolio_holdings=portfolio_holdings,
+        cap_pct=policy.liquidation_cap_pct,
     )
     return result

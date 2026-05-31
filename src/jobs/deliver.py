@@ -53,7 +53,7 @@ def _merge_telemetry(prep_tel: dict, debate_tel: dict, deliver_activity: dict) -
     return merged
 
 
-async def run_deliver(run_id: str) -> dict:
+async def run_deliver(run_id: str, user_id: str = "stan") -> dict:
     """Render + post-work QA + email for an existing debate checkpoint.
 
     Returns {'run_id', 'status'}. Marks the overall run 'success' on completion."""
@@ -62,18 +62,18 @@ async def run_deliver(run_id: str) -> dict:
     started = now_local()
     agent_activity.reset()
 
-    prep = storage_client.load_checkpoint(run_id, "prepare")
-    debate = storage_client.load_checkpoint(run_id, "debate")
+    prep = storage_client.load_checkpoint(run_id, "prepare", user_id=user_id)
+    debate = storage_client.load_checkpoint(run_id, "debate", user_id=user_id)
     if not prep or not debate:
         missing = "prepare" if not prep else "debate"
         msg = f"Deliver phase could not load {missing} checkpoint for run {run_id}."
         logger.error(msg)
         notifier.send_error_alert(msg)
         storage_client.mark_phase(run_id, "deliver", "failed",
-                                  finished_at=now_local().isoformat(), error=f"missing {missing} checkpoint")
+                                  finished_at=now_local().isoformat(), error=f"missing {missing} checkpoint", user_id=user_id)
         return {"run_id": run_id, "status": "failed"}
 
-    storage_client.mark_phase(run_id, "deliver", "running", started_at=started.isoformat())
+    storage_client.mark_phase(run_id, "deliver", "running", started_at=started.isoformat(), user_id=user_id)
 
     try:
         # Unpack prepared + debate state.
@@ -167,7 +167,7 @@ async def run_deliver(run_id: str) -> dict:
         )
         qa_reports.append(integrity_report)
 
-        storage_client.save_report(f"qa_reports_{run_id}.json", json.dumps(qa_reports, indent=2, default=str))
+        storage_client.save_report(f"qa_reports_{run_id}.json", json.dumps(qa_reports, indent=2, default=str), user_id=user_id)
 
         # Retrospective before dashboard email so candidate actions appear in QA dashboard.
         deliver_activity = agent_activity.snapshot()
@@ -182,7 +182,7 @@ async def run_deliver(run_id: str) -> dict:
                 qa_scorecard=qa_scorecard,
                 write_local_insights=False,
             )
-            retro_marker = storage_client.load_state_blob(f"retrospective_{run_id}.json")
+            retro_marker = storage_client.load_state_blob(f"retrospective_{run_id}.json", user_id=user_id)
             if isinstance(retro_marker, dict):
                 retrospective_candidates = retro_marker.get("candidates") or []
             logger.info(
@@ -203,9 +203,9 @@ async def run_deliver(run_id: str) -> dict:
             triage_url=triage_url,
         )
 
-        storage_client.save_report(f"qa_dashboard_{run_id}.html", qa_dashboard_html)
-        storage_client.save_report(f"executive_briefing_{run_id}.html", investor_briefing_html)
-        storage_client.save_report(f"raw_debate_log_{run_id}.md", raw_log_combined)
+        storage_client.save_report(f"qa_dashboard_{run_id}.html", qa_dashboard_html, user_id=user_id)
+        storage_client.save_report(f"executive_briefing_{run_id}.html", investor_briefing_html, user_id=user_id)
+        storage_client.save_report(f"raw_debate_log_{run_id}.md", raw_log_combined, user_id=user_id)
 
         briefing_sent_at = now_local().isoformat()
         briefing_ok = notifier.send_executive_briefing(investor_briefing_html)
@@ -258,6 +258,7 @@ async def run_deliver(run_id: str) -> dict:
                 email_delivery=email_delivery,
                 briefing_blob=f"executive_briefing_{run_id}.html",
                 qa_blob=f"qa_dashboard_{run_id}.html",
+                user_id=user_id
             )
             return {"run_id": run_id, "status": "failed"}
 
@@ -270,13 +271,13 @@ async def run_deliver(run_id: str) -> dict:
 
         merged_telemetry["QA_EXECUTION"] = extract_qa_execution(qa_reports)
         merged_telemetry["QA_SCORECARD"] = qa_scorecard
-        storage_client.save_report(f"api_telemetry_{run_id}.json", json.dumps(merged_telemetry, indent=4))
+        storage_client.save_report(f"api_telemetry_{run_id}.json", json.dumps(merged_telemetry, indent=4), user_id=user_id)
 
         # Post-job oversight blobs (API Optimization / Data Insight / Supervisor).
         try:
             from src.qa.post_job_audit import execute_post_job_oversight
 
-            run_status = storage_client.load_run_status_for_run(run_id) or {}
+            run_status = storage_client.load_run_status_for_run(run_id, user_id=user_id) or {}
             oversight = execute_post_job_oversight(
                 run_id, merged_telemetry, qa_reports, run_status=run_status,
             )
@@ -294,17 +295,17 @@ async def run_deliver(run_id: str) -> dict:
                                   duration_seconds=round((finished - started).total_seconds(), 1),
                                   briefing_blob=f"executive_briefing_{run_id}.html",
                                   qa_blob=f"qa_dashboard_{run_id}.html",
-                                  email_delivery=email_delivery)
+                                  email_delivery=email_delivery, user_id=user_id)
         # Mirror briefing/qa blob names to the top level for existing monitors.
-        status = storage_client.load_run_status_for_run(run_id) or {}
+        status = storage_client.load_run_status_for_run(run_id, user_id=user_id) or {}
         status["briefing_blob"] = f"executive_briefing_{run_id}.html"
         status["qa_blob"] = f"qa_dashboard_{run_id}.html"
-        storage_client.save_run_status_for_run(run_id, status)
-        current = storage_client.load_run_status()
+        storage_client.save_run_status_for_run(run_id, status, user_id=user_id)
+        current = storage_client.load_run_status(user_id=user_id)
         if not current or current.get("run_id") == run_id:
-            storage_client.save_run_status(status)
+            storage_client.save_run_status(status, user_id=user_id)
 
-        storage_client.execute_retention_policy(14)
+        storage_client.execute_retention_policy(14, user_id=user_id)
 
         portfolio_syms = set(prep.get("portfolio_holdings") or {})
         watchlist_symbols = [
@@ -317,6 +318,7 @@ async def run_deliver(run_id: str) -> dict:
             run_id,
             is_approved=bool(debate.get("is_approved")),
             watchlist_symbols=watchlist_symbols,
+            user_id=user_id
         )
 
         logger.info(f"[DELIVER] Completed for run {run_id} in {round((finished - started).total_seconds(), 1)}s.")
@@ -326,7 +328,7 @@ async def run_deliver(run_id: str) -> dict:
         logger.error(f"[DELIVER] Fatal exception: {e}")
         notifier.send_error_alert(f"Deliver phase failed: {e}")
         storage_client.mark_phase(run_id, "deliver", "failed",
-                                  finished_at=now_local().isoformat(), error=str(e))
+                                  finished_at=now_local().isoformat(), error=str(e), user_id=user_id)
         return {"run_id": run_id, "status": "failed"}
 
 
@@ -335,4 +337,5 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python -m src.jobs.deliver <run_id>", file=sys.stderr)
         sys.exit(2)
-    asyncio.run(run_deliver(sys.argv[1]))
+    user_id_arg = sys.argv[2] if len(sys.argv) > 2 else "stan"
+    asyncio.run(run_deliver(sys.argv[1], user_id=user_id_arg))

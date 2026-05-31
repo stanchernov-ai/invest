@@ -3,7 +3,10 @@ import logging
 import json
 import os
 import sys
+import typing
 import asyncio
+
+from src.api.routes import bp as api_bp
 
 root_path = os.path.dirname(os.path.abspath(__file__))
 src_path = os.path.join(root_path, "src")
@@ -16,6 +19,7 @@ for path_dir in [src_path, root_path, core_path, output_path, data_path]:
         sys.path.insert(0, path_dir)
 
 app = func.FunctionApp()
+app.register_functions(api_bp)
 
 # Split pipeline: prepare -> (queue) -> debate -> (queue) -> deliver. Each phase
 # runs as its own invocation with an independent 10-minute ceiling and chains the
@@ -23,6 +27,7 @@ app = func.FunctionApp()
 # producer phase exits immediately instead of holding its budget open).
 DEBATE_QUEUE = "boardroom-debate-queue"
 DELIVER_QUEUE = "boardroom-deliver-queue"
+PREPARE_QUEUE = "boardroom-prepare-queue"
 LOCK_BLOB = "daily_execution.lock"
 STATE_CONTAINER = "boardroom-state"
 
@@ -31,12 +36,12 @@ STATE_CONTAINER = "boardroom-state"
 PHASE_SOFT_TIMEOUT_SECONDS = 540
 
 
-def _enqueue_phase(run_id: str, phase: str) -> None:
+def _enqueue_phase(run_id: str, phase: str, user_id: str = "stan") -> None:
     """Record that the next phase was handed off to a Storage Queue."""
     from src import storage_client
     from src.config.settings import now_local
 
-    storage_client.mark_phase(run_id, phase, "queued", started_at=now_local().isoformat())
+    storage_client.mark_phase(run_id, phase, "queued", started_at=now_local().isoformat(), user_id=user_id)
 
 
 def _guard_timer_prepare() -> bool:
@@ -68,7 +73,7 @@ def _new_run_id() -> str:
     return now_local().strftime('%Y%m%d_%H%M%S')
 
 
-def _run_phase(coro, run_id: str, phase: str) -> bool:
+def _run_phase(coro, run_id: str, phase: str, user_id: str = "stan") -> bool:
     """Run a phase coroutine with a soft timeout. Returns True on success.
 
     On timeout/exception, marks the phase failed in run_status so a monitor never
@@ -87,7 +92,7 @@ def _run_phase(coro, run_id: str, phase: str) -> bool:
         try:
             storage_client.mark_phase(run_id, phase, "failed",
                                       finished_at=now_local().isoformat(),
-                                      error=f"{phase} soft timeout ({PHASE_SOFT_TIMEOUT_SECONDS}s)")
+                                      error=f"{phase} soft timeout ({PHASE_SOFT_TIMEOUT_SECONDS}s)", user_id=user_id)
         except Exception as e:
             logging.error(f"Could not record {phase} timeout status: {e}")
         return False
@@ -96,7 +101,7 @@ def _run_phase(coro, run_id: str, phase: str) -> bool:
         try:
             storage_client.mark_phase(run_id, phase, "failed",
                                       finished_at=now_local().isoformat(),
-                                      error=str(e))
+                                      error=str(e), user_id=user_id)
         except Exception as mark_err:
             logging.error(f"Could not record {phase} failure status: {mark_err}")
         return False
@@ -119,71 +124,68 @@ def boardroom_stale_run_watchdog(watchdogTimer: func.TimerRequest) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Job 1 - PREPARE (timer entry + manual HTTP). Holds the daily lock.           #
+# Multi-User Dispatcher (Timer -> Queue fan-out)                               #
 # --------------------------------------------------------------------------- #
-def _kickoff_prepare(run_id: str) -> bool:
-    """Acquire the daily lock and run the prepare phase. Returns True on success."""
-    from azure.storage.blob import BlobServiceClient, BlobLeaseClient
-    from azure.core.exceptions import ResourceModifiedError
-    from src.jobs.prepare import run_prepare
-
-    conn_str = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
-    if not conn_str:
-        logging.error("FATAL. AZURE_STORAGE_CONNECTION_STRING is missing. Halting execution.")
-        return False
-
-    try:
-        blob_service = BlobServiceClient.from_connection_string(conn_str)
-        container = blob_service.get_container_client(STATE_CONTAINER)
-        if not container.exists():
-            container.create_container()
-
-        blob_client = container.get_blob_client(LOCK_BLOB)
-        if not blob_client.exists():
-            blob_client.upload_blob("lock_established", overwrite=True)
-        else:
-            try:
-                props = blob_client.get_blob_properties()
-                from datetime import datetime, timezone
-                age = (datetime.now(timezone.utc) - props.last_modified).total_seconds()
-                if age > 3600:
-                    BlobLeaseClient(blob_client).break_lease()
-                    logging.info("Broke orphaned lease from a previous failed run.")
-            except Exception as e:
-                logging.warning(f"Could not check or break orphaned lease: {e}")
-
-        lease_client = BlobLeaseClient(blob_client)
-        lease_client.acquire(lease_duration=-1)
-        blob_client.upload_blob("lock_established", overwrite=True, lease=lease_client)
-        logging.info("Distributed lock acquired (infinite lease). Running prepare phase.")
-
-        try:
-            return _run_phase(run_prepare(run_id=run_id), run_id, "prepare")
-        finally:
-            lease_client.release()
-            logging.info("Prepare lock released.")
-
-    except ResourceModifiedError:
-        logging.warning("Lock acquisition failed. Another container is preparing this window. Terminating safely.")
-        return False
-    except Exception as e:
-        logging.error(f"FATAL. Prepare kickoff failed: {e}")
-        return False
-
-
-# 6:00 AM daily in WEBSITE_TIME_ZONE (set to America/Los_Angeles on the Function App).
-# Typical finish ~6:07–6:15; briefing email before the 6:30 market open (Pacific).
 @app.timer_trigger(schedule="0 0 6 * * *", arg_name="myTimer", run_on_startup=False, use_monitor=False)
+@app.queue_output(arg_name="prepareOut", queue_name=PREPARE_QUEUE, connection="AzureWebJobsStorage")
+def boardroom_dispatcher(myTimer: func.TimerRequest, prepareOut: func.Out[typing.List[str]]) -> None:
+    from src.data.db import fetch_query
+    
+    logging.info("Waking up the Board of Directors. Initiating MULTI-USER DISPATCHER.")
+    
+    async def _fetch_users():
+        # Requires DATABASE_URL to be set, gracefully fails to 'stan' if not
+        try:
+            rows = await fetch_query("SELECT id, slug FROM users WHERE status = 'active'")
+            return [dict(r) for r in rows]
+        except Exception as e:
+            logging.error(f"Database unavailable for fan-out: {e}")
+            return [{"id": "stan", "slug": "stan"}]
+            
+    try:
+        users = asyncio.run(_fetch_users())
+    except Exception:
+        users = [{"id": "stan", "slug": "stan"}]
+        
+    messages = []
+    for u in users:
+        run_id = _new_run_id()
+        msg = json.dumps({"run_id": run_id, "user_id": str(u["id"]), "slug": u["slug"]})
+        messages.append(msg)
+        
+    prepareOut.set(messages)
+    logging.info(f"Enqueued {len(messages)} users for prepare phase.")
+
+
+# --------------------------------------------------------------------------- #
+# Job 1 - PREPARE (Queue trigger + manual HTTP).
+# --------------------------------------------------------------------------- #
+def _kickoff_prepare(run_id: str, user_id: str = "stan") -> bool:
+    """Run the prepare phase."""
+    from src.jobs.prepare import run_prepare
+    return _run_phase(run_prepare(run_id=run_id, user_id=user_id), run_id, "prepare", user_id=user_id)
+
+
+@app.queue_trigger(arg_name="msg", queue_name=PREPARE_QUEUE, connection="AzureWebJobsStorage")
 @app.queue_output(arg_name="debateOut", queue_name=DEBATE_QUEUE, connection="AzureWebJobsStorage")
-def boardroom_prepare(myTimer: func.TimerRequest, debateOut: func.Out[str]) -> None:
-    logging.info("Waking up the Board of Directors. Initiating PREPARE phase.")
-    if not _guard_timer_prepare():
-        return
-    run_id = _new_run_id()
-    if _kickoff_prepare(run_id):
-        debateOut.set(run_id)
-        _enqueue_phase(run_id, "debate")
-        logging.info(f"Prepare succeeded; enqueued debate for run {run_id}.")
+def boardroom_prepare(msg: func.QueueMessage, debateOut: func.Out[str]) -> None:
+    logging.info("PREPARE phase triggered from queue.")
+    raw_msg = (msg.get_body().decode("utf-8") or "").strip()
+    try:
+        payload = json.loads(raw_msg)
+        run_id = payload["run_id"]
+        user_id = payload["user_id"]
+    except Exception:
+        # Fallback for old simple string messages
+        run_id = raw_msg
+        user_id = "stan"
+        
+    if _kickoff_prepare(run_id, user_id=user_id):
+        # Pass JSON payload to next phase
+        next_msg = json.dumps({"run_id": run_id, "user_id": user_id})
+        debateOut.set(next_msg)
+        _enqueue_phase(run_id, "debate", user_id=user_id)
+        logging.info(f"Prepare succeeded; enqueued debate for run {run_id} (user: {user_id}).")
 
 
 @app.route(route="prepare", auth_level=func.AuthLevel.FUNCTION)
@@ -230,12 +232,21 @@ def boardroom_prepare_http(req: func.HttpRequest, debateOut: func.Out[str]) -> f
 @app.queue_output(arg_name="deliverOut", queue_name=DELIVER_QUEUE, connection="AzureWebJobsStorage")
 def boardroom_debate(msg: func.QueueMessage, deliverOut: func.Out[str]) -> None:
     from src.jobs.debate import run_debate
-    run_id = (msg.get_body().decode("utf-8") or "").strip()
-    logging.info(f"DEBATE phase triggered for run {run_id}.")
-    if _run_phase(run_debate(run_id), run_id, "debate"):
-        deliverOut.set(run_id)
-        _enqueue_phase(run_id, "deliver")
-        logging.info(f"Debate succeeded; enqueued deliver for run {run_id}.")
+    raw_msg = (msg.get_body().decode("utf-8") or "").strip()
+    try:
+        payload = json.loads(raw_msg)
+        run_id = payload["run_id"]
+        user_id = payload["user_id"]
+    except Exception:
+        run_id = raw_msg
+        user_id = "stan"
+        
+    logging.info(f"DEBATE phase triggered for run {run_id} (user: {user_id}).")
+    if _run_phase(run_debate(run_id, user_id=user_id), run_id, "debate", user_id=user_id):
+        next_msg = json.dumps({"run_id": run_id, "user_id": user_id})
+        deliverOut.set(next_msg)
+        _enqueue_phase(run_id, "deliver", user_id=user_id)
+        logging.info(f"Debate succeeded; enqueued deliver for run {run_id} (user: {user_id}).")
 
 
 @app.route(route="debate", auth_level=func.AuthLevel.FUNCTION)
@@ -258,9 +269,17 @@ def boardroom_debate_http(req: func.HttpRequest, deliverOut: func.Out[str]) -> f
 @app.queue_trigger(arg_name="msg", queue_name=DELIVER_QUEUE, connection="AzureWebJobsStorage")
 def boardroom_deliver(msg: func.QueueMessage) -> None:
     from src.jobs.deliver import run_deliver
-    run_id = (msg.get_body().decode("utf-8") or "").strip()
-    logging.info(f"DELIVER phase triggered for run {run_id}.")
-    _run_phase(run_deliver(run_id), run_id, "deliver")
+    raw_msg = (msg.get_body().decode("utf-8") or "").strip()
+    try:
+        payload = json.loads(raw_msg)
+        run_id = payload["run_id"]
+        user_id = payload["user_id"]
+    except Exception:
+        run_id = raw_msg
+        user_id = "stan"
+        
+    logging.info(f"DELIVER phase triggered for run {run_id} (user: {user_id}).")
+    _run_phase(run_deliver(run_id, user_id=user_id), run_id, "deliver", user_id=user_id)
 
 
 @app.route(route="deliver", auth_level=func.AuthLevel.FUNCTION)

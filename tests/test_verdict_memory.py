@@ -81,7 +81,7 @@ class VerdictMemoryTests(unittest.TestCase):
         with patch.object(verdict_memory, "DATA_DIR", self.data_dir):
             loaded = verdict_memory.load_board_verdicts()
         self.assertEqual(loaded, cloud)
-        local_path = os.path.join(self.data_dir, "board_verdicts.json")
+        local_path = os.path.join(self.data_dir, "stan", "board_verdicts.json")
         self.assertTrue(os.path.exists(local_path))
 
     @patch("src.verdict_memory.load_state_blob", return_value=None)

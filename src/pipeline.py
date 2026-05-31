@@ -19,8 +19,7 @@ def clean_num(val_str):
     except ValueError:
         return 0.0
 
-def parse_activity_dates():
-    data_dir = DATA_DIR
+def parse_activity_dates(data_dir=DATA_DIR):
     purchase_dates = {}
     for file in glob.glob(os.path.join(data_dir, "*.csv")):
         if "activity" not in file.lower():
@@ -129,15 +128,14 @@ def parse_broker_csv(filepath, broker_type):
         logger.error("CSV native parsing failure.")
     return positions
 
-def process_portfolios():
+def process_portfolios(data_dir=DATA_DIR):
     logger.info("Initializing native dictionary brokerage data parsing engine.")
     master_ledger = {}
     total_portfolio_value = 0.0
 
-    data_dir = DATA_DIR
     os.makedirs(data_dir, exist_ok=True)
     
-    purchase_dates = parse_activity_dates()
+    purchase_dates = parse_activity_dates(data_dir=data_dir)
 
     for file in glob.glob(os.path.join(data_dir, "*.csv")):
         file_lower = file.lower()

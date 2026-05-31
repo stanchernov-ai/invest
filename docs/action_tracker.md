@@ -1,7 +1,7 @@
 # SC Invest Boardroom — Action Tracker
 
 **Status:** Active  
-**Last Updated:** May 31, 2026 (prod `b6984fa`; validated run **`20260531_014121`** — Crucible palette, QA triage, backlog sync)
+**Last Updated:** May 31, 2026 (prod `c66e52e`; validated run **`20260531_090637`** — debate QA + briefing visuals deploy)
 
 **Purpose:** Current session pickup and prioritized backlog (**single file** for QA findings + engineering work). Every QA CRITICAL/WARNING is logged to **Open items** via `tools/sync_backlog.py`. Historical handoffs and Phase 0–6 specs live in [`archive/implementation_log_2026-05.md`](archive/implementation_log_2026-05.md). Maintenance rules: [`doc_hygiene.md`](doc_hygiene.md). Doc map: [`DOCUMENTATION.md`](DOCUMENTATION.md).
 
@@ -9,16 +9,24 @@
 
 ---
 
-## Session Handoff — May 31, 2026 Crucible + QA backlog (**pick up here**)
+## Session Handoff — May 31, 2026 Multi-Tenant SaaS Rollout (Phase 1 & 2)
 
-**Theme:** **May 31 deploy batch on prod.** First validated run with cold-iron Crucible styling, QA dashboard backlog triage, and unified `action_tracker` sync.
+**Theme:** Full multi-user isolation, Postgres schemas, REST APIs, and Expo client scaffolding.
+
+**Details:** See [`saas_architect_handoff.md`](saas_architect_handoff.md) for full context on the new `user_id` isolation, Auth/REST API layers, and the dispatcher queue fan-out.
+
+---
+
+## Session Handoff — May 31, 2026 debate QA + visuals deploy (**pick up here**)
+
+**Theme:** **Debate quality + briefing visual fixes on prod.** First validation after PASS-SPAM-1, R2-1, PE-PERSONA-1 prompts, GFX-2/3/SOTU, and GFX-5 avatar revert.
 
 | State | Detail |
 |-------|--------|
-| **Prod HEAD** | **`b6984fa`** — unified backlog sync · **`760ebb6`** Crucible palette · **`52613b2`** QA triage UI · **`6de1d69`** Today's Actions layout |
-| **Last validated run** | **`20260531_014121`** (~4.5 min, pipeline SUCCESS, all emails ok) |
-| **Local git** | `main` synced with `origin/main`; minor uncommitted fix in `fetch_azure_reports.py` (Path for sync_backlog) |
-| **Deploy** | GitHub Actions [run #92](https://github.com/stanchernov-ai/invest/actions/runs/26707882120) — success |
+| **Prod HEAD** | **`c66e52e`** — avatar revert to GFX-5 · **`4d0bbaa`** briefing visuals · **`29052fa`** debate QA |
+| **Last validated run** | **`20260531_090637`** (~4.5 min, pipeline SUCCESS, all emails ok) |
+| **Prior baseline** | **`20260531_014121`** on `b6984fa` (pre-debate-QA fixes) |
+| **Local git** | `main` synced with `origin/main`; unrelated WIP in `portfolio_policy.py`, `engine.py`, etc. |
 
 **Kickoff (manual run):** `GET /api/prepare?code=<function-key>` — hostname: `app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewebsites.net`. Function key: `az functionapp keys list -g rg-boardroom-prod -n app-boardroom-prod --query functionKeys.default -o tsv`. **Note:** `/api/prepare` is **synchronous** — waits for prepare phase (~8–60s) before returning 202; do not interrupt.
 
@@ -28,7 +36,43 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 .venv\Scripts\python.exe scripts\wait_for_run.py --run-id YYYYMMDD_HHMMSS --timeout 2700 --post-job
 ```
 
-### Shipped May 31 (`52613b2` → `b6984fa`)
+### Shipped May 31 afternoon (`29052fa` → `c66e52e`)
+
+| Area | Key paths | What |
+|------|-----------|------|
+| **Debate QA** | `rebuttal.py`, `debate_format.py`, `engine.py`, `architect_audit.py` | Anti-drift Round 2 prompt; slim watchlist Pass markdown; reframed Pass-spam audit |
+| **Briefing visuals** | `briefing_style.py`, `reporting.py` | GFX-2 Alpha Pick logo chip; GFX-SOTU-1 border-only SoTU; GFX-3 pie palette spread |
+| **Avatars** | `assets/avatars/*.png` | Reverted to GFX-5 (`d8b7385`); AV-2 closed as duplicate |
+
+### Run `20260531_090637` — post-deploy QA notes
+
+| Phase | Duration | Status |
+|-------|----------|--------|
+| Prepare | 10.3s | success |
+| Debate | 125.4s | success |
+| Deliver | 109.5s | success |
+
+**Email:** briefing + QA dashboard + Legal Counsel — all sent.
+
+**Validated on prod:**
+- **Systems Architect** — deterministic **PASS** (PASS-SPAM-1 fixed; 0 `\bPass\b` in debate log)
+- **R2-1** — no verbatim R1 copy CRITICAL
+- **Post Mortem + Legal** — PASS
+
+**Still failing QA (4 CRITICAL):**
+- **Prompt Engineer** — 1× persona drift (Aurelius `margin of safety`) — PE-PERSONA-1 partial
+- **Graphics Designer** — chart title color + Debate wall-of-text (LLM path; not prior parse error)
+- **QA Integrity** — PE finding unverifiable (Round 2 absent from integrity excerpt)
+
+**Post-job:** ~273k tokens · artifacts cached under `.cache/` for run `20260531_090637`.
+
+**Human QA still open (Gmail):** SoTU borders, pie colors, avatar rings, GFX-2 MSFT logo (**QA-HUMAN-1**).
+
+```powershell
+.venv\Scripts\python.exe tools/fetch_azure_reports.py --run-id 20260531_090637 --post-job
+```
+
+### Shipped May 31 morning (`52613b2` → `b6984fa`)
 
 | Area | Key paths | What |
 |------|-----------|------|
@@ -75,15 +119,9 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 
 | Pri | ID | Status | Source | Fix | Item | Evidence |
 |-----|-----|--------|--------|-----|------|----------|
-| **P0** | QA-HUMAN-1 | open | manual | code | Gmail review of `20260531_014121` — Crucible palette, Today's Actions, QA backlog triage, debate | |
-| **P1** | PASS-SPAM-1 | done | Systems Architect | code | Reduce watchlist Pass spam in debate log (86/100 Pass rows; 192 mentions / 27 symbols) | qa_reports_20260531_014121.json |
-| **P1** | PE-PERSONA-1 | done | Prompt Engineer | agent | Round 2 persona drift — forbidden vocab (`margin of safety`, `relative strength`, `the tape`) across panelists | qa_reports_20260531_014121.json |
-| **P1** | R2-1 | done | Prompt Engineer | agent | Round 2 `overall_portfolio_critique` verbatim copy of Round 1 | qa_reports_20260530_205821.json |
+
+| **P0** | QA-HUMAN-1 | open | manual | code | Gmail review of `20260531_014121` — Crucible palette, Today's Actions, QA backlog triage, debate |  |
 | **P1** | HR-TELEM-1 | open | HR | code | HR Efficiency review on prod telemetry — `hr_review` on `20260531_014121` (`QA_EXECUTION` now on prod) | api_telemetry_20260531_014121.json |
-| **P1** | GFX-2 | done | Graphics Designer | code | Logo contrast on `#27272a` — MSFT Alpha Pick | qa_reports_20260530_205821.json |
-| **P1** | GFX-SOTU-1 | done | Graphics Designer | code | SoTU non-SSOT `box-shadow` / colors | qa_reports_20260530_205821.json |
-| **P1** | AV-2 | closed | manual | code | SoTU avatar ring alignment — **duplicate of GFX-5 (`d8b7385`); reverted `4d0bbaa` re-recenter** |  |
-| **P1** | GFX-3 | done | manual | code | Pie categorical palette — too many similar greens |  |
 | **P1** | CHAIR-1 | open | Post Mortem QA | code | Post Mortem Trim→Hold mandate — AVGO/ASML on `010432` |  |
 | **P1** | HR-1 | open | manual | code | Commit + deploy remaining HR/QA roster WIP | [`hr_qa_roster_handoff.md`](hr_qa_roster_handoff.md) |
 | **P2** | GFX-LLM-1 | open | Graphics Designer | agent | Visual review LLM parse error (deterministic chart audit still PASS) | qa_reports_20260531_014121.json |
@@ -91,6 +129,18 @@ Invoke-WebRequest "https://app-boardroom-prod-b5h4epg2d0cxefa0.eastus-01.azurewe
 | **P2** | LEG-BRIEF-1 | open | Legal Counsel | code | Briefing Jinja wraps `champion_quote` in quotes — safe for panelist only |  |
 | **P2** | HR-ROSTER-1 | open | HR | agent | Reduce deliver QA overlap / token sink | [`agent_architecture.md`](agent_architecture.md) §9 |
 | **P3** | LEG-MUNGER-1 | open | Legal Counsel | code | Rename `MUNGER_DOCTRINE` user-facing string for SaaS | debate injection only |
+| **P1** | QA-090637-01 | open | Graphics Designer Visual SME | code | The 'The Debate' section contains excessively long and dense paragraphs for each analyst's initial positions. This creates a 'wall of text' that is not scannable and violates the requirement for concise analyst quotes and a scannable action plan. | qa_reports_20260531_090637.json |
+| **P2** | QA-090637-02 | open | Graphics Designer Visual SME | code | The executive briefing is missing a footer. A professional investment committee briefing should include a footer for essential information such as disclaimers, copyright, or contact details. | qa_reports_20260531_090637.json |
+| **P1** | QA-090637-03 | open | Prompt Engineer QA | code | QA agent failed compliance (1 CRITICAL). | qa_reports_20260531_090637.json |
+
+**Done (recent):**
+| **P1** | PASS-SPAM-1 | done | Systems Architect | code | Reduce watchlist Pass spam in debate log — **validated PASS on `20260531_090637`** | qa_reports_20260531_090637.json |
+| **P1** | PE-PERSONA-1 | partial | Prompt Engineer | agent | Round 2 persona drift — 1 CRITICAL remain on `20260531_090637` (Aurelius `margin of safety`; was 3) | qa_reports_20260531_090637.json |
+| **P1** | R2-1 | done | Prompt Engineer | agent | Round 2 `overall_portfolio_critique` verbatim copy of Round 1 | qa_reports_20260530_205821.json |
+| **P1** | GFX-2 | done | Graphics Designer | code | Logo contrast on `#27272a` — MSFT Alpha Pick | qa_reports_20260530_205821.json |
+| **P1** | GFX-SOTU-1 | done | Graphics Designer | code | SoTU non-SSOT `box-shadow` / colors | qa_reports_20260530_205821.json |
+| **P1** | AV-2 | done | manual | code | SoTU avatar ring alignment — duplicate of GFX-5 (`d8b7385`); reverted `4d0bbaa` re-recenter |  |
+| **P1** | GFX-3 | done | manual | code | Pie categorical palette — too many similar greens |  |
 
 **Done (now prod):** GFX-2, GFX-SOTU-1, GFX-3, GFX-5 (avatar rings), PASS-SPAM-1, R2-1, PE-PERSONA-1, DEPLOY-1, REVIEW-1, AP-1, **AP-2**, GFX-4, GFX-QA, INT-1, UNICORN-1, Legal Counsel QA, catalysts, per-stock debate, QA review footer, investor voice, Yahoo cache, scout validation, **PE-VOICE-1**, **Crucible palette** (`760ebb6`), **QA triage UI** (`52613b2`), **backlog sync** (`b6984fa`), `qa_augmentation.py` (B2).
 

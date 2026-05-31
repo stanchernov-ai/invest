@@ -53,9 +53,9 @@ class RunStatusTests(unittest.TestCase):
             storage_client.save_run_status({"run_id": "20260529_120049", "status": "success"})
 
         for name in (
-            storage_client.RUN_STATUS_BLOB,
-            storage_client.RUN_STATUS_CURRENT_BLOB,
-            storage_client._run_status_blob_for_run("20260529_120049"),
+            storage_client._run_status_blob("stan"),
+            storage_client._run_status_current_blob("stan"),
+            storage_client._run_status_blob_for_run("20260529_120049", "stan"),
         ):
             path = os.path.join(self.data_dir, name)
             self.assertTrue(os.path.exists(path), name)

@@ -20,7 +20,7 @@ from src.logging_setup import configure_logging
 logger = configure_logging()
 
 
-async def run_debate(run_id: str) -> dict:
+async def run_debate(run_id: str, user_id: str = "stan") -> dict:
     """Execute the debate phase for an existing prepare checkpoint.
 
     Returns {'run_id', 'status', 'is_approved'}. On success writes the 'debate'
@@ -30,16 +30,16 @@ async def run_debate(run_id: str) -> dict:
     started = now_local()
     agent_activity.reset()
 
-    prep = storage_client.load_checkpoint(run_id, "prepare")
+    prep = storage_client.load_checkpoint(run_id, "prepare", user_id=user_id)
     if not prep:
         msg = f"Debate phase could not load prepare checkpoint for run {run_id}."
         logger.error(msg)
         notifier.send_error_alert(msg)
         storage_client.mark_phase(run_id, "debate", "failed",
-                                  finished_at=now_local().isoformat(), error="missing prepare checkpoint")
+                                  finished_at=now_local().isoformat(), error="missing prepare checkpoint", user_id=user_id)
         return {"run_id": run_id, "status": "failed", "is_approved": False}
 
-    storage_client.mark_phase(run_id, "debate", "running", started_at=started.isoformat())
+    storage_client.mark_phase(run_id, "debate", "running", started_at=started.isoformat(), user_id=user_id)
 
     try:
         prep_oracle = prep.get("oracle") or {}
@@ -76,7 +76,7 @@ async def run_debate(run_id: str) -> dict:
                     notifier.send_error_alert(error_msg)
                     storage_client.mark_phase(run_id, "debate", "failed",
                                               finished_at=now_local().isoformat(),
-                                              error="data oracle validation failed")
+                                              error="data oracle validation failed", user_id=user_id)
                     return {"run_id": run_id, "status": "failed", "is_approved": False}
                 if "messages" in value:
                     for msg in value["messages"]:
@@ -133,11 +133,11 @@ async def run_debate(run_id: str) -> dict:
             try:
                 storage_client.save_state_blob(
                     f"compliance_failure_{run_id}.json",
-                    failure_blob,
+                    failure_blob, user_id=user_id
                 )
                 storage_client.save_state_blob(
                     f"debate_review_{run_id}.json",
-                    review_blob,
+                    review_blob, user_id=user_id
                 )
                 storage_client.save_report(
                     f"api_telemetry_{run_id}_debate.json",
@@ -148,7 +148,7 @@ async def run_debate(run_id: str) -> dict:
                             "DEBATE_REVIEW": {"blob": f"debate_review_{run_id}.json"},
                         },
                         indent=4,
-                    ),
+                    ), user_id=user_id
                 )
             except Exception as persist_exc:
                 logger.warning("[DEBATE] Could not persist compliance failure artifact: %s", persist_exc)
@@ -162,6 +162,7 @@ async def run_debate(run_id: str) -> dict:
                 error=error_summary[:2000],
                 compliance_violations=detail.get("violations") or [],
                 requires_expert_review=True,
+                user_id=user_id
             )
             return {"run_id": run_id, "status": "failed", "is_approved": False}
 
@@ -190,14 +191,14 @@ async def run_debate(run_id: str) -> dict:
             "compliance_source": compliance_source,
             "munger_skipped": munger_skipped,
         }
-        storage_client.save_checkpoint(run_id, "debate", checkpoint)
-        storage_client.save_report(f"api_telemetry_{run_id}_debate.json", json.dumps(telemetry, indent=4))
+        storage_client.save_checkpoint(run_id, "debate", checkpoint, user_id=user_id)
+        storage_client.save_report(f"api_telemetry_{run_id}_debate.json", json.dumps(telemetry, indent=4), user_id=user_id)
 
         finished = now_local()
         storage_client.mark_phase(run_id, "debate", "success",
                                   started_at=started.isoformat(),
                                   finished_at=finished.isoformat(),
-                                  duration_seconds=round((finished - started).total_seconds(), 1))
+                                  duration_seconds=round((finished - started).total_seconds(), 1), user_id=user_id)
         logger.info(f"[DEBATE] Completed for run {run_id} in {round((finished - started).total_seconds(), 1)}s.")
         return {"run_id": run_id, "status": "success", "is_approved": is_approved_flag}
 
@@ -205,7 +206,7 @@ async def run_debate(run_id: str) -> dict:
         logger.error(f"[DEBATE] Fatal exception: {e}")
         notifier.send_error_alert(f"Debate phase failed: {e}")
         storage_client.mark_phase(run_id, "debate", "failed",
-                                  finished_at=now_local().isoformat(), error=str(e))
+                                  finished_at=now_local().isoformat(), error=str(e), user_id=user_id)
         return {"run_id": run_id, "status": "failed", "is_approved": False}
 
 
@@ -214,4 +215,5 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python -m src.jobs.debate <run_id>", file=sys.stderr)
         sys.exit(2)
-    asyncio.run(run_debate(sys.argv[1]))
+    user_id_arg = sys.argv[2] if len(sys.argv) > 2 else "stan"
+    asyncio.run(run_debate(sys.argv[1], user_id=user_id_arg))

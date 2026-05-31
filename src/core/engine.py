@@ -7,9 +7,10 @@ from google.genai import types
 from src.core.schemas import (
     BoardroomState, PanelistPortfolioVerdict, PanelistRebuttalVerdict, ChiefOfStaffSynthesis, 
     ChairmanMasterSynthesis, ComplianceReport, RedTeamReport, DATA_SCHEMA_BINDING, 
-    TONE_OVERRIDE, MUNGER_DOCTRINE, CHAIRMAN_MANDATE, RETAIL_EDGE_DOCTRINE, 
+    TONE_OVERRIDE, CHAIRMAN_MANDATE, 
     WATCHLIST_RULING, ROUND_2_REBUTTAL_DIRECTIVE,
 )
+from src.core.portfolio_policy import resolve_policy
 from src.core.rebuttal import build_round2_user_prompt
 from src.core.debate_format import (
     format_portfolio_verdict_markdown_lines,
@@ -37,12 +38,6 @@ from src.core.agents import call_gemini_async, agent_config, FAST_MODEL, FLASH_T
 from src.core.board_roster import CONCENTRATION_AUDIT_KEYS, PANELIST_KEYS
 
 logger = logging.getLogger(__name__)
-
-CONCENTRATION_EXEMPTION = (
-    "[CRITICAL CONCENTRATION EXEMPTION]: This portfolio is intentionally tech heavy. "
-    "You are strictly FORBIDDEN from voting to Sell or Trim purely to achieve sector diversification. "
-    "Evaluate assets on individual mathematical metrics and edge."
-)
 
 class StateMachineOrchestrator:
     def __init__(self, state: BoardroomState):
@@ -83,6 +78,7 @@ class StateMachineOrchestrator:
             purchase_dates=self.state.purchase_dates,
             raw_verdicts=self.raw_verdicts,
             all_symbols=self.state.all_symbols,
+            user_profile=self.state.user_profile,
         )
         return enforce_alpha_pick_from_executed_buys(
             chairman,
@@ -145,13 +141,13 @@ class StateMachineOrchestrator:
     ) -> dict:
         member_info = agent_config["board_members"][agent_key]
         
+        policy = resolve_policy(self.state.user_profile)
+        
         instructions = [
             member_info['system_instruction'],
-            CONCENTRATION_EXEMPTION,
+            policy.get_doctrine_blocks(),
             DATA_SCHEMA_BINDING,
             self.state.live_mandate,
-            MUNGER_DOCTRINE,
-            RETAIL_EDGE_DOCTRINE,
             WATCHLIST_RULING,
             TONE_OVERRIDE,
         ]
@@ -337,7 +333,7 @@ class StateMachineOrchestrator:
         history = "\n\n".join([m["content"] for m in self.state.messages])
         munger_warning = ""
         if self.state.munger_overrides:
-            munger_warning = "\n\n[CRITICAL MUNGER AUDIT CONCENTRATION WARNINGS]:\n"
+            munger_warning = "\n\n[CRITICAL CONCENTRATION WARNINGS]:\n"
             for agent, data in self.state.munger_overrides.items():
                 munger_warning += f"--- {agent.upper()} ---\n{data}\n"
         corrections = ""

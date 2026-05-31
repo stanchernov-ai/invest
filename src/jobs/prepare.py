@@ -64,7 +64,7 @@ def _market_regime_block(macro_data: dict, portfolio_3m: float, qqq_3m: float, s
     )
 
 
-async def run_prepare(run_id: str = None) -> dict:
+async def run_prepare(run_id: str = None, user_id: str = "stan") -> dict:
     """Execute the prepare phase. Returns {'run_id', 'status', 'oracle'}.
 
     On success writes the 'prepare' checkpoint and marks the phase complete so the
@@ -76,8 +76,8 @@ async def run_prepare(run_id: str = None) -> dict:
     logger.info(f"[PREPARE] Starting data preparation for run {run_id}.")
     started = now_local()
     agent_activity.reset()
-    storage_client.begin_run_status(run_id, started.isoformat())
-    storage_client.mark_phase(run_id, "prepare", "running", started_at=started.isoformat())
+    storage_client.begin_run_status(run_id, started.isoformat(), user_id=user_id)
+    storage_client.mark_phase(run_id, "prepare", "running", started_at=started.isoformat(), user_id=user_id)
 
     api_telemetry = {}
 
@@ -85,11 +85,12 @@ async def run_prepare(run_id: str = None) -> dict:
         logger.error("FATAL ABORT: Required environment variables missing.")
         storage_client.mark_phase(run_id, "prepare", "failed",
                                   finished_at=now_local().isoformat(),
-                                  error="missing environment variables")
+                                  error="missing environment variables",
+                                  user_id=user_id)
         return {"run_id": run_id, "status": "failed", "oracle": None}
 
     try:
-        storage_client.sync_inputs_from_cloud()
+        storage_client.sync_inputs_from_cloud(user_id=user_id)
 
         master_ledger, total_portfolio_value = pipeline.process_portfolios()
         account_holdings = pipeline.build_account_holdings()
@@ -100,7 +101,7 @@ async def run_prepare(run_id: str = None) -> dict:
 
         watchlist_data = build_review_universe(
             master_ledger.keys(),
-            verdicts_history=verdict_memory.load_board_verdicts(),
+            verdicts_history=verdict_memory.load_board_verdicts(user_id=user_id),
         )
         persist_daily_target_list(watchlist_data)
 
@@ -153,7 +154,8 @@ async def run_prepare(run_id: str = None) -> dict:
                     notifier.send_error_alert(error_msg)
                     storage_client.mark_phase(run_id, "prepare", "failed",
                                               finished_at=now_local().isoformat(),
-                                              error=f"advanced metrics corrupted for {sym}")
+                                              error=f"advanced metrics corrupted for {sym}",
+                                              user_id=user_id)
                     return {"run_id": run_id, "status": "failed", "oracle": None}
                 advanced_data[sym] = res
 
@@ -191,7 +193,7 @@ async def run_prepare(run_id: str = None) -> dict:
             os.makedirs(DATA_DIR, exist_ok=True)
             with open(history_path, "w") as f:
                 json.dump(history_data, f)
-            storage_client.save_report("portfolio_history.json", json.dumps(history_data))
+            storage_client.save_report("portfolio_history.json", json.dumps(history_data), user_id=user_id)
         elif spy_price > 0 and total_portfolio_value > 0:
             if os.path.exists(history_path):
                 try:
@@ -209,11 +211,11 @@ async def run_prepare(run_id: str = None) -> dict:
             os.makedirs(DATA_DIR, exist_ok=True)
             with open(history_path, "w") as f:
                 json.dump(history_data, f)
-            storage_client.save_report("portfolio_history.json", json.dumps(history_data))
+            storage_client.save_report("portfolio_history.json", json.dumps(history_data), user_id=user_id)
 
         if account_returns:
             try:
-                storage_client.save_report("portfolio_returns.json", json.dumps(account_returns))
+                storage_client.save_report("portfolio_returns.json", json.dumps(account_returns), user_id=user_id)
             except Exception:
                 logger.warning("Could not persist portfolio_returns.json")
 
@@ -309,7 +311,8 @@ async def run_prepare(run_id: str = None) -> dict:
             storage_client.mark_phase(run_id, "prepare", "failed",
                                       finished_at=now_local().isoformat(),
                                       error="data oracle validation failed",
-                                      oracle_reason=oracle["reason"])
+                                      oracle_reason=oracle["reason"],
+                                      user_id=user_id)
             return {"run_id": run_id, "status": "failed", "oracle": oracle}
 
         api_telemetry['AGENT_ACTIVITY'] = agent_activity.snapshot()
@@ -335,14 +338,15 @@ async def run_prepare(run_id: str = None) -> dict:
             "price_feed": price_feed,
             "telemetry": api_telemetry,
         }
-        storage_client.save_checkpoint(run_id, "prepare", checkpoint)
-        storage_client.save_report(f"api_telemetry_{run_id}_prepare.json", json.dumps(api_telemetry, indent=4))
+        storage_client.save_checkpoint(run_id, "prepare", checkpoint, user_id=user_id)
+        storage_client.save_report(f"api_telemetry_{run_id}_prepare.json", json.dumps(api_telemetry, indent=4), user_id=user_id)
 
         finished = now_local()
         storage_client.mark_phase(run_id, "prepare", "success",
                                   started_at=started.isoformat(),
                                   finished_at=finished.isoformat(),
-                                  duration_seconds=round((finished - started).total_seconds(), 1))
+                                  duration_seconds=round((finished - started).total_seconds(), 1),
+                                  user_id=user_id)
         logger.info(f"[PREPARE] Completed for run {run_id} in {round((finished - started).total_seconds(), 1)}s.")
         return {"run_id": run_id, "status": "success", "oracle": oracle}
 
@@ -350,7 +354,7 @@ async def run_prepare(run_id: str = None) -> dict:
         logger.error(f"[PREPARE] Fatal exception: {e}")
         notifier.send_error_alert(f"Prepare phase failed: {e}")
         storage_client.mark_phase(run_id, "prepare", "failed",
-                                  finished_at=now_local().isoformat(), error=str(e))
+                                  finished_at=now_local().isoformat(), error=str(e), user_id=user_id)
         return {"run_id": run_id, "status": "failed", "oracle": None}
 
 

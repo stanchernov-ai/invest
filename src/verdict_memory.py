@@ -9,19 +9,19 @@ import logging
 import os
 
 from src.config.settings import DATA_DIR, now_local
-from src.storage_client import STATE_CONTAINER, get_blob_service_client, load_state_blob
+from src.storage_client import STATE_CONTAINER, get_blob_service_client, load_state_blob, DEFAULT_USER
 
 logger = logging.getLogger(__name__)
 
 BOARD_VERDICTS_FILE = "board_verdicts.json"
 
 
-def _verdict_path() -> str:
-    return os.path.join(DATA_DIR, BOARD_VERDICTS_FILE)
+def _verdict_path(user_id: str = DEFAULT_USER) -> str:
+    return os.path.join(DATA_DIR, user_id, BOARD_VERDICTS_FILE)
 
 
-def _read_local_board_verdicts() -> dict | None:
-    path = _verdict_path()
+def _read_local_board_verdicts(user_id: str = DEFAULT_USER) -> dict | None:
+    path = _verdict_path(user_id)
     if not os.path.exists(path):
         return None
     try:
@@ -33,30 +33,31 @@ def _read_local_board_verdicts() -> dict | None:
         return None
 
 
-def _cache_board_verdicts_local(history: dict) -> None:
-    os.makedirs(DATA_DIR, exist_ok=True)
-    with open(_verdict_path(), "w", encoding="utf-8") as f:
+def _cache_board_verdicts_local(history: dict, user_id: str = DEFAULT_USER) -> None:
+    target_dir = os.path.join(DATA_DIR, user_id)
+    os.makedirs(target_dir, exist_ok=True)
+    with open(_verdict_path(user_id), "w", encoding="utf-8") as f:
         json.dump(history, f, indent=4)
 
 
-def load_board_verdicts() -> dict:
+def load_board_verdicts(user_id: str = DEFAULT_USER) -> dict:
     """Azure state first (Functions cold start), then local DATA_DIR copy."""
-    cloud = load_state_blob(BOARD_VERDICTS_FILE)
+    cloud = load_state_blob(BOARD_VERDICTS_FILE, user_id)
     if isinstance(cloud, dict) and cloud:
-        _cache_board_verdicts_local(cloud)
+        _cache_board_verdicts_local(cloud, user_id)
         return cloud
 
-    local = _read_local_board_verdicts()
+    local = _read_local_board_verdicts(user_id)
     return local if local is not None else {}
 
 
-def save_board_verdicts(history: dict) -> None:
+def save_board_verdicts(history: dict, user_id: str = DEFAULT_USER) -> None:
     if not isinstance(history, dict):
         history = {}
     if not history:
-        prior = _read_local_board_verdicts()
+        prior = _read_local_board_verdicts(user_id)
         if not prior:
-            prior_cloud = load_state_blob(BOARD_VERDICTS_FILE)
+            prior_cloud = load_state_blob(BOARD_VERDICTS_FILE, user_id)
             prior = prior_cloud if isinstance(prior_cloud, dict) else None
         if prior:
             logger.warning(
@@ -65,13 +66,13 @@ def save_board_verdicts(history: dict) -> None:
             )
             return
 
-    _cache_board_verdicts_local(history)
+    _cache_board_verdicts_local(history, user_id)
 
     client = get_blob_service_client()
     if not client:
         return
     try:
-        blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=BOARD_VERDICTS_FILE)
+        blob_client = client.get_blob_client(container=STATE_CONTAINER, blob=f"{user_id}/{BOARD_VERDICTS_FILE}")
         blob_client.upload_blob(json.dumps(history, indent=4), overwrite=True)
         logger.info("board_verdicts.json uploaded to Azure state container.")
     except Exception:
@@ -125,6 +126,7 @@ def persist_chairman_watchlist_passes(
     *,
     is_approved: bool,
     watchlist_symbols: list[str] | None = None,
+    user_id: str = DEFAULT_USER,
 ) -> int:
     """Append Pass cooldown entries after a compliant debate. Returns symbols updated."""
     if not is_approved:
@@ -137,9 +139,9 @@ def persist_chairman_watchlist_passes(
     if not new_entries:
         return 0
 
-    history = load_board_verdicts()
+    history = load_board_verdicts(user_id)
     for sym, records in new_entries.items():
         history.setdefault(sym, []).extend(records)
-    save_board_verdicts(history)
+    save_board_verdicts(history, user_id)
     logger.info("Persisted %d watchlist Pass verdict(s) to board_verdicts.json.", len(new_entries))
     return len(new_entries)
