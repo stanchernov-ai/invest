@@ -34,6 +34,8 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | Plan SaaS / multi-tenant (blocked on stabilization) | [`saas_technical_solution.md`](saas_technical_solution.md) |
 | Postgres schema for multi-user | [`saas_data_schema.md`](saas_data_schema.md) |
 | Deploy Azure Postgres + admin-provision beta users | [`saas_postgres_rollout.md`](saas_postgres_rollout.md) |
+| Plan client app (Expo, web + native) | [`saas_client_strategy.md`](saas_client_strategy.md) |
+| Multi-user singleton inventory / tenancy threading | [`saas_tenancy_gaps.md`](saas_tenancy_gaps.md) |
 | Edit briefing HTML palette / dark theme | [`briefing_style.md`](briefing_style.md) + `src/output/briefing_style.py` |
 | Edit briefing charts / QuickChart / section order | [`briefing_charts_handoff.md`](briefing_charts_handoff.md) + `src/output/reporting.py` |
 | Debug chairman retries / vote alignment | [`qa_layers.md`](qa_layers.md) § Debate-phase audit + `src/core/vote_engine.py` |
@@ -75,6 +77,8 @@ When auditing a blocked cycle: `.cursor/agent_state/ecosystem_state.json` (see `
 | [`saas_technical_solution.md`](saas_technical_solution.md) | **Planning** — multi-user architecture, Entra External ID, tenancy phases |
 | [`saas_data_schema.md`](saas_data_schema.md) | **Planning** — Postgres tables, indexes, `profile_json`, migration SQL |
 | [`saas_postgres_rollout.md`](saas_postgres_rollout.md) | **Planning** — Azure Postgres provisioning + admin-provision beta playbook |
+| [`saas_client_strategy.md`](saas_client_strategy.md) | **Planning** — Expo client, MSAL/Entra, briefing WebView, API contract, build phases |
+| [`saas_tenancy_gaps.md`](saas_tenancy_gaps.md) | **Planning** — global→per-user inventory, orchestration, Phase 0/1 checklist, evolve vs greenfield |
 | [`agent_guardrails.md`](agent_guardrails.md) | **Pointer only** → `.cursorrules` |
 
 ---
